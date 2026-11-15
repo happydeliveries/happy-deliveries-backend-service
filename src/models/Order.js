@@ -1486,7 +1486,6 @@ class Order {
     const query = `
       UPDATE orders o
       SET status = 'no_drivers_available',
-          cancellation_reason = 'No drivers available within timeout',
           cancelled_at = CURRENT_TIMESTAMP,
           updated_at = CURRENT_TIMESTAMP
       FROM driver_order_queue q
@@ -1549,7 +1548,6 @@ class Order {
     await db.query(
       `UPDATE orders
        SET status = 'cancelled',
-           cancellation_reason = 'Abandoned unpaid order timeout',
            cancelled_at = CURRENT_TIMESTAMP,
            updated_at = CURRENT_TIMESTAMP
        WHERE status IN ('pending', 'ordering_at_restaurant')
