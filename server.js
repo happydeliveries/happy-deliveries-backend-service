@@ -44,37 +44,8 @@ const io = new Server(server, {
 // ---------------------------------------------------------
 app.set('io', io);
 
-// Handle Connections
-io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-
-  // Drivers join a specific "drivers" room to receive updates
-  socket.on('join_driver_room', () => {
-    socket.join('drivers');
-    console.log(`Socket ${socket.id} joined drivers room`);
-  });
-
-  // Restaurant managers join this room to receive pending order notifications
-  socket.on('join_manager_room', () => {
-    socket.join('restaurant_managers');
-    console.log(`Socket ${socket.id} joined restaurant managers room`);
-  });
-
-  socket.on('join_manager', () => {
-    socket.join('restaurant_managers');
-    console.log(`Socket ${socket.id} joined restaurant managers room`);
-  });
-
-  socket.on('join_order', (orderId) => {
-    if (orderId) {
-      socket.join(`order_${orderId}`);
-    }
-  });
-
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-  });
-});
+// NOTE: All Socket.IO connection handlers (rooms, driver location, status updates)
+// live in ./src/socket/index.js and are registered below.
 
 // Rate Limiting
 const limiter = rateLimit({
@@ -126,6 +97,11 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Root route (Render health checks / browsers hitting the bare domain)
+app.get('/', (req, res) => {
+  res.redirect('/manager/login');
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/restaurants', restaurantRoutes);
@@ -161,22 +137,9 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
-  console.log(`Base URL on localhost: http://localhost:${PORT}`);
-  const os = require('os');
-  const nets = os.networkInterfaces();
-  let localIp = '10.206.76.95';
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-      if (net.family === 'IPv4' && !net.internal) {
-        localIp = net.address;
-        break;
-      }
-    }
-  }
-  console.log(`Base URL on IPv4: http://${localIp}:${PORT}`);
 });
 
 process.on('unhandledRejection', (err) => {

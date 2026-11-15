@@ -26,6 +26,20 @@ module.exports = (io) => {
   io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
     
+    // Drivers join the shared "drivers" room to receive newly published (paid) orders
+    socket.on('join_driver_room', () => {
+      socket.join('drivers');
+      console.log(`Socket ${socket.id} joined drivers room`);
+    });
+
+    // Restaurant managers join this room to receive pending order notifications
+    const joinManagerRoom = () => {
+      socket.join('restaurant_managers');
+      console.log(`Socket ${socket.id} joined restaurant managers room`);
+    };
+    socket.on('join_manager_room', joinManagerRoom);
+    socket.on('join_manager', joinManagerRoom);
+
     // Join user to their room based on user ID
     socket.on('join', (userId) => {
       socket.join(`user_${userId}`);
