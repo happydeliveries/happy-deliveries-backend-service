@@ -8,12 +8,16 @@ const {
   declineOrder,
   updateOrderStatus,
   verifyDeliveryCode,
-  getOrderTracking
+  getOrderTracking,
+  cancelOrder,
+  rateOrder
 } = require('../controllers/orderController');
 const { auth, authorize } = require('../middleware/auth');
 
 // Customer routes
 router.post('/', auth, authorize('customer'), createOrder);
+router.post('/:id/cancel', auth, authorize('customer'), cancelOrder);
+router.post('/:id/rate', auth, authorize('customer'), rateOrder);
 
 // Specific routes MUST come before parameterized routes
 router.get('/my', auth, authorize('customer', 'restaurant_manager', 'driver'), getMyOrders);

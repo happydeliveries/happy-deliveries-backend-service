@@ -47,11 +47,20 @@ app.set('io', io);
 // NOTE: All Socket.IO connection handlers (rooms, driver location, status updates)
 // live in ./src/socket/index.js and are registered below.
 
-// Rate Limiting
+// Rate Limiting (exempt high-frequency GPS location updates, live tracking polls, and payment webhooks)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests from this IP, please try again later.'
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) =>
+    req.path.includes('/drivers/location') ||
+    req.path.includes('/tracking') ||
+    req.path.includes('/payments/webhook'),
+  message: {
+    success: false,
+    error: 'Too many requests from this IP, please try again later.'
+  }
 });
 
 // 1. Setup View Engine
@@ -82,7 +91,12 @@ app.use('/api/', limiter);
 
 app.use(cors());
 app.use(morgan('dev'));
-app.use(express.json());
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files
@@ -125,6 +139,19 @@ app.get(['/driver', '/driver/register', '/driver/apply'], (req, res) => {
 
 // Socket.io setup 
 require('./src/socket/index')(io);
+
+// Periodic expired order & stale unpaid order processor (runs every 60 seconds)
+const Order = require('./src/models/Order');
+const expiredOrdersInterval = setInterval(async () => {
+  try {
+    await Order.processExpiredOrders();
+  } catch (err) {
+    console.warn('Order expiration sweep warning:', err.message);
+  }
+}, 60 * 1000);
+if (expiredOrdersInterval.unref) {
+  expiredOrdersInterval.unref();
+}
 
 app.use(errorHandler);
 

@@ -32,7 +32,7 @@ exports.updateLocation = async (req, res) => {
       `INSERT INTO delivery_tracking (order_id, driver_id, location, accuracy, speed)
        SELECT o.id, $1, POINT($2, $3), $4, $5
        FROM orders o
-       WHERE o.driver_id = $1 AND o.status IN ('accepted_by_driver', 'picked_up', 'on_the_way', 'arrived')`,
+       WHERE o.driver_id = $1 AND o.status IN ('accepted_by_driver', 'order_ready', 'picked_up', 'on_the_way', 'arrived')`,
       [driver.id, lng, lat, accuracy || null, speed || null]
     ).catch(() => {});
     
@@ -40,7 +40,7 @@ exports.updateLocation = async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       const orders = await db.query(
-        `SELECT id FROM orders WHERE driver_id = $1 AND status IN ('accepted_by_driver', 'picked_up', 'on_the_way', 'arrived')`,
+        `SELECT id FROM orders WHERE driver_id = $1 AND status IN ('accepted_by_driver', 'order_ready', 'picked_up', 'on_the_way', 'arrived')`,
         [driver.id]
       );
       
@@ -107,11 +107,23 @@ exports.getStats = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Driver profile not found' });
     }
 
+    const todayEarningsRes = await db.query(
+      `SELECT
+         COALESCE(SUM(net_amount), 0) AS today_earnings,
+         COUNT(*)::int AS today_deliveries
+       FROM earnings
+       WHERE driver_id = $1
+         AND created_at >= CURRENT_DATE`,
+      [driver.id]
+    );
+    const todayRow = todayEarningsRes.rows[0] || {};
+
     // Logic for dashboard stats
     const stats = {
       totalEarnings: parseFloat(driver.total_earnings || 0),
-      todayEarnings: 0, // You can calculate this from earnings table
-      totalDeliveries: parseInt(driver.total_deliveries || 0),
+      todayEarnings: parseFloat(todayRow.today_earnings || 0),
+      todayDeliveries: parseInt(todayRow.today_deliveries || 0, 10),
+      totalDeliveries: parseInt(driver.total_deliveries || 0, 10),
       averageRating: parseFloat(driver.average_rating || 5.0),
       isAvailable: driver.is_available
     };
@@ -193,12 +205,20 @@ exports.getDriverProfile = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Driver profile not found' });
     }
 
-    // Convert potential string decimals to actual numbers
+    const maskValue = (val) => {
+      if (!val || typeof val !== 'string') return null;
+      return val.length > 4 ? `${'*'.repeat(val.length - 4)}${val.slice(-4)}` : '****';
+    };
+
+    // Convert potential string decimals to actual numbers and mask sensitive PII
     const formattedDriver = {
       ...driver,
+      id_number: maskValue(driver.id_number),
+      account_number: maskValue(driver.account_number),
       average_rating: parseFloat(driver.average_rating || 0),
       total_earnings: parseFloat(driver.total_earnings || 0)
     };
+    delete formattedDriver.password_hash;
 
     res.json({
       success: true,

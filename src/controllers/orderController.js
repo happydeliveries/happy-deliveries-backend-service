@@ -222,12 +222,13 @@ exports.updateOrderStatus = async (req, res) => {
         });
       }
       
-      // Valid driver transitions: accepted → picked_up → on_the_way → arrived → delivered
+      // Valid driver transitions: accepted_by_driver / order_ready → picked_up → on_the_way → arrived
       const validDriverTransitions = {
-        'accepted_by_driver': ['picked_up', 'on_the_way', 'arrived', 'delivered'],
-        'picked_up': ['on_the_way', 'arrived', 'delivered'],
-        'on_the_way': ['arrived', 'delivered'],
-        'arrived': ['delivered'],
+        'accepted_by_driver': ['picked_up', 'on_the_way', 'arrived'],
+        'order_ready': ['picked_up', 'on_the_way', 'arrived'],
+        'picked_up': ['on_the_way', 'arrived'],
+        'on_the_way': ['arrived'],
+        'arrived': [],
         'delivered': []
       };
       
@@ -244,7 +245,7 @@ exports.updateOrderStatus = async (req, res) => {
     } else if (userRole === 'restaurant_manager') {
       // Verify manager owns the restaurant
       const managerRes = await db.query(
-        `SELECT r.id FROM restaurants r
+        `SELECT r.id, rm.id AS manager_id FROM restaurants r
          JOIN restaurant_managers rm ON r.manager_id = rm.id
          WHERE r.id = $1 AND rm.user_id = $2`,
         [order.restaurant_id, req.user.id]
@@ -256,17 +257,36 @@ exports.updateOrderStatus = async (req, res) => {
           error: 'Not authorized to update this order'
         });
       }
+
+      const managerId = managerRes.rows[0].manager_id;
       
-      // Valid manager transitions: pending → ordering_at_restaurant (accept) or cancelled (reject)
+      // Valid manager transitions
       const validManagerTransitions = {
         'pending': ['ordering_at_restaurant', 'cancelled'],
         'ordering_at_restaurant': ['order_ready', 'cancelled'],
         'order_ready': ['picked_up', 'cancelled'],
-        'accepted_by_driver': ['ordering_at_restaurant', 'order_ready', 'cancelled']
+        'accepted_by_driver': ['order_ready', 'cancelled']
       };
       
       if (validManagerTransitions[order.status]?.includes(status)) {
         allowed = true;
+      }
+
+      if (allowed && status === 'order_ready' && order.payment_status !== 'completed') {
+        return res.status(400).json({
+          success: false,
+          error: 'Cannot mark order ready before customer payment is completed'
+        });
+      }
+
+      if (allowed && status === 'ordering_at_restaurant' && order.status === 'pending') {
+        const acceptedOrder = await Order.acceptByManager(orderId, managerId);
+        return res.json({ success: true, data: acceptedOrder });
+      }
+
+      if (allowed && status === 'cancelled') {
+        const rejectedOrder = await Order.rejectByManager(orderId, managerId, req.body.reason || 'Cancelled by restaurant');
+        return res.json({ success: true, data: rejectedOrder });
       }
     }
     
@@ -362,6 +382,45 @@ exports.getOrderTracking = async (req, res) => {
   } catch (error) {
     console.error('Get order tracking error:', error);
     res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Cancel order (customer before pickup)
+exports.cancelOrder = async (req, res) => {
+  try {
+    const reason = req.body?.reason || 'Cancelled by customer';
+    const cancelledOrder = await Order.cancelByCustomer(req.params.id, req.user.id, reason);
+    res.json({
+      success: true,
+      data: cancelledOrder
+    });
+  } catch (error) {
+    console.error('Cancel order error:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Rate delivered order (customer)
+exports.rateOrder = async (req, res) => {
+  try {
+    const { restaurant_rating, driver_rating } = req.body || {};
+    const ratedOrder = await Order.rateOrder(req.params.id, req.user.id, {
+      restaurant_rating,
+      driver_rating
+    });
+    res.json({
+      success: true,
+      data: ratedOrder
+    });
+  } catch (error) {
+    console.error('Rate order error:', error);
+    res.status(400).json({
       success: false,
       error: error.message
     });

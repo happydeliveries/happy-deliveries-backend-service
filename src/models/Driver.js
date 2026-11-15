@@ -658,7 +658,13 @@ class Driver {
     `;
     
     const result = await db.query(query, [driverId]);
-    return result.rows;
+    return result.rows.map(row => {
+      const copy = { ...row };
+      delete copy.verification_code;
+      delete copy.code_expires_at;
+      delete copy.code_used_at;
+      return copy;
+    });
   }
 
   // Get available orders for driver (only paid orders that have been accepted by manager and not yet taken)
@@ -694,13 +700,29 @@ class Driver {
         AND o.payment_status = 'completed'
         AND o.driver_id IS NULL
         AND d.is_available = true
+        AND d.is_approved = true
+        AND (
+          d.current_location IS NULL
+          OR r.location IS NULL
+          OR ST_DWithin(
+            ST_SetSRID(ST_MakePoint(d.current_location[0], d.current_location[1]), 4326)::geography,
+            r.location::geography,
+            25000
+          )
+        )
         AND (q.seen_by_driver_ids IS NULL OR NOT (q.seen_by_driver_ids @> ARRAY[$1]::uuid[]))
         AND (q.declined_by_driver_ids IS NULL OR NOT (q.declined_by_driver_ids @> ARRAY[$1]::uuid[]))
-      ORDER BY q.created_at ASC
+      ORDER BY distance_to_restaurant ASC, q.created_at ASC
       LIMIT 10
     `;
     const result = await db.query(query, [driverId]);
-    return result.rows;
+    return result.rows.map(row => {
+      const copy = { ...row };
+      delete copy.verification_code;
+      delete copy.code_expires_at;
+      delete copy.code_used_at;
+      return copy;
+    });
   }
 }
 

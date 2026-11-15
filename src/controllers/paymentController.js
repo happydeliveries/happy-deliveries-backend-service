@@ -36,6 +36,27 @@ function normalizeDbPaymentMethod(channelOrMethod) {
   return 'card';
 }
 
+function validatePaystackAmountAndCurrency(psData, order) {
+  const expectedSubunit = Math.max(100, Math.round(Number(order.total_amount || 0) * 100));
+  const expectedCurrency = (process.env.PAYSTACK_CURRENCY || 'ZAR').toUpperCase();
+  const paidSubunit = Number(psData?.amount ?? 0);
+  const paidCurrency = String(psData?.currency || expectedCurrency).toUpperCase();
+
+  if (paidSubunit < expectedSubunit) {
+    return {
+      valid: false,
+      error: `Payment amount mismatch: expected ${expectedSubunit} (${expectedCurrency} subunits) but received ${paidSubunit}`,
+    };
+  }
+  if (paidCurrency !== expectedCurrency) {
+    return {
+      valid: false,
+      error: `Payment currency mismatch: expected ${expectedCurrency} but received ${paidCurrency}`,
+    };
+  }
+  return { valid: true };
+}
+
 /**
  * Shared helper that marks the payment record completed, marks the order paid,
  * activates the driver_order_queue, and broadcasts real-time Socket.IO events
@@ -186,7 +207,7 @@ exports.initializePaystackPayment = async (req, res) => {
             currency,
             reference,
             callback_url: callbackUrl,
-            channels: ['card', 'bank', 'eft', 'qr', 'mobile_money', 'ussd', 'bank_transfer'],
+            channels: currency === 'ZAR' ? ['card', 'eft', 'qr', 'bank_transfer'] : ['card', 'bank', 'eft', 'qr', 'mobile_money', 'ussd', 'bank_transfer'],
             metadata: {
               order_id: order.id,
               order_number: order.order_number,
@@ -347,6 +368,12 @@ exports.handlePaystackCallback = async (req, res) => {
     }
 
     const secretKey = getPaystackSecretKey();
+    const existingGatewayInfo =
+      typeof payment?.gateway_response === 'string'
+        ? (() => { try { return JSON.parse(payment.gateway_response); } catch { return {}; } })()
+        : payment?.gateway_response || {};
+    const isHostedFallbackMode = existingGatewayInfo.mode === 'paystack_checkout';
+
     let verifiedGatewayData = {
       gateway: 'paystack',
       status: 'success',
@@ -357,7 +384,10 @@ exports.handlePaystackCallback = async (req, res) => {
       currency: process.env.PAYSTACK_CURRENCY || 'ZAR',
     };
 
-    if (secretKey && reference) {
+    if (secretKey && !isHostedFallbackMode) {
+      if (!reference) {
+        return res.status(400).send('Missing Paystack transaction reference.');
+      }
       try {
         const verifyRes = await axios.get(
           `${PAYSTACK_BASE_URL}/transaction/verify/${encodeURIComponent(reference)}`,
@@ -368,7 +398,7 @@ exports.handlePaystackCallback = async (req, res) => {
         );
 
         const psData = verifyRes.data?.data;
-        if (psData && psData.status !== 'success') {
+        if (!psData || psData.status !== 'success') {
           return res.status(400).render('payment/paystack-success', {
             title: 'Payment Not Completed',
             success: false,
@@ -376,20 +406,38 @@ exports.handlePaystackCallback = async (req, res) => {
             reference,
             amount: Number(order.total_amount || 0).toFixed(2),
             currency: process.env.PAYSTACK_CURRENCY || 'ZAR',
-            errorMessage: `Paystack reported transaction status: "${psData.status}". Please return to the app and try again.`,
+            errorMessage: `Paystack reported transaction status: "${psData?.status || 'failed'}". Please return to the app and try again.`,
           });
         }
-        if (psData) {
-          verifiedGatewayData = {
-            gateway: 'paystack',
-            ...psData,
-          };
+
+        const amountCheck = validatePaystackAmountAndCurrency(psData, order);
+        if (!amountCheck.valid) {
+          return res.status(400).render('payment/paystack-success', {
+            title: 'Payment Verification Failed',
+            success: false,
+            order,
+            reference,
+            amount: Number(order.total_amount || 0).toFixed(2),
+            currency: process.env.PAYSTACK_CURRENCY || 'ZAR',
+            errorMessage: amountCheck.error,
+          });
         }
+
+        verifiedGatewayData = {
+          gateway: 'paystack',
+          ...psData,
+        };
       } catch (verifyErr) {
-        console.warn(
-          '[handlePaystackCallback] Live verify warning (proceeding if hosted test checkout):',
-          verifyErr.response?.data || verifyErr.message
-        );
+        console.error('[handlePaystackCallback] Paystack verify error:', verifyErr.response?.data || verifyErr.message);
+        return res.status(400).render('payment/paystack-success', {
+          title: 'Payment Verification Failed',
+          success: false,
+          order,
+          reference,
+          amount: Number(order.total_amount || 0).toFixed(2),
+          currency: process.env.PAYSTACK_CURRENCY || 'ZAR',
+          errorMessage: 'Could not verify transaction with Paystack. Please return to the app and tap Verify Payment.',
+        });
       }
     }
 
@@ -482,10 +530,11 @@ exports.verifyPaystackPayment = async (req, res) => {
 
     const activeRef = reference || payment?.gateway_transaction_id || `PSK_${Date.now()}`;
     const secretKey = getPaystackSecretKey();
+    const isLiveKey = Boolean(secretKey && secretKey.startsWith('sk_live_'));
 
     let verifiedGatewayData = null;
 
-    if (secretKey && !complete_checkout) {
+    if (secretKey && (isLiveKey || !complete_checkout)) {
       try {
         const verifyRes = await axios.get(
           `${PAYSTACK_BASE_URL}/transaction/verify/${encodeURIComponent(activeRef)}`,
@@ -497,6 +546,14 @@ exports.verifyPaystackPayment = async (req, res) => {
 
         const psData = verifyRes.data?.data;
         if (psData?.status === 'success') {
+          const amountCheck = validatePaystackAmountAndCurrency(psData, order);
+          if (!amountCheck.valid) {
+            return res.status(400).json({
+              success: false,
+              verified: false,
+              error: amountCheck.error,
+            });
+          }
           verifiedGatewayData = {
             gateway: 'paystack',
             ...psData,
@@ -510,7 +567,7 @@ exports.verifyPaystackPayment = async (req, res) => {
           });
         }
       } catch (apiErr) {
-        if (!complete_checkout) {
+        if (isLiveKey || !complete_checkout) {
           return res.status(400).json({
             success: false,
             verified: false,
@@ -523,7 +580,14 @@ exports.verifyPaystackPayment = async (req, res) => {
     }
 
     if (!verifiedGatewayData) {
-      // If using hosted Paystack checkout and customer hasn't completed it yet nor submitted in-app Paystack form
+      if (isLiveKey) {
+        return res.status(400).json({
+          success: false,
+          verified: false,
+          error: 'Live Paystack verification is required before completing payment.',
+        });
+      }
+      // If using hosted Paystack checkout and customer hasn't completed it yet nor submitted in-app test Paystack form
       if (!complete_checkout && payment?.payment_status !== 'completed') {
         return res.status(400).json({
           success: false,
@@ -582,13 +646,14 @@ exports.handlePaystackWebhook = async (req, res) => {
     const secretKey = getPaystackSecretKey();
     if (secretKey) {
       const signature = req.headers['x-paystack-signature'];
+      const payloadBuffer = req.rawBody || Buffer.from(JSON.stringify(req.body || {}));
       const hash = crypto
         .createHmac('sha512', secretKey)
-        .update(JSON.stringify(req.body))
+        .update(payloadBuffer)
         .digest('hex');
 
-      if (signature && hash !== signature) {
-        return res.status(401).json({ success: false, error: 'Invalid Paystack signature' });
+      if (!signature || hash !== signature) {
+        return res.status(401).json({ success: false, error: 'Invalid or missing Paystack signature' });
       }
     }
 
@@ -606,6 +671,11 @@ exports.handlePaystackWebhook = async (req, res) => {
       if (resolvedOrderId) {
         const order = await Order.findById(resolvedOrderId);
         if (order && order.payment_status !== 'completed') {
+          const amountCheck = validatePaystackAmountAndCurrency(psData, order);
+          if (!amountCheck.valid) {
+            console.warn('[handlePaystackWebhook] Amount/currency mismatch:', amountCheck.error);
+            return res.status(400).json({ success: false, error: amountCheck.error });
+          }
           await finalizeOrderPayment({
             app: req.app,
             order,
@@ -626,7 +696,7 @@ exports.handlePaystackWebhook = async (req, res) => {
   }
 };
 
-// Process payment for order (direct / Paystack fallback)
+// Process payment for order (verifies with Paystack when secretKey is configured in live mode)
 exports.processPayment = async (req, res) => {
   try {
     const { order_id, payment_method, payment_details, paystack_reference } = req.body;
@@ -681,6 +751,47 @@ exports.processPayment = async (req, res) => {
     const existingPayment = await Payment.findByOrderId(order_id);
     const chosenMethod = payment_method || order.payment_method || 'card';
     const reference = paystack_reference || existingPayment?.gateway_transaction_id || `PSK_${Date.now()}`;
+    const secretKey = getPaystackSecretKey();
+
+    let gatewayResponse = {
+      gateway: 'paystack',
+      status: 'success',
+      reference,
+      amount: Math.round(Number(order.total_amount) * 100),
+      currency: process.env.PAYSTACK_CURRENCY || 'ZAR',
+      details: payment_details || null,
+    };
+
+    if (secretKey && secretKey.startsWith('sk_live_')) {
+      if (!paystack_reference && !existingPayment?.gateway_transaction_id) {
+        return res.status(400).json({
+          success: false,
+          error: 'A valid Paystack transaction reference is required to process payment.',
+        });
+      }
+      const verifyRes = await axios.get(
+        `${PAYSTACK_BASE_URL}/transaction/verify/${encodeURIComponent(reference)}`,
+        {
+          headers: { Authorization: `Bearer ${secretKey}` },
+          timeout: 12000,
+        }
+      );
+      const psData = verifyRes.data?.data;
+      if (!psData || psData.status !== 'success') {
+        return res.status(400).json({
+          success: false,
+          error: `Paystack transaction not completed (status: ${psData?.status || 'pending'})`,
+        });
+      }
+      const amountCheck = validatePaystackAmountAndCurrency(psData, order);
+      if (!amountCheck.valid) {
+        return res.status(400).json({
+          success: false,
+          error: amountCheck.error,
+        });
+      }
+      gatewayResponse = { gateway: 'paystack', ...psData };
+    }
 
     const { payment, updatedOrder } = await finalizeOrderPayment({
       app: req.app,
@@ -689,14 +800,7 @@ exports.processPayment = async (req, res) => {
       paymentRecord: existingPayment,
       paymentMethod: chosenMethod,
       reference,
-      gatewayResponse: {
-        gateway: 'paystack',
-        status: 'success',
-        reference,
-        amount: Math.round(Number(order.total_amount) * 100),
-        currency: process.env.PAYSTACK_CURRENCY || 'ZAR',
-        details: payment_details || null,
-      },
+      gatewayResponse,
     });
     
     res.json({

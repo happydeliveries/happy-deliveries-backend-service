@@ -1694,18 +1694,39 @@ router.patch('/api/orders/:id/status', isLoggedInApi, async (req, res) => {
         }
 
         const Order = getModel.Order();
+        const order = await Order.findById(req.params.id, req.session.user.id, 'restaurant_manager');
+        if (!order) {
+            return res.status(404).json({ success: false, error: 'Order not found or access denied' });
+        }
+
+        const validManagerTransitions = {
+            'pending': ['ordering_at_restaurant', 'cancelled'],
+            'ordering_at_restaurant': ['order_ready', 'cancelled'],
+            'order_ready': ['picked_up', 'cancelled'],
+            'accepted_by_driver': ['order_ready', 'cancelled']
+        };
+
+        if (!validManagerTransitions[order.status]?.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                error: `Invalid manager status transition from ${order.status} to ${status}`
+            });
+        }
+
+        if (status === 'order_ready' && order.payment_status !== 'completed') {
+            return res.status(400).json({
+                success: false,
+                error: 'Cannot mark order ready before customer payment is completed'
+            });
+        }
+
         if (status === 'cancelled') {
-            const cancelledOrder = await Order.rejectByManager(req.params.id, req.session.user.id);
+            const cancelledOrder = await Order.rejectByManager(req.params.id, req.session.user.id, req.body.reason || 'Rejected by restaurant');
             return res.json({ success: true, order: cancelledOrder });
         }
         if (status === 'ordering_at_restaurant') {
             const acceptedOrder = await Order.acceptByManager(req.params.id, req.session.user.id);
             return res.json({ success: true, order: acceptedOrder });
-        }
-
-        const order = await Order.findById(req.params.id, req.session.user.id, 'restaurant_manager');
-        if (!order) {
-            return res.status(404).json({ success: false, error: 'Order not found or access denied' });
         }
 
         const updatedOrder = await Order.updateStatus(req.params.id, status, null);

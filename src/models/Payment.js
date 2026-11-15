@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const axios = require('axios');
 
 class Payment {
   // Create payment record
@@ -215,9 +216,11 @@ class Payment {
       `;
       
       const updateResult = await client.query(updateQuery, [paymentId]);
-      
-      // Create refund record (you might want a separate refunds table)
-      // For now, we'll just log it
+
+      await client.query(
+        `UPDATE orders SET payment_status = 'refunded', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        [payment.order_id]
+      );
       
       await client.query('COMMIT');
       return updateResult.rows[0];
@@ -227,6 +230,67 @@ class Payment {
       throw error;
     } finally {
       client.release();
+    }
+  }
+
+  // Refund payment by orderId (calls Paystack Refund API when secret key is configured)
+  static async refundByOrderId(orderId, reason = 'Order cancelled') {
+    try {
+      const payment = await this.findByOrderId(orderId);
+      if (!payment || payment.payment_status !== 'completed') {
+        return null;
+      }
+
+      const secretKey = (process.env.PAYSTACK_SECRET_KEY || '').trim();
+      const hasValidKey = secretKey && secretKey !== '-' && !secretKey.startsWith('your-');
+      let gatewayRefundData = null;
+
+      if (hasValidKey && payment.gateway_transaction_id) {
+        try {
+          const refundRes = await axios.post(
+            'https://api.paystack.co/refund',
+            {
+              transaction: payment.gateway_transaction_id,
+              merchant_note: reason,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${secretKey}`,
+                'Content-Type': 'application/json',
+              },
+              timeout: 12000,
+            }
+          );
+          gatewayRefundData = refundRes.data?.data || { status: 'refund_initiated' };
+        } catch (err) {
+          console.warn('[Payment.refundByOrderId] Paystack refund API warning:', err.response?.data || err.message);
+          gatewayRefundData = {
+            status: 'local_refund_recorded',
+            reason,
+            error: err.response?.data?.message || err.message,
+          };
+        }
+      }
+
+      const refunded = await this.processRefund(payment.id, payment.amount, reason);
+      if (gatewayRefundData && refunded) {
+        const mergedResponse = {
+          ...(typeof refunded.gateway_response === 'object' && refunded.gateway_response ? refunded.gateway_response : {}),
+          refund: {
+            reason,
+            refunded_at: new Date().toISOString(),
+            gateway: gatewayRefundData,
+          },
+        };
+        await db.query(
+          `UPDATE payments SET gateway_response = $2 WHERE id = $1`,
+          [refunded.id, JSON.stringify(mergedResponse)]
+        ).catch(() => {});
+      }
+      return refunded;
+    } catch (err) {
+      console.error('[Payment.refundByOrderId] Failed to process refund:', err.message);
+      return null;
     }
   }
 }

@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const crypto = require('crypto');
-const { emitOrderUpdate, emitDriverLocation } = require('../socket');
+const Payment = require('./Payment');
+const { emitOrderUpdate, emitUserEvent, emitDriverLocation } = require('../socket');
 
 function normalizePointCoords(pt) {
   if (!pt) return null;
@@ -20,8 +21,8 @@ function normalizePointCoords(pt) {
   }
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
   if (x === 0 && y === 0) return null;
-  // Auto-correct if lat/lng were historically stored reversed (e.g. South Africa lat ~ -22..-35, lng ~ 16..33)
-  if (x < 0 && y > 0) {
+  // Auto-correct only if latitude (y) is outside [-90, 90] or South Africa lat/lng were clearly reversed
+  if ((Math.abs(y) > 90 && Math.abs(x) <= 90) || (x < -15 && x > -38 && y > 15 && y < 35)) {
     const tmp = x;
     x = y;
     y = tmp;
@@ -34,8 +35,27 @@ function normalizePointCoords(pt) {
   };
 }
 
+function computeSelectedOptionsDelta(selectedOptions) {
+  if (!selectedOptions || typeof selectedOptions !== 'object') return 0;
+  let delta = 0;
+  for (const val of Object.values(selectedOptions)) {
+    if (Array.isArray(val)) {
+      for (const entry of val) {
+        if (entry && typeof entry === 'object') {
+          const p = Number(entry.price ?? entry.priceDelta ?? 0);
+          if (Number.isFinite(p) && p > 0) delta += p;
+        }
+      }
+    } else if (val && typeof val === 'object') {
+      const p = Number(val.price ?? val.priceDelta ?? 0);
+      if (Number.isFinite(p) && p > 0) delta += p;
+    }
+  }
+  return delta;
+}
+
 class Order {
-  // Create new order
+  // Create new order (with server-side item & price verification)
   static async create(customerId, orderData) {
     const {
       restaurant_id,
@@ -44,14 +64,18 @@ class Order {
       delivery_instructions,
       delivery_address,
       payment_method = 'card',
-      subtotal,
-      delivery_fee,
-      tax_amount,
+      delivery_fee: clientDeliveryFee,
+      tax_amount: clientTaxAmount,
       tip_amount = 0
     } = orderData;
+
+    if (!restaurant_id) {
+      throw new Error('restaurant_id is required');
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new Error('Order must contain at least one item');
+    }
     
-    // Calculate total
-    const total_amount = Number(subtotal) + Number(delivery_fee) + Number(tax_amount) + Number(tip_amount || 0);
     const order_number = `ORD-${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
     
     // Start transaction
@@ -59,6 +83,82 @@ class Order {
     
     try {
       await client.query('BEGIN');
+
+      // 1. Validate restaurant is active and accepting orders
+      const restRes = await client.query(
+        `SELECT id, name, is_active, is_accepting_orders FROM restaurants WHERE id = $1`,
+        [restaurant_id]
+      );
+      if (restRes.rows.length === 0) {
+        throw new Error('Restaurant not found');
+      }
+      const restaurant = restRes.rows[0];
+      if (restaurant.is_active === false || restaurant.is_accepting_orders === false) {
+        throw new Error('This restaurant is currently not accepting orders');
+      }
+
+      // 2. Fetch authoritative menu item prices from DB
+      const itemIds = items.map((i) => i.menu_item_id).filter(Boolean);
+      const dbItemsRes = await client.query(
+        `SELECT id, name, restaurant_id, price, discounted_price, is_available
+         FROM menu_items
+         WHERE id = ANY($1::uuid[])`,
+        [itemIds]
+      );
+      const dbItemMap = new Map(dbItemsRes.rows.map((r) => [r.id, r]));
+
+      let verifiedSubtotal = 0;
+      const verifiedItems = [];
+
+      for (const item of items) {
+        const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
+        const dbItem = dbItemMap.get(item.menu_item_id);
+        if (!dbItem) {
+          throw new Error('One or more menu items were not found');
+        }
+        if (dbItem.restaurant_id !== restaurant_id) {
+          throw new Error(`Item "${dbItem.name}" does not belong to this restaurant`);
+        }
+        if (dbItem.is_available === false) {
+          throw new Error(`Item "${dbItem.name}" is currently unavailable`);
+        }
+
+        const basePrice =
+          dbItem.discounted_price !== null &&
+          dbItem.discounted_price !== undefined &&
+          Number(dbItem.discounted_price) > 0 &&
+          Number(dbItem.discounted_price) < Number(dbItem.price)
+            ? Number(dbItem.discounted_price)
+            : Number(dbItem.price);
+
+        const optionsDelta = computeSelectedOptionsDelta(item.selected_options);
+        const authoritativeUnitPrice = +(basePrice + optionsDelta).toFixed(2);
+        verifiedSubtotal += authoritativeUnitPrice * qty;
+
+        verifiedItems.push({
+          ...item,
+          quantity: qty,
+          unit_price: authoritativeUnitPrice,
+        });
+      }
+
+      verifiedSubtotal = +verifiedSubtotal.toFixed(2);
+      const verifiedDeliveryFee = Math.max(
+        0,
+        Number.isFinite(Number(clientDeliveryFee)) ? +Number(clientDeliveryFee).toFixed(2) : 3.99
+      );
+      const computedTax = +(verifiedSubtotal * 0.08).toFixed(2);
+      const verifiedTaxAmount = Math.max(
+        computedTax,
+        Number.isFinite(Number(clientTaxAmount)) ? +Number(clientTaxAmount).toFixed(2) : computedTax
+      );
+      const verifiedTipAmount = Math.max(0, Number.isFinite(Number(tip_amount)) ? +Number(tip_amount).toFixed(2) : 0);
+      const total_amount = +(
+        verifiedSubtotal +
+        verifiedDeliveryFee +
+        verifiedTaxAmount +
+        verifiedTipAmount
+      ).toFixed(2);
       
       // Create order
       const orderQuery = `
@@ -77,7 +177,7 @@ class Order {
           total_amount,
           status,
           driver_acceptance_deadline
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'pending', NOW() + INTERVAL '150 seconds')
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'pending', NOW() + INTERVAL '1800 seconds')
         RETURNING *
       `;
       
@@ -89,17 +189,17 @@ class Order {
         delivery_instructions,
         JSON.stringify(delivery_address),
         payment_method,
-        Number(subtotal),
-        Number(delivery_fee),
-        Number(tax_amount),
-        Number(tip_amount || 0),
+        verifiedSubtotal,
+        verifiedDeliveryFee,
+        verifiedTaxAmount,
+        verifiedTipAmount,
         total_amount
       ]);
       
       const order = orderResult.rows[0];
       
       // Add order items
-      for (const item of items) {
+      for (const item of verifiedItems) {
         const itemQuery = `
           INSERT INTO order_items (
             order_id,
@@ -240,10 +340,10 @@ class Order {
       }
     }
 
-    // If order is picked_up or accepted_by_driver and driver has not sent GPS coordinates yet, default to restaurant coordinates
+    // Only fall back to restaurant coordinates right when picked_up at restaurant if no GPS ping has arrived yet
     if (
       !normalizedDriverLoc &&
-      ['accepted_by_driver', 'picked_up', 'on_the_way'].includes(row.status) &&
+      row.status === 'picked_up' &&
       row.restaurant_location &&
       typeof row.restaurant_location === 'object' &&
       Number.isFinite(row.restaurant_location.latitude)
@@ -253,6 +353,23 @@ class Order {
 
     if (normalizedDriverLoc) {
       row.driver_location = normalizedDriverLoc;
+    }
+
+    // Automatically ensure a valid delivery verification code for active transit orders
+    if (['picked_up', 'on_the_way', 'arrived'].includes(row.status) && !row.code_used_at) {
+      const now = new Date();
+      if (!row.verification_code || !row.code_expires_at || new Date(row.code_expires_at) <= now) {
+        try {
+          const refreshed = await this.ensureVerificationCode(orderId);
+          if (refreshed) {
+            row.verification_code = refreshed.verification_code;
+            row.code_expires_at = refreshed.code_expires_at;
+            row.code_used_at = refreshed.code_used_at;
+          }
+        } catch {
+          // ignore
+        }
+      }
     }
 
     return row;
@@ -287,7 +404,7 @@ class Order {
 
   static async generateVerificationCode(orderId) {
     const verificationCode = this.createReadableVerificationCode(8);
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 60 minutes (valid for entire delivery window)
 
     const query = `
       UPDATE orders
@@ -303,16 +420,33 @@ class Order {
     const result = await db.query(query, [orderId, verificationCode, expiresAt.toISOString()]);
     const order = result.rows[0];
 
-    if (order && emitOrderUpdate) {
-      emitOrderUpdate(order.id, {
-        type: 'delivery_code_generated',
-        order: {
-          id: order.id,
-          verification_code: order.verification_code,
-          code_expires_at: order.code_expires_at,
-          code_used_at: order.code_used_at
+    if (order) {
+      try {
+        const custRes = await db.query('SELECT user_id FROM customers WHERE id = $1', [order.customer_id]);
+        const customerUserId = custRes.rows[0]?.user_id;
+        if (customerUserId && emitUserEvent) {
+          emitUserEvent(customerUserId, 'order_update', {
+            type: 'delivery_code_generated',
+            orderId: order.id,
+            status: order.status,
+            order: {
+              id: order.id,
+              verification_code: order.verification_code,
+              code_expires_at: order.code_expires_at,
+              code_used_at: order.code_used_at,
+            },
+          });
         }
-      });
+      } catch {
+        // ignore
+      }
+      if (emitOrderUpdate) {
+        emitOrderUpdate(order.id, {
+          type: 'delivery_code_generated',
+          orderId: order.id,
+          status: order.status,
+        });
+      }
     }
 
     return order;
@@ -409,18 +543,31 @@ class Order {
       const updateResult = await client.query(updateQuery, [orderId]);
       const updatedOrder = updateResult.rows[0];
 
-      await client.query(
-        `UPDATE drivers SET current_status = 'available', is_available = true WHERE id = $1`,
-        [driverId]
-      );
+      const deliveryFee = Number(order.delivery_fee || 0);
+      const tipAmount = Number(order.tip_amount || 0);
+      const subtotalAmount = Number(order.subtotal || order.total_amount || 0);
+      const driverEarnings = +(
+        (deliveryFee > 0 ? deliveryFee * 0.7 : Number(order.total_amount || 0) * 0.15) + tipAmount
+      ).toFixed(2);
+      const commissionPercentage = 15;
+      const commissionAmount = +(subtotalAmount * 0.15).toFixed(2);
 
-      const driverEarnings = Number(order.total_amount) * 0.7;
-      const commissionAmount = Number(order.total_amount) * 0.3;
+      await client.query(
+        `UPDATE drivers
+         SET current_status = 'available',
+             is_available = true,
+             total_deliveries = COALESCE(total_deliveries, 0) + 1,
+             total_earnings = COALESCE(total_earnings, 0) + $2,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [driverId, driverEarnings]
+      );
 
       await client.query(
         `INSERT INTO earnings (order_id, driver_id, restaurant_id, amount, commission_percentage, commission_amount, net_amount)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [orderId, driverId, order.restaurant_id, driverEarnings, 30, commissionAmount, driverEarnings]
+         SELECT $1, $2, $3, $4, $5, $6, $7
+         WHERE NOT EXISTS (SELECT 1 FROM earnings WHERE order_id = $1)`,
+        [orderId, driverId, order.restaurant_id, driverEarnings, commissionPercentage, commissionAmount, driverEarnings]
       );
 
       await client.query(
@@ -615,6 +762,12 @@ class Order {
 
       await client.query('COMMIT');
 
+      // If the order was already paid, automatically refund the customer
+      if (existingOrder.payment_status === 'completed') {
+        await Payment.refundByOrderId(orderId, 'Order rejected/cancelled by restaurant manager');
+        updatedOrder.payment_status = 'refunded';
+      }
+
       if (emitOrderUpdate) {
         emitOrderUpdate(orderId, {
           type: 'order_rejected_by_manager',
@@ -628,7 +781,9 @@ class Order {
           customerUserId,
           'customer',
           'Order Rejected',
-          'Sorry, the restaurant rejected your order and it has been cancelled.',
+          existingOrder.payment_status === 'completed'
+            ? 'Sorry, the restaurant cancelled your order. A full refund has been initiated.'
+            : 'Sorry, the restaurant rejected your order and it has been cancelled.',
           'order_cancelled',
           { order_id: orderId, status: 'cancelled' }
         );
@@ -641,6 +796,134 @@ class Order {
     } finally {
       client.release();
     }
+  }
+
+  // Customer cancels order (allowed while pending or ordering_at_restaurant before driver pickup)
+  static async cancelByCustomer(orderId, userId, reason = 'Cancelled by customer') {
+    const client = await db.pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const orderRes = await client.query(
+        `SELECT o.*
+         FROM orders o
+         JOIN customers c ON o.customer_id = c.id
+         WHERE o.id = $1 AND c.user_id = $2
+         FOR UPDATE OF o`,
+        [orderId, userId]
+      );
+
+      if (orderRes.rows.length === 0) {
+        throw new Error('Order not found');
+      }
+
+      const existingOrder = orderRes.rows[0];
+      if (existingOrder.status === 'cancelled') {
+        throw new Error('Order is already cancelled');
+      }
+      if (!['pending', 'ordering_at_restaurant'].includes(existingOrder.status) || existingOrder.driver_id) {
+        throw new Error('Order cannot be cancelled after preparation is complete or a driver has been assigned');
+      }
+
+      const updateRes = await client.query(
+        `UPDATE orders
+         SET status = 'cancelled',
+             cancelled_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1
+         RETURNING *`,
+        [orderId]
+      );
+      const updatedOrder = updateRes.rows[0];
+
+      await client.query(
+        `UPDATE driver_order_queue
+         SET is_active = false,
+             completed_at = CURRENT_TIMESTAMP
+         WHERE order_id = $1`,
+        [orderId]
+      );
+
+      await client.query('COMMIT');
+
+      if (existingOrder.payment_status === 'completed') {
+        await Payment.refundByOrderId(orderId, reason);
+        updatedOrder.payment_status = 'refunded';
+      }
+
+      if (emitOrderUpdate) {
+        emitOrderUpdate(orderId, {
+          type: 'order_cancelled_by_customer',
+          order: updatedOrder,
+          new_status: 'cancelled',
+        });
+      }
+
+      return updatedOrder;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Customer rates a delivered order (1-5 stars for restaurant and/or driver)
+  static async rateOrder(orderId, userId, { restaurant_rating, driver_rating }) {
+    const rRating = restaurant_rating ? Math.min(5, Math.max(1, parseInt(restaurant_rating, 10))) : null;
+    const dRating = driver_rating ? Math.min(5, Math.max(1, parseInt(driver_rating, 10))) : null;
+
+    if (!rRating && !dRating) {
+      throw new Error('Please provide a valid rating between 1 and 5');
+    }
+
+    const orderRes = await db.query(
+      `SELECT o.*
+       FROM orders o
+       JOIN customers c ON o.customer_id = c.id
+       WHERE o.id = $1 AND c.user_id = $2`,
+      [orderId, userId]
+    );
+    if (orderRes.rows.length === 0) {
+      throw new Error('Order not found');
+    }
+    const order = orderRes.rows[0];
+    if (order.status !== 'delivered') {
+      throw new Error('Only delivered orders can be rated');
+    }
+
+    const updateRes = await db.query(
+      `UPDATE orders
+       SET restaurant_rating = COALESCE($2, restaurant_rating),
+           driver_rating = COALESCE($3, driver_rating),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING *`,
+      [orderId, rRating, dRating]
+    );
+    const updatedOrder = updateRes.rows[0];
+
+    if (rRating && order.restaurant_id) {
+      await db.query(
+        `UPDATE restaurants r
+         SET average_rating = COALESCE((SELECT ROUND(AVG(restaurant_rating)::numeric, 2) FROM orders WHERE restaurant_id = $1 AND restaurant_rating IS NOT NULL), 5.00),
+             total_ratings = (SELECT COUNT(*) FROM orders WHERE restaurant_id = $1 AND restaurant_rating IS NOT NULL)
+         WHERE r.id = $1`,
+        [order.restaurant_id]
+      ).catch(() => {});
+    }
+
+    if (dRating && order.driver_id) {
+      await db.query(
+        `UPDATE drivers d
+         SET average_rating = COALESCE((SELECT ROUND(AVG(driver_rating)::numeric, 2) FROM orders WHERE driver_id = $1 AND driver_rating IS NOT NULL), 5.00)
+         WHERE d.id = $1`,
+        [order.driver_id]
+      ).catch(() => {});
+    }
+
+    return updatedOrder;
   }
 
   // Complete customer payment and publish order to active drivers
@@ -766,7 +1049,26 @@ class Order {
     
     try {
       await client.query('BEGIN');
+
+      // Lock and validate driver status to prevent accepting multiple simultaneous orders
+      const driverCheck = await client.query(
+        `SELECT d.id, d.is_approved, d.current_status, u.is_active
+         FROM drivers d
+         JOIN users u ON d.user_id = u.id
+         WHERE d.id = $1
+         FOR UPDATE OF d`,
+        [driverId]
+      );
+
+      if (driverCheck.rows.length === 0) {
+        throw new Error('Driver profile not found');
+      }
+      const driverRow = driverCheck.rows[0];
+      if (!driverRow.is_approved || !driverRow.is_active) {
+        throw new Error('Driver account is not active or approved');
+      }
       
+      // Lock both order and queue rows atomically so two concurrent drivers cannot accept the same order
       const checkQuery = `
         SELECT o.*, q.expires_at
         FROM orders o
@@ -777,6 +1079,7 @@ class Order {
           AND o.driver_id IS NULL
           AND q.is_active = true
           AND q.expires_at > NOW()
+        FOR UPDATE OF o, q
       `;
       
       const checkResult = await client.query(checkQuery, [orderId]);
@@ -792,12 +1095,15 @@ class Order {
           status = 'accepted_by_driver',
           accepted_at = CURRENT_TIMESTAMP,
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1
+        WHERE id = $1 AND driver_id IS NULL
         RETURNING *
       `;
       
       const updateResult = await client.query(updateQuery, [orderId, driverId]);
       const order = updateResult.rows[0];
+      if (!order) {
+        throw new Error('Order was already accepted by another driver');
+      }
       
       await client.query(
         `UPDATE drivers SET current_status = 'busy', is_available = false WHERE id = $1`,
@@ -809,32 +1115,42 @@ class Order {
         [orderId]
       );
 
-      // FIX: Get the actual User ID linked to this Customer ID
+      // Get the actual User ID linked to this Customer ID
       const userRes = await client.query(
         'SELECT user_id FROM customers WHERE id = $1', 
         [order.customer_id]
       );
-      const customerUserId = userRes.rows[0].user_id;
+      const customerUserId = userRes.rows[0]?.user_id;
       
       await client.query('COMMIT');
       
       if (emitOrderUpdate) {
         emitOrderUpdate(order.id, {
-            type: 'order_accepted',
-            order,
-            driver_id: driverId
+          type: 'order_accepted',
+          order,
+          driver_id: driverId
+        });
+      }
+
+      if (emitManagerEvent && order.restaurant_id) {
+        emitManagerEvent(order.restaurant_id, 'driver_assigned', {
+          order_id: order.id,
+          order_number: order.order_number,
+          driver_id: driverId,
+          status: order.status
         });
       }
       
-      // FIX: Pass customerUserId instead of order.customer_id
-      await this.createNotification(
-        customerUserId,
-        'customer',
-        'Driver Accepted',
-        'A driver has accepted your order!',
-        'order_accepted',
-        { order_id: orderId, driver_id: driverId }
-      );
+      if (customerUserId) {
+        await this.createNotification(
+          customerUserId,
+          'customer',
+          'Driver Accepted',
+          'A driver has accepted your order!',
+          'order_accepted',
+          { order_id: orderId, driver_id: driverId }
+        );
+      }
       
       return order;
       
@@ -850,13 +1166,48 @@ class Order {
   static async declineOrder(orderId, driverId) {
     const query = `
       UPDATE driver_order_queue 
-      SET declined_by_driver_ids = COALESCE(declined_by_driver_ids, '{}'::uuid[]) || $2
+      SET declined_by_driver_ids = CASE
+        WHEN $2 = ANY(COALESCE(declined_by_driver_ids, '{}'::uuid[]))
+          THEN COALESCE(declined_by_driver_ids, '{}'::uuid[])
+        ELSE COALESCE(declined_by_driver_ids, '{}'::uuid[]) || $2
+      END
       WHERE order_id = $1
       RETURNING *
     `;
     
     const result = await db.query(query, [orderId, driverId]);
-    return result.rows[0];
+    const queueRow = result.rows[0];
+
+    if (queueRow && queueRow.is_active) {
+      try {
+        const remainingRes = await db.query(
+          `SELECT COUNT(*)::int AS available_count
+           FROM drivers d
+           JOIN users u ON d.user_id = u.id
+           WHERE d.is_approved = true
+             AND u.is_active = true
+             AND d.is_available = true
+             AND NOT (d.id = ANY(COALESCE($1::uuid[], '{}'::uuid[])))`,
+          [queueRow.declined_by_driver_ids || []]
+        );
+        const remainingDrivers = remainingRes.rows[0]?.available_count ?? 1;
+        if (remainingDrivers === 0) {
+          const orderRes = await db.query('SELECT id, order_number, restaurant_id FROM orders WHERE id = $1', [orderId]);
+          const order = orderRes.rows[0];
+          if (order && emitManagerEvent) {
+            emitManagerEvent(order.restaurant_id, 'all_drivers_declined', {
+              order_id: order.id,
+              order_number: order.order_number,
+              message: 'All currently online drivers have declined this order.'
+            });
+          }
+        }
+      } catch (notifyErr) {
+        console.warn('Failed checking remaining drivers after decline:', notifyErr.message);
+      }
+    }
+
+    return queueRow;
   }
 
   // Update order status
@@ -870,7 +1221,8 @@ class Order {
       'on_the_way',
       'arrived',
       'delivered',
-      'cancelled'
+      'cancelled',
+      'no_drivers_available'
     ];
     
     if (!validStatuses.includes(status)) {
@@ -881,10 +1233,11 @@ class Order {
       'ordering_at_restaurant': 'restaurant_notified_at',
       'order_ready': 'ready_for_pickup_at',
       'picked_up': 'picked_up_at',
-      'on_the_way': null, // No specific timestamp
+      'on_the_way': null,
       'arrived': null,
       'delivered': 'delivered_at',
-      'cancelled': 'cancelled_at'
+      'cancelled': 'cancelled_at',
+      'no_drivers_available': 'cancelled_at'
     };
     
     let query = `
@@ -913,7 +1266,7 @@ class Order {
     const order = result.rows[0];
     
     if (order) {
-      if (status === 'cancelled') {
+      if (status === 'cancelled' || status === 'no_drivers_available') {
         await db.query(
           `UPDATE driver_order_queue SET is_active = false, completed_at = CURRENT_TIMESTAMP WHERE order_id = $1`,
           [order.id]
@@ -928,7 +1281,7 @@ class Order {
       const activeDriverId = driverId || order.driver_id;
       let driverCoords = null;
 
-      if (activeDriverId && ['accepted_by_driver', 'picked_up', 'on_the_way', 'arrived'].includes(status)) {
+      if (activeDriverId && ['accepted_by_driver', 'order_ready', 'picked_up', 'on_the_way', 'arrived'].includes(status)) {
         if (locationCoords && Number.isFinite(Number(locationCoords.lat)) && Number.isFinite(Number(locationCoords.lng))) {
           const lat = Number(locationCoords.lat);
           const lng = Number(locationCoords.lng);
@@ -942,7 +1295,7 @@ class Order {
           ).catch(() => {});
           driverCoords = { latitude: lat, longitude: lng, x: lng, y: lat };
         } else {
-          // Check driver's current location in DB; if null, initialize from restaurant location on picked_up
+          // Check driver's current location in DB; only fallback to restaurant_location when status === 'picked_up'
           const locRes = await db.query(
             `SELECT
                d.current_location,
@@ -957,7 +1310,7 @@ class Order {
           const row = locRes.rows[0];
           driverCoords = normalizePointCoords(row?.current_location);
 
-          if (!driverCoords && Number.isFinite(Number(row?.restaurant_lng)) && Number.isFinite(Number(row?.restaurant_lat))) {
+          if (!driverCoords && status === 'picked_up' && Number.isFinite(Number(row?.restaurant_lng)) && Number.isFinite(Number(row?.restaurant_lat))) {
             const rLng = Number(row.restaurant_lng);
             const rLat = Number(row.restaurant_lat);
             driverCoords = normalizePointCoords({ x: rLng, y: rLat });
@@ -995,17 +1348,40 @@ class Order {
         });
       }
       
-      if (status === 'delivered') {
+      if (status === 'delivered' && activeDriverId) {
+        const deliveryFee = parseFloat(order.delivery_fee) || 0;
+        const tipAmount = parseFloat(order.tip_amount) || 0;
+        const driverCommission = Math.round(deliveryFee * 0.30 * 100) / 100;
+        const driverNet = Math.round((deliveryFee * 0.70 + tipAmount) * 100) / 100;
+
         await db.query(
-          `UPDATE drivers SET current_status = 'available', is_available = true WHERE id = $1`,
-          [driverId]
+          `UPDATE drivers
+           SET current_status = 'available',
+               is_available = true,
+               total_deliveries = COALESCE(total_deliveries, 0) + 1,
+               total_earnings = COALESCE(total_earnings, 0) + $2
+           WHERE id = $1`,
+          [activeDriverId, driverNet]
         );
         
-        const driverEarnings = order.total_amount * 0.7; 
-        await this.createEarning(order.id, driverId, null, driverEarnings, 30, order.total_amount * 0.3, driverEarnings);
+        const existingEarning = await db.query(
+          'SELECT id FROM earnings WHERE order_id = $1 AND driver_id = $2 LIMIT 1',
+          [order.id, activeDriverId]
+        );
+        if (existingEarning.rows.length === 0) {
+          await this.createEarning(
+            order.id,
+            activeDriverId,
+            null,
+            deliveryFee + tipAmount,
+            30,
+            driverCommission,
+            driverNet
+          );
+        }
       }
       
-      // FIX: Get User ID for notification
+      // Get User ID for notification
       const userRes = await db.query(
         'SELECT user_id FROM customers WHERE id = $1', 
         [order.customer_id]
@@ -1035,7 +1411,6 @@ class Order {
 
   // Get orders for user based on role
   static async getOrdersByUser(userId, userRole, filters = {}) {
-    // ... (paste your existing getOrdersByUser code here)
     let baseQuery = '';
     const params = [];
     
@@ -1049,7 +1424,6 @@ class Order {
         `;
         params.push(userId);
         break;
-      // ... rest of cases ...
       case 'driver':
         baseQuery = `
           SELECT o.*, r.name as restaurant_name, c.first_name as customer_first_name
@@ -1077,7 +1451,6 @@ class Order {
       default:
         throw new Error('Invalid user role');
     }
-    // ... (keep filters logic) ...
     const { status, start_date, end_date, page = 1, limit = 20 } = filters;
     let paramIndex = params.length + 1;
     if (status) { baseQuery += ` AND o.status = $${paramIndex}`; params.push(status); paramIndex++; }
@@ -1111,21 +1484,80 @@ class Order {
   // Check for expired orders (cron job)
   static async processExpiredOrders() {
     const query = `
-      UPDATE orders o SET status = 'no_drivers_available', updated_at = CURRENT_TIMESTAMP
-      FROM driver_order_queue q WHERE o.id = q.order_id AND q.is_active = true AND q.expires_at <= NOW() AND o.status IN ('pending', 'ordering_at_restaurant', 'order_ready') AND o.driver_id IS NULL RETURNING o.*
+      UPDATE orders o
+      SET status = 'no_drivers_available',
+          cancellation_reason = 'No drivers available within timeout',
+          cancelled_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      FROM driver_order_queue q
+      WHERE o.id = q.order_id
+        AND q.is_active = true
+        AND q.expires_at <= NOW()
+        AND o.status IN ('pending', 'ordering_at_restaurant', 'order_ready')
+        AND o.driver_id IS NULL
+      RETURNING o.*
     `;
     const result = await db.query(query);
     if (result.rows.length > 0) {
       const expiredOrderIds = result.rows.map(row => row.id);
-      await db.query(`UPDATE driver_order_queue SET is_active = false WHERE order_id = ANY($1)`, [expiredOrderIds]);
+      await db.query(
+        `UPDATE driver_order_queue SET is_active = false, completed_at = CURRENT_TIMESTAMP WHERE order_id = ANY($1)`,
+        [expiredOrderIds]
+      );
+      const Payment = require('./Payment');
       for (const order of result.rows) {
-        // FIX: Get user ID for notification here as well if needed, similar to above
+        if (order.payment_status === 'completed') {
+          try {
+            await Payment.refundByOrderId(order.id, 'No drivers available within timeout');
+            order.payment_status = 'refunded';
+          } catch (refundErr) {
+            console.error(`Auto-refund failed for expired order ${order.id}:`, refundErr.message);
+          }
+        }
+        if (emitOrderUpdate) {
+          emitOrderUpdate(order.id, {
+            type: 'status_update',
+            order,
+            status: 'no_drivers_available',
+            new_status: 'no_drivers_available'
+          });
+        }
+        if (emitManagerEvent && order.restaurant_id) {
+          emitManagerEvent(order.restaurant_id, 'order_expired', {
+            order_id: order.id,
+            order_number: order.order_number,
+            status: 'no_drivers_available'
+          });
+        }
         const userRes = await db.query('SELECT user_id FROM customers WHERE id = $1', [order.customer_id]);
-        if(userRes.rows[0]) {
-             await this.createNotification(userRes.rows[0].user_id, 'customer', 'No Drivers Available', 'Sorry, no drivers were available.', 'order_expired', { order_id: order.id });
+        if (userRes.rows[0]) {
+          await this.createNotification(
+            userRes.rows[0].user_id,
+            'customer',
+            'No Drivers Available',
+            order.payment_status === 'refunded'
+              ? 'Sorry, no drivers were available for your order. Your payment has been refunded.'
+              : 'Sorry, no drivers were available for your order.',
+            'order_expired',
+            { order_id: order.id }
+          );
         }
       }
     }
+
+    // Also cancel abandoned unpaid orders older than 30 minutes
+    await db.query(
+      `UPDATE orders
+       SET status = 'cancelled',
+           cancellation_reason = 'Abandoned unpaid order timeout',
+           cancelled_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE status IN ('pending', 'ordering_at_restaurant')
+         AND payment_status = 'pending'
+         AND driver_id IS NULL
+         AND created_at <= NOW() - INTERVAL '30 minutes'`
+    ).catch(err => console.warn('Stale unpaid order cleanup warning:', err.message));
+
     return result.rows;
   }
 }
