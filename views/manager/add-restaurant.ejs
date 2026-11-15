@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add New Restaurant - Restaurant Manager</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.75rem;
+    --sidebar-width: 16rem;
+    }
+
+    * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    border-color: hsl(var(--border));
+    }
+
+    body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    line-height: 1.5;
+    min-height: 100vh;
+    }
+
+    /* Layout */
+    .app-container {
+    display: flex;
+    min-height: 100vh;
+    width: 100%;
+    }
+
+    /* Sidebar */
+    .sidebar {
+    width: var(--sidebar-width);
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    background: hsl(var(--card));
+    border-right: 1px solid hsl(var(--border));
+    display: flex;
+    flex-direction: column;
+    z-index: 50;
+    transition: transform 0.2s ease;
+    }
+
+    .sidebar-header {
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    }
+
+    .sidebar-logo {
+    width: 2rem;
+    height: 2rem;
+    background: url('./logo.jpg');
+    background-size: cover;
+    background-repeat: no-repeat;
+    border-radius: 0.25rem;
+    }
+
+    .sidebar-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    }
+
+    .sidebar-content {
+    flex: 1;
+    padding: 0.5rem;
+    overflow-y: auto;
+    }
+
+    .sidebar-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    }
+
+    .sidebar-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: hsl(var(--foreground));
+    transition: background-color 0.15s, color 0.15s;
+    text-decoration: none;
+    }
+
+    .sidebar-menu-item:hover {
+    background: hsl(var(--accent));
+    }
+
+    .sidebar-menu-item.active {
+    background: hsl(var(--accent));
+    font-weight: 500;
+    }
+
+    .sidebar-menu-item svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    }
+
+    .sidebar-footer {
+    padding: 1rem;
+    border-top: 1px solid hsl(var(--border));
+    }
+
+    .sidebar-user {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    }
+
+    .sidebar-user-avatar {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    object-fit: cover;
+    }
+
+    .sidebar-user-info {
+    display: flex;
+    flex-direction: column;
+    }
+
+    .sidebar-user-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    }
+
+    .sidebar-user-role {
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+    }
+
+    /* Main Content */
+    .main-content {
+    flex: 1;
+    margin-left: var(--sidebar-width);
+    overflow: auto;
+    }
+    /* Template design system overrides */
+    .page-container { padding: 1.5rem 2rem; max-width: 1200px; margin: 0 auto; }
+    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+    .page-title { font-size: 1.875rem; font-weight: 700; letter-spacing: -0.025em; }
+    .card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: var(--radius); overflow: hidden; margin-bottom: 1.5rem; }
+    .card-header { padding: 1.5rem; display: flex; flex-direction: column; gap: 0.375rem; }
+    .card-header-row { display: flex; align-items: center; justify-content: space-between; }
+    .card-title { font-size: 1rem; font-weight: 600; line-height: 1.5; }
+    .card-title-lg { font-size: 1.125rem; }
+    .card-description { font-size: 0.875rem; color: hsl(var(--muted-foreground)); }
+    .card-content { padding: 0 1.5rem 1.5rem; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.875rem;
+      font-weight: 500; cursor: pointer; transition: background-color 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s;
+      border: none; text-decoration: none;
+    }
+    .btn svg { width: 1rem; height: 1rem; }
+    .btn-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
+    .btn-secondary:hover { background: hsl(var(--accent)); }
+    .btn-outline {
+      background: transparent; border: 1px solid hsl(var(--input));
+      color: hsl(var(--foreground));
+    }
+    .btn-outline:hover { background: hsl(var(--accent)); }
+    .btn-success { background: hsl(142.1 76.2% 36.3%); color: white; }
+    .btn-success:hover { opacity: 0.9; }
+    .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; }
+    .btn-lg { padding: 0.75rem 1.5rem; font-size: 1rem; }
+
+    /* Stepper */
+    .stepper {
+      display: flex; justify-content: space-between; margin-bottom: 2rem;
+      position: relative;
+    }
+    .stepper::before {
+      content: ''; position: absolute; top: 1.25rem; left: 0; right: 0;
+      height: 2px; background: hsl(var(--border)); z-index: 1;
+    }
+    .step {
+      display: flex; flex-direction: column; align-items: center;
+      position: relative; z-index: 2; flex: 1;
+    }
+    .step-number {
+      width: 2.5rem; height: 2.5rem; border-radius: 50%; background: hsl(var(--background));
+      border: 2px solid hsl(var(--border)); display: flex; align-items: center; justify-content: center;
+      font-weight: 600; color: hsl(var(--muted-foreground)); margin-bottom: 0.5rem;
+      transition: all 0.3s; font-size: 0.875rem;
+    }
+    .step.active .step-number {
+      background: hsl(var(--primary)); border-color: hsl(var(--primary));
+      color: hsl(var(--primary-foreground)); transform: scale(1.1);
+    }
+    .step.completed .step-number {
+      background: hsl(142.1 76.2% 36.3%); border-color: hsl(142.1 76.2% 36.3%);
+      color: white;
+    }
+    .step-label { font-size: 0.875rem; color: hsl(var(--muted-foreground)); font-weight: 500; }
+    .step.active .step-label { color: hsl(var(--foreground)); font-weight: 600; }
+
+    /* Form elements */
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+    .form-label {
+      font-size: 0.875rem; font-weight: 500; display: flex;
+      align-items: center; justify-content: space-between;
+    }
+    .form-label .required { color: hsl(var(--destructive)); font-size: 0.75rem; font-weight: 400; }
+    input[type="text"], input[type="tel"], input[type="email"], input[type="url"],
+    input[type="number"], textarea, select {
+      width: 100%; padding: 0.5rem 0.75rem;
+      border: 1px solid hsl(var(--input)); border-radius: var(--radius);
+      font-size: 0.875rem; background: hsl(var(--background));
+      color: hsl(var(--foreground)); outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s; font-family: inherit;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: hsl(var(--ring));
+      box-shadow: 0 0 0 2px hsla(var(--ring), 0.2);
+    }
+    textarea { resize: vertical; min-height: 5rem; }
+    .form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+    .form-row-3 { grid-template-columns: repeat(3, 1fr); }
+    .form-row-4 { grid-template-columns: repeat(4, 1fr); }
+    input.is-invalid { border-color: hsl(var(--destructive)); }
+    .invalid-feedback {
+      color: hsl(var(--destructive)); font-size: 0.75rem; margin-top: 0.25rem; display: none;
+    }
+    input.is-invalid + .invalid-feedback { display: block; }
+
+    /* Image upload */
+    .image-upload-container {
+      border: 2px dashed hsl(var(--border)); border-radius: var(--radius);
+      padding: 2rem; text-align: center; cursor: pointer; transition: all 0.3s;
+      background: hsl(var(--muted));
+    }
+    .image-upload-container:hover {
+      border-color: hsl(var(--ring));
+      background: hsla(var(--primary), 0.05);
+    }
+    .image-upload-container.dragover {
+      border-color: hsl(142.1 76.2% 36.3%);
+      background: hsla(142.1, 76.2%, 36.3%, 0.05);
+    }
+    .image-preview {
+      max-width: 200px; max-height: 200px; border-radius: var(--radius);
+      object-fit: cover; margin: 1rem auto 0; display: none;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    }
+    .gallery-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; justify-content: center; }
+    .gallery-grid img {
+      width: 100px; height: 100px; object-fit: cover; border-radius: var(--radius);
+      border: 1px solid hsl(var(--border));
+    }
+
+    /* Toggle switches */
+    .switch-group {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.75rem 0; border-bottom: 1px solid hsl(var(--border));
+    }
+    .switch-group:last-child { border-bottom: none; }
+    .switch-info { flex: 1; }
+    .switch-label { font-size: 0.875rem; font-weight: 500; display: block; }
+    .switch-desc { font-size: 0.75rem; color: hsl(var(--muted-foreground)); margin-top: 0.125rem; }
+    .switch-input {
+      appearance: none; width: 2.5rem; height: 1.25rem;
+      background: hsl(var(--input)); border-radius: 9999px;
+      position: relative; cursor: pointer; transition: background-color 0.15s;
+      border: 1px solid hsl(var(--border)); flex-shrink: 0;
+    }
+    .switch-input::after {
+      content: ''; position: absolute; top: 1px; left: 1px;
+      width: calc(1.25rem - 4px); height: calc(1.25rem - 4px);
+      background: white; border-radius: 50%; transition: transform 0.15s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .switch-input:checked { background: hsl(var(--primary)); border-color: hsl(var(--primary)); }
+    .switch-input:checked::after { transform: translateX(1.25rem); }
+
+    /* Map preview */
+    .map-preview {
+      height: 200px; background: hsl(var(--muted)); border-radius: var(--radius);
+      display: flex; align-items: center; justify-content: center;
+      color: hsl(var(--muted-foreground)); font-size: 0.875rem;
+      border: 1px solid hsl(var(--border)); overflow: hidden;
+    }
+    .map-preview iframe { width: 100%; height: 100%; border: none; }
+
+    /* Hours */
+    .hours-row {
+      display: flex; align-items: center; gap: 1rem;
+      padding: 0.75rem; background: hsl(var(--background));
+      border-radius: var(--radius); margin-bottom: 0.5rem;
+      border: 1px solid hsl(var(--border));
+    }
+    .hours-label { min-width: 120px; font-weight: 500; font-size: 0.875rem; }
+
+    /* Toast */
+    .toast-container {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 200;
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .toast {
+      background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+      border-radius: var(--radius); padding: 1rem 1.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      min-width: 20rem; transform: translateX(100%); opacity: 0;
+      transition: transform 0.3s, opacity 0.3s;
+    }
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast-title { font-weight: 500; margin-bottom: 0.25rem; }
+    .toast-description { font-size: 0.875rem; color: hsl(var(--muted-foreground)); }
+
+    /* Spinner */
+    .spinner-container {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,0.9); z-index: 9999;
+      justify-content: center; align-items: center;
+    }
+    .spinner {
+      width: 50px; height: 50px; border: 5px solid #f3f3f3;
+      border-top: 5px solid hsl(var(--primary)); border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* Form step animation */
+    .form-step { display: none; animation: fadeIn 0.5s ease; }
+    .form-step.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Navigation buttons */
+    .btn-group {
+      display: flex; justify-content: space-between;
+      margin-top: 2rem; padding-top: 1.5rem;
+      border-top: 1px solid hsl(var(--border));
+    }
+
+    @media (max-width: 768px) {
+      .form-row, .form-row-3, .form-row-4 { grid-template-columns: 1fr; }
+      .page-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+      .stepper { flex-direction: column; align-items: flex-start; gap: 1rem; }
+      .stepper::before { display: none; }
+      .step { flex-direction: row; gap: 1rem; width: 100%; }
+      .btn-group { flex-direction: column; gap: 0.75rem; }
+      .btn-group .btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="spinner-container" id="loadingSpinner">
+    <div class="spinner"></div>
+  </div>
+
+  <div class="page-container">
+    <!-- Header -->
+    <div class="page-header">
+      <div>
+        <h2 class="page-title">Add New Restaurant</h2>
+        <p class="text-muted" style="font-size:0.875rem; color:hsl(var(--muted-foreground));">Fill in all the details to add your restaurant to the platform</p>
+      </div>
+      <a href="/manager/restaurants" class="btn btn-outline btn-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Back to Restaurants
+      </a>
+    </div>
+
+    <!-- Stepper -->
+    <div class="stepper">
+      <div class="step active" data-step="1">
+        <div class="step-number">1</div>
+        <div class="step-label">Basic Info</div>
+      </div>
+      <div class="step" data-step="2">
+        <div class="step-number">2</div>
+        <div class="step-label">Location</div>
+      </div>
+      <div class="step" data-step="3">
+        <div class="step-number">3</div>
+        <div class="step-label">Settings</div>
+      </div>
+      <div class="step" data-step="4">
+        <div class="step-number">4</div>
+        <div class="step-label">Images</div>
+      </div>
+    </div>
+
+    <!-- Form -->
+    <div class="card">
+      <div class="card-content">
+        <form id="addRestaurantForm" enctype="multipart/form-data">
+          <input type="hidden" name="manager_id" value="<%= manager.manager_id || '' %>">
+
+          <!-- Step 1: Basic Info -->
+          <div class="form-step active" id="step-1">
+            <h3 class="card-title-lg" style="margin-bottom:1.5rem;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:0.5rem;color:hsl(var(--primary));"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+              Basic Information
+            </h3>
+
+            <div class="form-group">
+              <label class="form-label">
+                Restaurant Name
+                <span class="required">* Required</span>
+              </label>
+              <input type="text" id="name" name="name" required placeholder="e.g., Mumbai Kitchen">
+              <div class="invalid-feedback">Please enter a restaurant name.</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Description</label>
+              <textarea id="description" name="description" rows="4" placeholder="Tell customers about your restaurant..."></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Cuisine Types</label>
+                <select id="cuisine_type" name="cuisine_type" multiple style="min-height: 8rem;">
+                  <option value="indian">Indian</option>
+                  <option value="chinese">Chinese</option>
+                  <option value="italian">Italian</option>
+                  <option value="mexican">Mexican</option>
+                  <option value="fast_food">Fast Food</option>
+                  <option value="vegetarian">Vegetarian</option>
+                  <option value="non_vegetarian">Non-Vegetarian</option>
+                  <option value="south_indian">South Indian</option>
+                  <option value="north_indian">North Indian</option>
+                  <option value="biryani">Biryani</option>
+                  <option value="thai">Thai</option>
+                  <option value="japanese">Japanese</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">
+                  Phone Number
+                  <span class="required">* Required</span>
+                </label>
+                <input type="tel" id="phone_number" name="phone_number" pattern="[0-9]{10}" required placeholder="10-digit mobile number">
+                <div class="invalid-feedback">Please enter a valid 10-digit phone number.</div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input type="email" id="email" name="email" placeholder="restaurant@example.com">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Website</label>
+                <input type="url" id="website" name="website" placeholder="https://your-restaurant.com">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Opening Hours</label>
+              <div style="background: hsl(var(--muted)); padding: 1rem; border-radius: var(--radius);">
+                <div class="hours-row">
+                  <div class="hours-label">Monday - Friday</div>
+                  <input type="text" name="weekday_hours" value="10:00 AM - 10:00 PM" style="flex:1;">
+                </div>
+                <div class="hours-row">
+                  <div class="hours-label">Saturday</div>
+                  <input type="text" name="saturday_hours" value="10:00 AM - 11:00 PM" style="flex:1;">
+                </div>
+                <div class="hours-row">
+                  <div class="hours-label">Sunday</div>
+                  <input type="text" name="sunday_hours" value="10:00 AM - 10:00 PM" style="flex:1;">
+                </div>
+              </div>
+            </div>
+
+            <div class="btn-group">
+              <div></div>
+              <button type="button" class="btn btn-primary" onclick="nextStep(2)">
+                Next
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 2: Location -->
+          <div class="form-step" id="step-2">
+            <h3 class="card-title-lg" style="margin-bottom:1.5rem;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:0.5rem;color:hsl(var(--primary));"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              Location Details
+            </h3>
+
+            <div class="form-group">
+              <label class="form-label">
+                Full Address
+                <span class="required">* Required</span>
+              </label>
+              <textarea id="address" name="address" rows="3" required placeholder="Full address including city, state, and PIN code"></textarea>
+              <div class="invalid-feedback">Please enter the restaurant address.</div>
+            </div>
+
+            <div class="form-row form-row-3">
+              <div class="form-group">
+                <label class="form-label">City</label>
+                <input type="text" id="city" name="city" placeholder="City">
+              </div>
+              <div class="form-group">
+                <label class="form-label">State</label>
+                <input type="text" id="state" name="state" placeholder="State">
+              </div>
+              <div class="form-group">
+                <label class="form-label">ZIP/PIN Code</label>
+                <input type="text" id="zip_code" name="zip_code" placeholder="6-digit PIN code">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Country</label>
+                <input type="text" id="country" name="country" value="India">
+              </div>
+              <div></div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Latitude</label>
+                <div style="display:flex; gap:0.5rem;">
+                  <input type="number" step="any" id="latitude" name="latitude" placeholder="e.g., 19.0760" style="flex:1;">
+                  <button type="button" class="btn btn-outline" onclick="getCurrentLocation()" title="Get current location">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4"/><path d="M12 18v4"/><path d="m4.93 4.93 2.83 2.83"/><path d="m16.24 16.24 2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="m4.93 19.07 2.83-2.83"/><path d="m16.24 7.76 2.83-2.83"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Longitude</label>
+                <div style="display:flex; gap:0.5rem;">
+                  <input type="number" step="any" id="longitude" name="longitude" placeholder="e.g., 72.8777" style="flex:1;">
+                  <button type="button" class="btn btn-outline" onclick="getCurrentLocation()" title="Get current location">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4"/><path d="M12 18v4"/><path d="m4.93 4.93 2.83 2.83"/><path d="m16.24 16.24 2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="m4.93 19.07 2.83-2.83"/><path d="m16.24 7.76 2.83-2.83"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Map Preview</label>
+              <div class="map-preview" id="mapPreview">
+                <span style="display:flex; align-items:center; gap:0.5rem;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                  Coordinates will appear here
+                </span>
+              </div>
+            </div>
+
+            <div class="btn-group">
+              <button type="button" class="btn btn-secondary" onclick="prevStep(1)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                Back
+              </button>
+              <button type="button" class="btn btn-primary" onclick="nextStep(3)">
+                Next
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 3: Settings -->
+          <div class="form-step" id="step-3">
+            <h3 class="card-title-lg" style="margin-bottom:1.5rem;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:0.5rem;color:hsl(var(--primary));"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+              Business Settings
+            </h3>
+
+            <div class="form-row">
+              <div class="card" style="flex:1;">
+                <div class="card-header">
+                  <h4 class="card-title">Operational Settings</h4>
+                </div>
+                <div class="card-content">
+                  <div class="form-group">
+                    <label class="form-label">Preparation Time (minutes)</label>
+                    <input type="number" id="preparation_time_minutes" name="preparation_time_minutes" value="20" min="5" max="120">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Minimum Order Amount (₹)</label>
+                    <input type="number" id="min_order_amount" name="min_order_amount" value="0" min="0">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Delivery Radius (km)</label>
+                    <input type="number" id="delivery_radius" name="delivery_radius" value="5" min="1" max="20" step="0.5">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Packing Charges (₹)</label>
+                    <input type="number" id="packing_charges" name="packing_charges" value="0" min="0">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Tax Percentage (%)</label>
+                    <input type="number" id="tax_percentage" name="tax_percentage" value="5" min="0" max="50" step="0.1">
+                  </div>
+                </div>
+              </div>
+
+              <div class="card" style="flex:1;">
+                <div class="card-header">
+                  <h4 class="card-title">Status Settings</h4>
+                </div>
+                <div class="card-content">
+                  <div class="switch-group">
+                    <div class="switch-info">
+                      <span class="switch-label">Restaurant is Active</span>
+                      <span class="switch-desc">Customers can see and order from active restaurants</span>
+                    </div>
+                    <input type="checkbox" class="switch-input" id="is_active" name="is_active" checked>
+                  </div>
+                  <div class="switch-group">
+                    <div class="switch-info">
+                      <span class="switch-label">Accepting Orders</span>
+                      <span class="switch-desc">Allow customers to place orders</span>
+                    </div>
+                    <input type="checkbox" class="switch-input" id="is_accepting_orders" name="is_accepting_orders" checked>
+                  </div>
+                  <div class="switch-group">
+                    <div class="switch-info">
+                      <span class="switch-label">Restaurant is Verified</span>
+                      <span class="switch-desc">Show verified badge on restaurant profile</span>
+                    </div>
+                    <input type="checkbox" class="switch-input" id="is_verified" name="is_verified">
+                  </div>
+                  <div class="switch-group">
+                    <div class="switch-info">
+                      <span class="switch-label">Featured Restaurant</span>
+                      <span class="switch-desc">Show restaurant in featured section</span>
+                    </div>
+                    <input type="checkbox" class="switch-input" id="is_featured" name="is_featured">
+                  </div>
+                  <div class="switch-group">
+                    <div class="switch-info">
+                      <span class="switch-label">Allow Pre-orders</span>
+                      <span class="switch-desc">Allow customers to schedule orders for future</span>
+                    </div>
+                    <input type="checkbox" class="switch-input" id="allow_preorder" name="allow_preorder">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="btn-group">
+              <button type="button" class="btn btn-secondary" onclick="prevStep(2)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                Back
+              </button>
+              <button type="button" class="btn btn-primary" onclick="nextStep(4)">
+                Next
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 4: Images -->
+          <div class="form-step" id="step-4">
+            <h3 class="card-title-lg" style="margin-bottom:1.5rem;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:0.5rem;color:hsl(var(--primary));"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+              Restaurant Images
+            </h3>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Logo Image</label>
+                <div class="image-upload-container" id="logoUpload" onclick="document.getElementById('logoInput').click()">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:hsl(var(--muted-foreground));margin-bottom:0.75rem;"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                  <p style="font-weight:500;margin-bottom:0.25rem;">Click to upload logo</p>
+                  <p style="font-size:0.75rem;color:hsl(var(--muted-foreground));">Recommended: 500x500px, JPG/PNG, Max 2MB</p>
+                  <input type="file" class="d-none" id="logoInput" name="logo" accept="image/*">
+                  <img id="logoPreview" class="image-preview" src="" alt="Logo Preview">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Cover Image</label>
+                <div class="image-upload-container" id="coverUpload" onclick="document.getElementById('coverInput').click()">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:hsl(var(--muted-foreground));margin-bottom:0.75rem;"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                  <p style="font-weight:500;margin-bottom:0.25rem;">Click to upload cover</p>
+                  <p style="font-size:0.75rem;color:hsl(var(--muted-foreground));">Recommended: 1200x400px, JPG/PNG, Max 5MB</p>
+                  <input type="file" class="d-none" id="coverInput" name="cover_image" accept="image/*">
+                  <img id="coverPreview" class="image-preview" src="" alt="Cover Preview">
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Gallery Images</label>
+              <div class="image-upload-container" id="galleryUpload" onclick="document.getElementById('galleryInput').click()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:hsl(var(--muted-foreground));margin-bottom:0.75rem;"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                <p style="font-weight:500;margin-bottom:0.25rem;">Click to upload gallery images</p>
+                <p style="font-size:0.75rem;color:hsl(var(--muted-foreground));">You can upload multiple images at once. Max 5MB each.</p>
+                <input type="file" class="d-none" id="galleryInput" name="gallery_images" accept="image/*" multiple>
+                <div id="galleryPreviews" class="gallery-grid"></div>
+              </div>
+            </div>
+
+            <div class="btn-group">
+              <button type="button" class="btn btn-secondary" onclick="prevStep(3)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                Back
+              </button>
+              <button type="button" class="btn btn-success" onclick="submitForm()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                Save Restaurant
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    // Global variables
+    let currentStep = 1;
+    const API_BASE = '/api/restaurants';
+
+    // Toast notification (template style)
+    function showNotification(title, message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      
+      const colors = {
+        success: 'hsl(142.1 76.2% 36.3%)',
+        error: 'hsl(0 84.2% 60.2%)',
+        warning: 'hsl(38 92% 50%)',
+        info: 'hsl(221.2 83.2% 53.3%)'
+      };
+
+      toast.innerHTML = `
+        <div class="toast-title" style="color:${colors[type] || colors.info};">${title}</div>
+        <div class="toast-description">${message}</div>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.add('show'), 10);
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Loading spinner
+    function showLoading() {
+      document.getElementById('loadingSpinner').style.display = 'flex';
+    }
+    function hideLoading() {
+      document.getElementById('loadingSpinner').style.display = 'none';
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+      setupImageUploads();
+      document.getElementById('latitude').addEventListener('input', updateMapPreview);
+      document.getElementById('longitude').addEventListener('input', updateMapPreview);
+    });
+
+    function setupImageUploads() {
+      // Logo upload
+      document.getElementById('logoInput').addEventListener('change', function(e) {
+        if (validateImage(e.target.files[0], 2)) {
+          previewImage(e.target.files[0], 'logoPreview');
+        }
+      });
+
+      // Cover upload
+      document.getElementById('coverInput').addEventListener('change', function(e) {
+        if (validateImage(e.target.files[0], 5)) {
+          previewImage(e.target.files[0], 'coverPreview');
+        }
+      });
+
+      // Gallery upload
+      document.getElementById('galleryInput').addEventListener('change', function(e) {
+        const galleryPreviews = document.getElementById('galleryPreviews');
+        galleryPreviews.innerHTML = '';
+
+        Array.from(e.target.files).forEach(file => {
+          if (validateImage(file, 5)) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              const img = document.createElement('img');
+              img.src = e.target.result;
+              galleryPreviews.appendChild(img);
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+      });
+
+      // Drag and drop
+      ['logoUpload', 'coverUpload', 'galleryUpload'].forEach(id => {
+        const container = document.getElementById(id);
+        container.addEventListener('dragover', function(e) {
+          e.preventDefault();
+          this.classList.add('dragover');
+        });
+        container.addEventListener('dragleave', function(e) {
+          e.preventDefault();
+          this.classList.remove('dragover');
+        });
+        container.addEventListener('drop', function(e) {
+          e.preventDefault();
+          this.classList.remove('dragover');
+          const files = e.dataTransfer.files;
+          if (files.length > 0) {
+            if (id === 'galleryUpload') {
+              document.getElementById('galleryInput').files = files;
+              const event = new Event('change');
+              document.getElementById('galleryInput').dispatchEvent(event);
+            } else {
+              const inputId = id === 'logoUpload' ? 'logoInput' : 'coverInput';
+              document.getElementById(inputId).files = files;
+              const event = new Event('change');
+              document.getElementById(inputId).dispatchEvent(event);
+            }
+          }
+        });
+      });
+    }
+
+    function validateImage(file, maxSizeMB) {
+      if (!file) return false;
+      const maxSize = maxSizeMB * 1024 * 1024;
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
+
+      if (!allowedTypes.includes(file.type)) {
+        showNotification('Error', 'Please upload only JPG, PNG, or GIF images', 'error');
+        return false;
+      }
+      if (file.size > maxSize) {
+        showNotification('Error', `Image size should be less than ${maxSizeMB}MB`, 'error');
+        return false;
+      }
+      return true;
+    }
+
+    function previewImage(file, previewId) {
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const preview = document.getElementById(previewId);
+          preview.src = e.target.result;
+          preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // Stepper navigation
+    function nextStep(step) {
+      if (!validateStep(currentStep)) {
+        showNotification('Error', 'Please fill in all required fields', 'error');
+        return;
+      }
+      document.getElementById(`step-${currentStep}`).classList.remove('active');
+      document.querySelector(`.step[data-step="${currentStep}"]`).classList.remove('active');
+      currentStep = step;
+      document.getElementById(`step-${currentStep}`).classList.add('active');
+      document.querySelector(`.step[data-step="${currentStep}"]`).classList.add('active');
+      for (let i = 1; i < currentStep; i++) {
+        document.querySelector(`.step[data-step="${i}"]`).classList.add('completed');
+      }
+      if (currentStep === 2) updateMapPreview();
+    }
+
+    function prevStep(step) {
+      document.getElementById(`step-${currentStep}`).classList.remove('active');
+      document.querySelector(`.step[data-step="${currentStep}"]`).classList.remove('active');
+      currentStep = step;
+      document.getElementById(`step-${currentStep}`).classList.add('active');
+      document.querySelector(`.step[data-step="${currentStep}"]`).classList.add('active');
+    }
+
+    function validateStep(step) {
+      let isValid = true;
+      switch(step) {
+        case 1:
+          const name = document.getElementById('name');
+          const phone = document.getElementById('phone_number');
+          if (!name.value.trim()) { name.classList.add('is-invalid'); isValid = false; }
+          else { name.classList.remove('is-invalid'); }
+          if (!phone.value.trim() || !/^\d{10}$/.test(phone.value)) {
+            phone.classList.add('is-invalid'); isValid = false;
+          } else { phone.classList.remove('is-invalid'); }
+          break;
+        case 2:
+          const address = document.getElementById('address');
+          if (!address.value.trim()) { address.classList.add('is-invalid'); isValid = false; }
+          else { address.classList.remove('is-invalid'); }
+          break;
+        case 3: break;
+        case 4: break;
+      }
+      return isValid;
+    }
+
+    // Geolocation
+    function getCurrentLocation() {
+      if (navigator.geolocation) {
+        showNotification('Info', 'Getting your current location...', 'info');
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            document.getElementById('latitude').value = position.coords.latitude.toFixed(6);
+            document.getElementById('longitude').value = position.coords.longitude.toFixed(6);
+            showNotification('Success', 'Location fetched successfully!', 'success');
+            updateMapPreview();
+          },
+          (error) => {
+            console.error('Geolocation error:', error);
+            showNotification('Error', 'Failed to get location: ' + error.message, 'error');
+          }
+        );
+      } else {
+        showNotification('Error', 'Geolocation is not supported by your browser', 'error');
+      }
+    }
+
+    function updateMapPreview() {
+      const lat = document.getElementById('latitude').value;
+      const lng = document.getElementById('longitude').value;
+      const mapPreview = document.getElementById('mapPreview');
+      if (lat && lng) {
+        mapPreview.innerHTML = `<iframe width="100%" height="100%" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" src="https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed" style="border:none;"></iframe>`;
+      }
+    }
+
+    // Submit form
+    async function submitForm() {
+      const form = document.getElementById('addRestaurantForm');
+      for (let i = 1; i <= 4; i++) {
+        if (!validateStep(i)) {
+          showNotification('Error', 'Please fill in all required fields', 'error');
+          nextStep(i);
+          return;
+        }
+      }
+      try {
+        showLoading();
+        const formData = new FormData(form);
+        
+        // Convert cuisine array to string
+        const cuisineSelect = document.getElementById('cuisine_type');
+        const selectedCuisines = Array.from(cuisineSelect.selectedOptions).map(o => o.value);
+        if (selectedCuisines.length) {
+          formData.set('cuisine_type', selectedCuisines.join(','));
+        }
+        
+        // Prepare opening hours object
+        const openingHours = {
+          weekday: formData.get('weekday_hours'),
+          saturday: formData.get('saturday_hours'),
+          sunday: formData.get('sunday_hours'),
+          display: `${formData.get('weekday_hours')} (Mon-Fri), ${formData.get('saturday_hours')} (Sat), ${formData.get('sunday_hours')} (Sun)`
+        };
+        formData.set('opening_hours', JSON.stringify(openingHours));
+        ['weekday_hours', 'saturday_hours', 'sunday_hours'].forEach(field => formData.delete(field));
+        
+        // Convert booleans
+        ['is_active', 'is_accepting_orders', 'is_verified', 'is_featured', 'allow_preorder'].forEach(field => {
+          formData.set(field, formData.get(field) === 'on' ? 'true' : 'false');
+        });
+        
+        const response = await fetch(API_BASE, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${getToken()}` },
+          body: formData
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          showNotification('Success', 'Restaurant created successfully!', 'success');
+          setTimeout(() => { window.location.href = '/manager/restaurants'; }, 2000);
+        } else {
+          showNotification('Error', data.error || 'Failed to create restaurant', 'error');
+        }
+      } catch (error) {
+        console.error('Error creating restaurant:', error);
+        showNotification('Error', 'Failed to create restaurant: ' + error.message, 'error');
+      } finally {
+        hideLoading();
+      }
+    }
+
+    function getToken() {
+      return localStorage.getItem('manager_token') || '';
+    }
+  </script>
+</body>
+</html>

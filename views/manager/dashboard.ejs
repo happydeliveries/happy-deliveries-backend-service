@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Restaurant Manager</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem;
+      border-bottom: 1px solid hsl(var(--border));
+      background: hsl(var(--background));
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .topbar-search { flex: 1; max-width: 28rem; }
+    .search-input-wrapper { position: relative; }
+    .search-input-wrapper svg {
+      position: absolute; left: 0.75rem; top: 50%;
+      transform: translateY(-50%); width: 1rem; height: 1rem;
+      color: hsl(var(--muted-foreground));
+    }
+    .search-input {
+      width: 100%; padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+      border: 1px solid hsl(var(--input)); border-radius: var(--radius);
+      font-size: 0.875rem; background: hsl(var(--background));
+      color: hsl(var(--foreground)); outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .search-input:focus {
+      border-color: hsl(var(--ring));
+      box-shadow: 0 0 0 2px hsla(var(--ring), 0.2);
+    }
+    .search-input::placeholder { color: hsl(var(--muted-foreground)); }
+    .topbar-actions { display: flex; align-items: center; gap: 1rem; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.875rem;
+      font-weight: 500; cursor: pointer; transition: background-color 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s;
+      border: none; text-decoration: none;
+    }
+    .btn svg { width: 1rem; height: 1rem; }
+    .btn-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
+    .btn-secondary:hover { background: hsl(var(--accent)); }
+    .btn-outline {
+      background: transparent; border: 1px solid hsl(var(--input));
+      color: hsl(var(--foreground));
+    }
+    .btn-outline:hover { background: hsl(var(--accent)); }
+    .btn-ghost { background: transparent; color: hsl(var(--foreground)); }
+    .btn-ghost:hover { background: hsl(var(--accent)); }
+    .btn-icon { padding: 0.5rem; width: 2rem; height: 2rem; }
+    .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; }
+    .badge {
+      display: inline-flex; align-items: center; padding: 0.125rem 0.625rem;
+      border-radius: 9999px; font-size: 0.75rem; font-weight: 500;
+    }
+    .badge-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+    .badge-secondary { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
+    .badge-gray { background: #f3f4f6; color: #374151; }
+    .badge-blue { background: #dbeafe; color: #1e40af; }
+    .badge-yellow { background: #fef3c7; color: #92400e; }
+    .badge-orange { background: #ffedd5; color: #9a3412; }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-red { background: #fee2e2; color: #991b1b; }
+    .notification-btn { position: relative; }
+    .notification-badge {
+      position: absolute; top: -0.25rem; right: -0.25rem;
+      width: 1.25rem; height: 1.25rem; background: hsl(var(--primary));
+      color: hsl(var(--primary-foreground)); border-radius: 50%;
+      font-size: 0.625rem; display: flex; align-items: center; justify-content: center;
+      font-weight: 500;
+    }
+    .avatar {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      overflow: hidden;
+      background: hsl(var(--muted));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: hsl(var(--muted-foreground));
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .avatar-sm {
+      width: 1.5rem;
+      height: 1.5rem;
+      font-size: 0.625rem;
+    }
+
+    .avatar-lg {
+      width: 2.5rem;
+      height: 2.5rem;
+      font-size: 0.875rem;
+    }
+
+    .avatar-xl {
+      width: 5rem;
+      height: 5rem;
+      font-size: 1.5rem;
+    }
+    .card {
+      background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .card-header {
+      padding: 1.5rem; display: flex; flex-direction: column; gap: 0.375rem;
+    }
+    .card-header-row { display: flex; align-items: center; justify-content: space-between; }
+    .card-title { font-size: 1rem; font-weight: 600; line-height: 1.5; }
+    .card-title-lg { font-size: 1.125rem; }
+    .card-description { font-size: 0.875rem; color: hsl(var(--muted-foreground)); }
+    .card-content { padding: 0 1.5rem 1.5rem; }
+    .card-content-full { padding: 0; }
+    .stat-card .card-header {
+      display: flex; flex-direction: row; align-items: center; justify-content: space-between;
+      padding-bottom: 0.5rem;
+    }
+    .stat-card .card-title { font-size: 0.875rem; font-weight: 500; }
+    .stat-card .stat-icon { color: hsl(var(--muted-foreground)); }
+    .stat-card .stat-icon svg { width: 1rem; height: 1rem; }
+    .stat-value { font-size: 1.5rem; font-weight: 700; }
+    .stat-description { font-size: 0.75rem; color: hsl(var(--muted-foreground)); }
+    .page-container {
+      padding: 1.5rem 2rem; display: flex; flex-direction: column; gap: 1.5rem;
+    }
+    .page-header { display: flex; align-items: center; justify-content: space-between; }
+    .page-title { font-size: 1.875rem; font-weight: 700; letter-spacing: -0.025em; }
+    .page-actions { display: flex; align-items: center; gap: 0.5rem; }
+    .tabs { display: flex; flex-direction: column; gap: 1rem; }
+    .tabs-list {
+      display: inline-flex; padding: 0.25rem; background: hsl(var(--muted));
+      border-radius: var(--radius); gap: 0.125rem;
+    }
+    .tab-trigger {
+      padding: 0.375rem 0.75rem; border-radius: calc(var(--radius) - 0.125rem);
+      font-size: 0.875rem; font-weight: 500; cursor: pointer; background: transparent;
+      border: none; color: hsl(var(--muted-foreground));
+      transition: background-color 0.15s, color 0.15s;
+    }
+    .tab-trigger:hover { color: hsl(var(--foreground)); }
+    .tab-trigger.active {
+      background: hsl(var(--background)); color: hsl(var(--foreground));
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .grid { display: grid; gap: 1rem; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .grid-7 { grid-template-columns: repeat(7, 1fr); }
+    .col-span-3 { grid-column: span 3; }
+    .col-span-4 { grid-column: span 4; }
+    .recent-sales { display: flex; flex-direction: column; gap: 2rem; }
+    .recent-sale-item { display: flex; align-items: center; }
+    .recent-sale-info { margin-left: 1rem; display: flex; flex-direction: column; gap: 0.25rem; }
+    .recent-sale-name { font-size: 0.875rem; font-weight: 500; line-height: 1; }
+    .recent-sale-company { font-size: 0.875rem; color: hsl(var(--muted-foreground)); }
+    .recent-sale-amount { margin-left: auto; font-weight: 500; }
+    .table-wrapper {
+      border: 1px solid hsl(var(--border)); border-radius: var(--radius); overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th {
+      text-align: left; padding: 0.75rem 1rem; font-weight: 500;
+      color: hsl(var(--muted-foreground)); border-bottom: 1px solid hsl(var(--border));
+      background: hsl(var(--muted));
+    }
+    td { padding: 0.75rem 1rem; border-bottom: 1px solid hsl(var(--border)); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background: hsla(var(--muted), 0.5); }
+    .table-header-btn {
+      display: inline-flex; align-items: center; gap: 0.25rem; background: none;
+      border: none; cursor: pointer; font-weight: 500;
+      color: hsl(var(--muted-foreground)); padding: 0.25rem 0.5rem;
+      margin: -0.25rem -0.5rem; border-radius: 0.25rem; font-size: 0.875rem;
+    }
+    .table-header-btn:hover { background: hsla(var(--muted), 0.5); }
+    .table-header-btn svg { width: 1rem; height: 1rem; }
+    .checkbox {
+      width: 1rem; height: 1rem; border: 1px solid hsl(var(--input));
+      border-radius: 0.25rem; cursor: pointer; appearance: none;
+      background: hsl(var(--background)); transition: background-color 0.15s, border-color 0.15s;
+    }
+    .checkbox:checked {
+      background: hsl(var(--primary)); border-color: hsl(var(--primary));
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
+    }
+    .filters { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+    .filter-input { flex: 1; max-width: 20rem; }
+    .pagination { display: flex; align-items: center; justify-content: space-between; padding-top: 1rem; }
+    .pagination-info { font-size: 0.875rem; color: hsl(var(--muted-foreground)); }
+    .pagination-buttons { display: flex; gap: 0.5rem; }
+    .chart-container { height: 350px; position: relative; }
+    .toast-container {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 200;
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .toast {
+      background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: var(--radius);
+      padding: 1rem 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      min-width: 20rem; transform: translateX(100%); opacity: 0;
+      transition: transform 0.3s, opacity 0.3s;
+    }
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast-title { font-weight: 500; margin-bottom: 0.25rem; }
+    .toast-description { font-size: 0.875rem; color: hsl(var(--muted-foreground)); }
+    .hidden { display: none !important; }
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .gap-1 { gap: 0.25rem; }
+    .gap-2 { gap: 0.5rem; }
+    .gap-3 { gap: 0.75rem; }
+    .gap-4 { gap: 1rem; }
+    .text-center { text-align: center; }
+    .text-muted { color: hsl(var(--muted-foreground)); }
+    .font-medium { font-weight: 500; }
+    .font-semibold { font-weight: 600; }
+    .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dropdown { position: relative; }
+    .dropdown-content {
+      position: absolute; top: 100%; right: 0; background: hsl(var(--background));
+      border: 1px solid hsl(var(--border)); border-radius: var(--radius);
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      min-width: 12rem; z-index: 50; display: none; padding: 0.25rem;
+    }
+    .dropdown.active .dropdown-content { display: block; }
+    .dropdown-label { padding: 0.5rem 0.75rem; font-size: 0.875rem; font-weight: 500; }
+    .dropdown-item {
+      display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem;
+      font-size: 0.875rem; cursor: pointer; border-radius: 0.25rem;
+      transition: background-color 0.15s;
+    }
+    .dropdown-item:hover { background: hsl(var(--accent)); }
+    .dropdown-separator { height: 1px; background: hsl(var(--border)); margin: 0.25rem 0; }
+    .dropdown-item.danger { color: hsl(var(--destructive)); }
+    .spinner-container {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,0.9); z-index: 9999;
+      justify-content: center; align-items: center;
+    }
+    .spinner {
+      width: 50px; height: 50px; border: 5px solid #f3f3f3;
+      border-top: 5px solid hsl(var(--primary)); border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @media (max-width: 1024px) {
+      .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .grid-7 { grid-template-columns: 1fr; }
+      .col-span-3, .col-span-4 { grid-column: span 1; }
+    }
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+      .main-content { margin-left: 0; }
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .page-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+      .topbar { padding: 1rem; }
+      .topbar-search { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <!-- <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> -->
+        </div>
+        <span class="sidebar-title">Happy Deliveries</span>
+      </div>
+      <nav class="sidebar-content">
+        <ul class="sidebar-menu">
+          <li>
+            <a href="/manager/dashboard" class="sidebar-menu-item active">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard-icon lucide-layout-dashboard"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+              <span>Dashboard</span>
+            </a>
+          </li>
+          <li>
+            <a href="/manager/restaurants" class="sidebar-menu-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-store-icon lucide-store"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg>
+              <span>Restaurants</span>
+            </a>
+          </li>
+          <li>
+            <a href="/manager/menus" class="sidebar-menu-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-utensils-crossed-icon lucide-utensils-crossed"><path d="m16 2-2.3 2.3a3 3 0 0 0 0 4.2l1.8 1.8a3 3 0 0 0 4.2 0L22 8"/><path d="M15 15 3.3 3.3a4.2 4.2 0 0 0 0 6l7.3 7.3c.7.7 2 .7 2.8 0L15 15Zm0 0 7 7"/><path d="m2.1 21.8 6.4-6.3"/><path d="m19 5-7 7"/></svg>
+              <span>Menus</span>
+            </a>
+          </li>
+          <li>
+            <a href="/manager/orders" class="sidebar-menu-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-receipt-text-icon lucide-receipt-text"><path d="M13 16H8"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg>
+              <span>Orders</span>
+            </a>
+          </li>
+          <li>
+            <a href="/manager/drivers" class="sidebar-menu-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>
+              <span>Manage Drivers</span>
+            </a>
+          </li>
+          <li>
+            <a href="/manager/analytics" class="sidebar-menu-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+              <span>Analytics</span>
+            </a>
+          </li>
+          <li>
+            <a href="/manager/settings" class="sidebar-menu-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>Settings</span>
+            </a>
+          </li>
+          
+        </ul>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="avatar avatar-lg">
+            <%= manager.first_name ? manager.first_name[0] : 'M' %><%= manager.last_name ? manager.last_name[0] : '' %>
+          </div>
+          <div class="sidebar-user-info">
+            <span class="sidebar-user-name"><%= manager.first_name %> <%= manager.last_name %></span>
+            <span class="sidebar-user-role">Restaurant Manager</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <script>window.managerId = "<%= manager.id || '' %>" || null;</script>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Topbar -->
+      <div class="topbar">
+        <div class="topbar-search">
+          <div class="search-input-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" class="search-input" placeholder="Search orders, restaurants, menus...">
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <div class="dropdown">
+            <button class="btn btn-ghost btn-icon notification-btn" onclick="toggleDropdown(this)">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+              <span class="notification-badge" id="notificationBadge">0</span>
+            </button>
+            <div class="dropdown-content" style="width: 20rem;">
+              <div class="dropdown-label">Notifications</div>
+              <div class="dropdown-separator"></div>
+              <div class="dropdown-item" style="flex-direction: column; align-items: flex-start;">
+                <span class="font-medium">Active Orders</span>
+                <span class="text-muted" style="font-size: 0.75rem;">You have <span id="notifActiveCount">0</span> orders currently processing</span>
+              </div>
+            </div>
+          </div>
+          <div class="dropdown">
+            <button class="btn btn-ghost btn-icon" onclick="toggleDropdown(this)" style="border-radius: 50%;">
+              <div class="avatar" style="background: hsl(var(--primary)); color: hsl(var(--primary-foreground));">
+                <%= manager.first_name ? manager.first_name[0] : 'M' %>
+              </div>
+            </button>
+            <div class="dropdown-content">
+              <div class="dropdown-label">My Account</div>
+              <div class="dropdown-separator"></div>
+              <a href="/manager/settings" class="dropdown-item" style="text-decoration:none;color:inherit;">Profile</a>
+              <a href="/manager/settings" class="dropdown-item" style="text-decoration:none;color:inherit;">Settings</a>
+              <div class="dropdown-separator"></div>
+              <a href="/manager/logout" class="dropdown-item danger" style="text-decoration:none;color:inherit;">Log out</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard Content -->
+      <div class="page-container">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Dashboard</h2>
+            <p class="text-muted" style="font-size:0.875rem;">Welcome back, <%= manager.first_name %>! Here's what's happening with your restaurants.</p>
+          </div>
+          <div class="page-actions">
+            <a href="/manager/restaurants/add" class="btn btn-primary">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              Add Restaurant
+            </a>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <div class="tabs-list">
+            <button class="tab-trigger active" data-tab="overview">Overview</button>
+            <button class="tab-trigger" data-tab="analytics">Analytics</button>
+            <button class="tab-trigger" data-tab="orders">Orders</button>
+            <button class="tab-trigger" data-tab="reports">Reports</button>
+          </div>
+
+          <!-- Overview Tab -->
+          <div class="tab-content active" id="tab-overview">
+            <!-- Stats Cards -->
+            <div class="grid grid-4">
+              <div class="card stat-card">
+                <div class="card-header">
+                  <span class="card-title">Total Revenue</span>
+                  <div class="stat-icon">
+                    <!-- <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-credit-card-icon lucide-credit-card"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                  </div>
+                </div>
+                <div class="card-content">
+                  <div class="stat-value" id="totalRevenue">R 0.00</div>
+                  <p class="stat-description" id="revenueChange">+0% from last week</p>
+                </div>
+              </div>
+              <div class="card stat-card">
+                <div class="card-header">
+                  <span class="card-title">Total Orders</span>
+                  <div class="stat-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                  </div>
+                </div>
+                <div class="card-content">
+                  <div class="stat-value" id="totalOrders">0</div>
+                  <p class="stat-description" id="ordersChange">+0% from last week</p>
+                </div>
+              </div>
+              <div class="card stat-card">
+                <div class="card-header">
+                  <span class="card-title">Average Rating</span>
+                  <div class="stat-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  </div>
+                </div>
+                <div class="card-content">
+                  <div class="stat-value" id="avgRating">0.0</div>
+                  <p class="stat-description">Based on <span id="totalReviews">0</span> reviews</p>
+                </div>
+              </div>
+              <div class="card stat-card">
+                <div class="card-header">
+                  <span class="card-title">Active Orders</span>
+                  <div class="stat-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  </div>
+                </div>
+                <div class="card-content">
+                  <div class="stat-value" id="activeOrders">0</div>
+                  <p class="stat-description">Currently processing</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="grid grid-7">
+              <div class="card col-span-4">
+                <div class="card-header">
+                  <h3 class="card-title">Revenue Trend</h3>
+                  <p class="card-description">Revenue performance over time</p>
+                </div>
+                <div class="card-content">
+                  <div class="chart-container">
+                    <canvas id="revenueChart"></canvas>
+                  </div>
+                </div>
+              </div>
+              <div class="card col-span-3">
+                <div class="card-header">
+                  <h3 class="card-title">Order Status</h3>
+                  <p class="card-description">Distribution of order statuses</p>
+                </div>
+                <div class="card-content">
+                  <div class="chart-container">
+                    <canvas id="ordersChart"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent Orders -->
+            <div class="card">
+              <div class="card-header card-header-row">
+                <div>
+                  <h3 class="card-title">Recent Orders</h3>
+                  <p class="card-description">Latest orders across your restaurants</p>
+                </div>
+                <a href="/manager/orders" class="btn btn-outline btn-sm">View All Orders</a>
+              </div>
+              <div class="card-content card-content-full" style="padding:0 1.5rem 1.5rem;">
+                <div class="table-wrapper">
+                  <table id="recentOrdersTable">
+                    <thead>
+                      <tr>
+                        <th>Order #</th>
+                        <th>Restaurant</th>
+                        <th>Customer</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Time</th>
+                        <th style="width: 50px;"></th>
+                      </tr>
+                    </thead>
+                    <tbody id="recentOrdersTableBody">
+                      <tr>
+                        <td colspan="7" class="text-center" style="padding:2rem;">
+                          <div class="spinner" style="width:24px;height:24px;display:inline-block;vertical-align:middle;border-width:3px;"></div>
+                          <span class="ms-2">Loading orders...</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pending Orders (Manager action required) -->
+            <div class="card">
+              <div class="card-header card-header-row">
+                <div>
+                  <h3 class="card-title">Pending Orders</h3>
+                  <p class="card-description">New customer orders awaiting your approval (Accept or Reject)</p>
+                </div>
+                <a href="/manager/orders" class="btn btn-outline btn-sm">View All Orders</a>
+              </div>
+              <div class="card-content card-content-full" style="padding:0 1.5rem 1.5rem;">
+                <div class="table-wrapper">
+                  <table id="pendingOrdersTable">
+                    <thead>
+                      <tr>
+                        <th>Order #</th>
+                        <th>Customer</th>
+                        <th>Amount</th>
+                        <th>Time</th>
+                        <th style="width:120px;">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="pendingOrdersTableBody">
+                      <tr>
+                        <td colspan="5" class="text-center" style="padding:2rem;">
+                          <div class="spinner" style="width:24px;height:24px;display:inline-block;vertical-align:middle;border-width:3px;"></div>
+                          <span class="ms-2">Loading pending orders...</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- My Restaurants -->
+            <div class="card">
+              <div class="card-header card-header-row">
+                <div>
+                  <h3 class="card-title">My Restaurants</h3>
+                  <p class="card-description">Manage your restaurant portfolio</p>
+                </div>
+                <a href="/manager/restaurants" class="btn btn-outline btn-sm">Manage Restaurants</a>
+              </div>
+              <div class="card-content">
+                <div class="grid grid-3" id="restaurantsGrid">
+                  <div class="text-center" style="grid-column: 1 / -1; padding: 2rem;">
+                    <div class="spinner" style="width:24px;height:24px;display:inline-block;vertical-align:middle;border-width:3px;"></div>
+                    <span class="ms-2">Loading restaurants...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Analytics Tab -->
+          <div class="tab-content" id="tab-analytics">
+            <div class="grid grid-4" style="margin-bottom: 1rem;">
+              <div class="card stat-card">
+                <div class="card-header">
+                  <span class="card-title">Total Revenue</span>
+                  <div class="stat-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-credit-card-icon lucide-credit-card"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                  </div>
+                </div>
+                <div class="card-content">
+                  <div class="stat-value" id="analyticsRevenue">R 0.00</div>
+                  <p class="stat-description">+0% from last week</p>
+                </div>
+              </div>
+              <div class="card stat-card">
+                <div class="card-header">
+                  <span class="card-title">Total Orders</span>
+                  <div class="stat-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                  </div>
+                </div>
+                <div class="card-content">
+                  <div class="stat-value" id="analyticsOrders">0</div>
+                  <p class="stat-description">+0% from last week</p>
+                </div>
+              </div>
+              <div class="card stat-card">
+                <div class="card-header">
+                  <span class="card-title">Average Rating</span>
+                  <div class="stat-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  </div>
+                </div>
+                <div class="card-content">
+                  <div class="stat-value" id="analyticsRating">0.0</div>
+                  <p class="stat-description">Based on <span id="analyticsReviews">0</span> reviews</p>
+                </div>
+              </div>
+              <div class="card stat-card">
+                <div class="card-header">
+                  <span class="card-title">Active Orders</span>
+                  <div class="stat-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  </div>
+                </div>
+                <div class="card-content">
+                  <div class="stat-value" id="analyticsActive">0</div>
+                  <p class="stat-description">Currently processing</p>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">Analytics Dashboard</h3>
+                <p class="card-description">Detailed analytics and performance metrics coming soon</p>
+              </div>
+              <div class="card-content">
+                <div style="display: flex; align-items: center; justify-content: center; height: 200px; color: hsl(var(--muted-foreground));">
+                  Advanced analytics features will be available here
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Orders Tab -->
+          <div class="tab-content" id="tab-orders">
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">All Orders</h3>
+                <p class="card-description">Comprehensive view of all orders with filtering</p>
+              </div>
+              <div class="card-content">
+                <div class="filters">
+                  <div class="search-input-wrapper filter-input">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);color:hsl(var(--muted-foreground));"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    <input type="text" class="search-input" placeholder="Filter orders..." style="padding-left: 2.5rem;" id="ordersTableFilter">
+                  </div>
+                  <button class="btn btn-outline btn-sm" style="margin-left: auto;">
+                    Columns
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                </div>
+                <div class="table-wrapper">
+                  <table id="ordersTable">
+                    <thead>
+                      <tr>
+                        <th style="width: 40px;"><input type="checkbox" class="checkbox" id="selectAllOrders"></th>
+                        <th><button class="table-header-btn">Order # <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg></button></th>
+                        <th><button class="table-header-btn">Restaurant <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg></button></th>
+                        <th><button class="table-header-btn">Customer <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg></button></th>
+                        <th>Status</th>
+                        <th><button class="table-header-btn">Amount <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg></button></th>
+                        <th><button class="table-header-btn">Time <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg></button></th>
+                        <th style="width: 50px;"></th>
+                      </tr>
+                    </thead>
+                    <tbody id="ordersTableBody">
+                      <tr>
+                        <td colspan="8" class="text-center" style="padding:2rem;">
+                          <div class="spinner" style="width:24px;height:24px;display:inline-block;vertical-align:middle;border-width:3px;"></div>
+                          <span class="ms-2">Loading orders...</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="pagination">
+                  <div class="pagination-info" id="ordersPaginationInfo">0 of 0 row(s) selected.</div>
+                  <div class="pagination-buttons">
+                    <button class="btn btn-outline btn-sm" disabled>Previous</button>
+                    <button class="btn btn-outline btn-sm" disabled>Next</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reports Tab -->
+          <div class="tab-content" id="tab-reports">
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">Reports</h3>
+                <p class="card-description">Generate and download comprehensive sales reports</p>
+              </div>
+              <div class="card-content">
+                <div style="display: flex; align-items: center; justify-content: center; height: 200px; color: hsl(var(--muted-foreground));">
+                  Report generation features will be available here
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Loading Spinner -->
+  <div class="spinner-container" id="loadingSpinner">
+    <div class="spinner"></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/manager.js"></script>
+  <script>
+    // Global variables
+    let revenueChart, ordersChart;
+    const API_BASE = '/manager/api';
+
+    // Toast notification (template style)
+    function showToast(title, description) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.innerHTML = `
+        <div class="toast-title">${title}</div>
+        <div class="toast-description">${description}</div>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.add('show'), 10);
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Loading spinner
+    function showLoading() {
+      document.getElementById('loadingSpinner').style.display = 'flex';
+    }
+    function hideLoading() {
+      document.getElementById('loadingSpinner').style.display = 'none';
+    }
+
+    // Create empty chart when data fails to load
+    function createEmptyChart(canvasId, type, message) {
+      try {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        new Chart(ctx, {
+          type: type,
+          data: {
+            labels: ['No Data'],
+            datasets: [{
+              data: [1],
+              backgroundColor: ['#e9ecef'],
+              borderColor: '#dee2e6'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { enabled: false }
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error creating empty chart:', error);
+      }
+    }
+
+    // Initialize dashboard
+    document.addEventListener('DOMContentLoaded', function() {
+      loadDashboardData();
+      setupEventListeners();
+      startAutoRefresh();
+    });
+
+    function setupEventListeners() {
+      // Tab switching
+      document.querySelectorAll('.tab-trigger').forEach(tab => {
+        tab.addEventListener('click', () => {
+          const tabId = tab.dataset.tab;
+          const parent = tab.closest('.tabs');
+          parent.querySelectorAll('.tab-trigger').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          parent.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+          document.getElementById('tab-' + tabId).classList.add('active');
+        });
+      });
+
+      // Dropdown toggle
+      document.querySelectorAll('.dropdown button').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const dropdown = this.closest('.dropdown');
+          document.querySelectorAll('.dropdown').forEach(d => {
+            if (d !== dropdown) d.classList.remove('active');
+          });
+          dropdown.classList.toggle('active');
+        });
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.dropdown')) {
+          document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('active'));
+        }
+      });
+
+      // Orders table filter
+      const filterInput = document.getElementById('ordersTableFilter');
+      if (filterInput) {
+        filterInput.addEventListener('input', function(e) {
+          const term = e.target.value.toLowerCase();
+          let visibleCount = 0;
+          document.querySelectorAll('#ordersTableBody tr').forEach(row => {
+            const text = row.textContent.toLowerCase();
+            const show = text.includes(term);
+            row.style.display = show ? '' : 'none';
+            if (show) visibleCount++;
+          });
+          document.getElementById('ordersPaginationInfo').textContent = `${visibleCount} order(s) shown`;
+        });
+      }
+    }
+
+    // Load dashboard data
+    async function loadDashboardData() {
+      try {
+        showLoading();
+        await Promise.all([
+          loadDashboardStats(),
+          loadRevenueChart('week'),
+          loadOrdersChart(),
+          loadRecentOrders(),
+          loadRestaurants(),
+          loadOrdersTab()
+        ]);
+        hideLoading();
+      } catch (error) {
+        console.error('Error loading dashboard:', error);
+        showToast('Error', 'Failed to load some dashboard data');
+        hideLoading();
+      }
+    }
+
+    // Load dashboard stats
+    async function loadDashboardStats() {
+      try {
+        const response = await fetch(`${API_BASE}/dashboard/stats`, { credentials: 'same-origin' });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+
+        if (data.success) {
+          const stats = data.stats;
+          document.getElementById('totalRevenue').textContent = `R ${stats.total_revenue || '0.00'}`;
+          document.getElementById('totalOrders').textContent = stats.total_orders || 0;
+          document.getElementById('avgRating').textContent = stats.avg_rating || '0.0';
+          document.getElementById('activeOrders').textContent = stats.active_orders || 0;
+          document.getElementById('totalReviews').textContent = stats.total_reviews || 0;
+
+          const revChange = document.getElementById('revenueChange');
+          revChange.textContent = `${stats.revenue_change >= 0 ? '+' : ''}${stats.revenue_change || 0}% from last week`;
+          revChange.style.color = stats.revenue_change >= 0 ? 'hsl(142.1 76.2% 36.3%)' : 'hsl(0 84.2% 60.2%)';
+
+          const ordChange = document.getElementById('ordersChange');
+          ordChange.textContent = `${stats.orders_change >= 0 ? '+' : ''}${stats.orders_change || 0}% from last week`;
+          ordChange.style.color = stats.orders_change >= 0 ? 'hsl(142.1 76.2% 36.3%)' : 'hsl(0 84.2% 60.2%)';
+
+          // Update analytics tab mirrors
+          document.getElementById('analyticsRevenue').textContent = `R ${stats.total_revenue || '0.00'}`;
+          document.getElementById('analyticsOrders').textContent = stats.total_orders || 0;
+          document.getElementById('analyticsRating').textContent = stats.avg_rating || '0.0';
+          document.getElementById('analyticsActive').textContent = stats.active_orders || 0;
+          document.getElementById('analyticsReviews').textContent = stats.total_reviews || 0;
+        }
+      } catch (error) {
+        console.error('Error loading stats:', error);
+        throw error;
+      }
+    }
+
+    // Load revenue chart
+    async function loadRevenueChart(period = 'week') {
+      try {
+        const response = await fetch(`${API_BASE}/dashboard/revenue?period=${period}`, { credentials: 'same-origin' });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+
+        if (data.success) {
+          const ctx = document.getElementById('revenueChart').getContext('2d');
+          if (revenueChart) revenueChart.destroy();
+
+          revenueChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: data.labels || [],
+              datasets: [{
+                label: 'Revenue',
+                data: data.data || [],
+                borderColor: 'hsl(221.2, 83.2%, 53.3%)',
+                backgroundColor: 'hsla(221.2, 83.2%, 53.3%, 0.1)',
+                tension: 0.4,
+                fill: true,
+                borderWidth: 2,
+                pointRadius: 5,
+                pointBackgroundColor: 'hsl(221.2, 83.2%, 53.3%)',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: {
+                    callback: function(value) {
+                      return 'R ' + value.toLocaleString('en-ZA');
+                    }
+                  }
+                }
+              }
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error loading revenue chart:', error);
+        createEmptyChart('revenueChart', 'line', 'Revenue data unavailable');
+      }
+    }
+
+    // Load orders chart
+    async function loadOrdersChart() {
+      try {
+        const response = await fetch(`${API_BASE}/dashboard/orders`, { credentials: 'same-origin' });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+
+        if (data.success) {
+          const ctx = document.getElementById('ordersChart').getContext('2d');
+          if (ordersChart) ordersChart.destroy();
+
+          ordersChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+              labels: data.labels || [],
+              datasets: [{
+                data: data.data || [],
+                backgroundColor: data.backgroundColor || [
+                  '#4a6fa5', '#17a2b8', '#28a745', '#20c997', '#ffc107', '#fd7e14', '#e83e8c', '#343a40'
+                ],
+                borderWidth: 0
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: { usePointStyle: true, padding: 16 }
+                }
+              }
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error loading orders chart:', error);
+        createEmptyChart('ordersChart', 'doughnut', 'Orders data unavailable');
+      }
+    }
+
+    // Load recent orders for Overview table
+    async function loadRecentOrders() {
+      try {
+        const response = await fetch(`${API_BASE}/dashboard/recent-orders?limit=5`, { credentials: 'same-origin' });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+
+        const tbody = document.getElementById('recentOrdersTableBody');
+        tbody.innerHTML = '';
+
+        if (!data.success || data.orders.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" class="text-center" style="padding:2rem; color:hsl(var(--muted-foreground));">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 0.5rem;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                No recent orders
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        data.orders.forEach(order => {
+          const row = document.createElement('tr');
+          const orderTime = new Date(order.placed_at);
+          const timeString = orderTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+          let statusClass = 'badge-gray';
+          let statusText = 'Pending Approval';
+          if (order.status === 'accepted_by_driver') { statusClass = 'badge-blue'; statusText = 'Driver Assigned'; }
+          else if (order.status === 'ordering_at_restaurant') {
+            statusClass = order.payment_status === 'completed' ? 'badge-green' : 'badge-blue';
+            statusText = order.payment_status === 'completed' ? 'Paid (Finding Driver)' : 'Accepted (Awaiting Payment)';
+          }
+          else if (order.status === 'order_ready') { statusClass = 'badge-green'; statusText = 'Ready'; }
+          else if (order.status === 'delivered') { statusClass = 'badge-green'; statusText = 'Delivered'; }
+          else if (order.status === 'cancelled') { statusClass = 'badge-red'; statusText = 'Rejected / Cancelled'; }
+          else if (order.status === 'on_the_way') { statusClass = 'badge-yellow'; statusText = 'On the Way'; }
+          else if (order.status === 'pending') { statusClass = 'badge-orange'; statusText = 'Pending Approval'; }
+
+          row.innerHTML = `
+            <td class="font-medium">#${order.order_number || order.id.substring(0, 8)}</td>
+            <td>${order.restaurant_name || 'Unknown'}</td>
+            <td>${order.customer_name || 'Unknown'}</td>
+            <td class="font-medium">R ${parseFloat(order.total_amount || 0).toFixed(2)}</td>
+            <td><span class="badge ${statusClass}">${statusText}</span></td>
+            <td class="text-muted">${timeString}</td>
+            <td>
+              <div style="display:flex; gap:0.35rem; align-items:center;">
+                ${order.status === 'pending' ? `
+                  <button class="btn btn-primary btn-sm" onclick="acceptOrder('${order.id}', this)">Accept</button>
+                  <button class="btn btn-outline btn-sm" style="color:hsl(var(--destructive));border-color:hsl(var(--destructive));" onclick="rejectOrder('${order.id}', this)">Reject</button>
+                ` : ''}
+                <button class="btn btn-ghost btn-icon" onclick="viewOrder('${order.id}')">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+      } catch (error) {
+        console.error('Error loading recent orders:', error);
+        document.getElementById('recentOrdersTableBody').innerHTML = `
+          <tr>
+            <td colspan="7" class="text-center" style="padding:2rem; color:hsl(var(--muted-foreground));">
+              Failed to load orders
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    // Load orders for Orders tab
+    async function loadOrdersTab() {
+      try {
+        const response = await fetch(`${API_BASE}/dashboard/recent-orders?limit=50`, { credentials: 'same-origin' });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+
+        const tbody = document.getElementById('ordersTableBody');
+        tbody.innerHTML = '';
+
+        if (!data.success || data.orders.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="8" class="text-center" style="padding:2rem; color:hsl(var(--muted-foreground));">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 0.5rem;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                No orders found
+              </td>
+            </tr>
+          `;
+          document.getElementById('ordersPaginationInfo').textContent = '0 orders';
+          return;
+        }
+
+        data.orders.forEach(order => {
+          const row = document.createElement('tr');
+          const orderTime = new Date(order.placed_at);
+          const timeString = orderTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+          let statusClass = 'badge-gray';
+          let statusText = 'Pending Approval';
+          if (order.status === 'accepted_by_driver') { statusClass = 'badge-blue'; statusText = 'Driver Assigned'; }
+          else if (order.status === 'ordering_at_restaurant') {
+            statusClass = order.payment_status === 'completed' ? 'badge-green' : 'badge-blue';
+            statusText = order.payment_status === 'completed' ? 'Paid (Finding Driver)' : 'Accepted (Awaiting Payment)';
+          }
+          else if (order.status === 'order_ready') { statusClass = 'badge-green'; statusText = 'Ready'; }
+          else if (order.status === 'delivered') { statusClass = 'badge-green'; statusText = 'Delivered'; }
+          else if (order.status === 'cancelled') { statusClass = 'badge-red'; statusText = 'Rejected / Cancelled'; }
+          else if (order.status === 'on_the_way') { statusClass = 'badge-yellow'; statusText = 'On the Way'; }
+          else if (order.status === 'pending') { statusClass = 'badge-orange'; statusText = 'Pending Approval'; }
+
+          row.innerHTML = `
+            <td><input type="checkbox" class="checkbox"></td>
+            <td class="font-medium">#${order.order_number || order.id.substring(0, 8)}</td>
+            <td>${order.restaurant_name || 'Unknown'}</td>
+            <td>${order.customer_name || 'Unknown'}</td>
+            <td><span class="badge ${statusClass}">${statusText}</span></td>
+            <td class="font-medium">R ${parseFloat(order.total_amount || 0).toFixed(2)}</td>
+            <td class="text-muted">${timeString}</td>
+            <td>
+              <div style="display:flex; gap:0.35rem; align-items:center;">
+                ${order.status === 'pending' ? `
+                  <button class="btn btn-primary btn-sm" onclick="acceptOrder('${order.id}', this)">Accept</button>
+                  <button class="btn btn-outline btn-sm" style="color:hsl(var(--destructive));border-color:hsl(var(--destructive));" onclick="rejectOrder('${order.id}', this)">Reject</button>
+                ` : ''}
+                <button class="btn btn-ghost btn-icon" onclick="viewOrder('${order.id}')">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        document.getElementById('ordersPaginationInfo').textContent = `${data.orders.length} orders shown`;
+      } catch (error) {
+        console.error('Error loading orders tab:', error);
+        document.getElementById('ordersTableBody').innerHTML = `
+          <tr>
+            <td colspan="8" class="text-center" style="padding:2rem; color:hsl(var(--muted-foreground));">
+              Failed to load orders
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    // Load restaurants
+    async function loadRestaurants() {
+      try {
+        const response = await fetch(`${API_BASE}/restaurants/my`, { credentials: 'same-origin' });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+
+        const container = document.getElementById('restaurantsGrid');
+        container.innerHTML = '';
+
+        if (!data.success || data.restaurants.length === 0) {
+          container.innerHTML = `
+            <div class="text-center" style="grid-column: 1 / -1; padding: 2rem; color: hsl(var(--muted-foreground));">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 0.75rem;"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+              <h4 style="font-weight:600;margin-bottom:0.25rem;">No restaurants yet</h4>
+              <p style="font-size:0.875rem;margin-bottom:1rem;">Add your first restaurant to get started</p>
+              <a href="/manager/restaurants/add" class="btn btn-primary btn-sm">Add Restaurant</a>
+            </div>
+          `;
+          return;
+        }
+
+        data.restaurants.forEach(r => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.style.padding = '1.5rem';
+          card.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.75rem;">
+              <h4 style="font-weight:600; font-size:1rem;">${r.name}</h4>
+              <span class="badge ${r.is_active ? 'badge-green' : 'badge-red'}">${r.is_active ? 'Active' : 'Inactive'}</span>
+            </div>
+            <p class="text-muted" style="font-size:0.875rem; margin-bottom:1rem;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:0.25rem;"><path d="M17 18a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2"/><rect width="18" height="18" x="3" y="4" rx="2"/><circle cx="12" cy="10" r="2"/><line x1="8" x2="8" y1="2" y2="4"/><line x1="16" x2="16" y1="2" y2="4"/></svg>
+              ${r.cuisine_type || 'Multi-cuisine'}
+            </p>
+            <div style="display:flex; gap:1.5rem; margin-bottom:1.25rem;">
+              <div>
+                <div style="font-size:1.25rem; font-weight:700;">${r.total_orders || 0}</div>
+                <div style="font-size:0.75rem; color:hsl(var(--muted-foreground));">Orders</div>
+              </div>
+              <div>
+                <div style="font-size:1.25rem; font-weight:700;">R ${r.total_revenue || '0.00'}</div>
+                <div style="font-size:0.75rem; color:hsl(var(--muted-foreground));">Revenue</div>
+              </div>
+              <div>
+                <div style="font-size:1.25rem; font-weight:700;">${r.average_rating || '0.0'}</div>
+                <div style="font-size:0.75rem; color:hsl(var(--muted-foreground));">Rating</div>
+              </div>
+            </div>
+            <a href="/manager/restaurants/edit/${r.id}" class="btn btn-outline btn-sm" style="width:100%;">Manage</a>
+          `;
+          container.appendChild(card);
+        });
+      } catch (error) {
+        console.error('Error loading restaurants:', error);
+        document.getElementById('restaurantsGrid').innerHTML = `
+          <div class="text-center" style="grid-column: 1 / -1; padding: 2rem; color: hsl(var(--muted-foreground));">
+            Failed to load restaurants
+          </div>
+        `;
+      }
+    }
+
+    // View order details
+    function viewOrder(orderId) {
+      window.location.href = `/manager/orders`;
+    }
+
+    // Auto-refresh dashboard
+    function startAutoRefresh() {
+      // Refresh stats and recent orders every 30 seconds
+      setInterval(async () => {
+        try {
+          await loadDashboardStats();
+          await loadRecentOrders();
+          await loadOrdersTab();
+        } catch (error) {
+          console.error('Auto-refresh error:', error);
+        }
+      }, 30000);
+
+      // Refresh active orders count every 15 seconds
+      setInterval(async () => {
+        try {
+          const response = await fetch(`${API_BASE}/dashboard/active-orders-count`, { credentials: 'same-origin' });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              const count = data.count || 0;
+              document.getElementById('notificationBadge').textContent = count;
+              document.getElementById('notifActiveCount').textContent = count;
+              document.getElementById('activeOrders').textContent = count;
+              document.getElementById('analyticsActive').textContent = count;
+            }
+          }
+        } catch (error) {
+          console.error('Error updating active count:', error);
+        }
+      }, 15000);
+    }
+  </script>
+</body>
+</html>

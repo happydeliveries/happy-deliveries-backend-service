@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <% if (publicKey) { %>
+  <script src="https://js.paystack.co/v1/inline.js"></script>
+  <% } %>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #0f172a;
+      color: #0f172a;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .paystack-shell {
+      background: #ffffff;
+      width: 100%;
+      max-width: 440px;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+    }
+    .ps-header {
+      background: linear-gradient(135deg, #011b33 0%, #09A5DB 100%);
+      color: #fff;
+      padding: 22px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .ps-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .ps-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: #00C3F7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      color: #011b33;
+      font-size: 18px;
+    }
+    .ps-merchant {
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .ps-email {
+      font-size: 12px;
+      color: rgba(255,255,255,0.8);
+    }
+    .ps-amount-box {
+      text-align: right;
+    }
+    .ps-amount-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: rgba(255,255,255,0.8);
+    }
+    .ps-amount-value {
+      font-size: 19px;
+      font-weight: 800;
+      color: #38bdf8;
+    }
+    .ps-channels {
+      display: flex;
+      background: #f1f5f9;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .ps-channel-btn {
+      flex: 1;
+      padding: 12px 8px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #64748b;
+      background: transparent;
+      border: none;
+      border-bottom: 2.5px solid transparent;
+      cursor: pointer;
+    }
+    .ps-channel-btn.active {
+      color: #011b33;
+      background: #fff;
+      border-bottom-color: #09A5DB;
+    }
+    .ps-body {
+      padding: 24px;
+    }
+    .order-pill {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 12.5px;
+      color: #334155;
+      margin-bottom: 18px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-label {
+      display: block;
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #475569;
+      margin-bottom: 6px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 15px;
+      color: #0f172a;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: #09A5DB;
+      box-shadow: 0 0 0 3px rgba(9, 165, 219, 0.15);
+    }
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .pay-btn {
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 10px;
+      background: #3bb75e;
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.15s;
+    }
+    .pay-btn:hover {
+      background: #2f9e4f;
+    }
+    .pay-btn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+    .ps-footer {
+      padding: 14px 24px 20px;
+      text-align: center;
+      font-size: 11.5px;
+      color: #64748b;
+      border-top: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .test-badge {
+      display: inline-block;
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="paystack-shell">
+    <div class="ps-header">
+      <div class="ps-brand">
+        <div class="ps-logo">P</div>
+        <div>
+          <div class="ps-merchant">Happy Delivery</div>
+          <div class="ps-email"><%= email %></div>
+        </div>
+      </div>
+      <div class="ps-amount-box">
+        <div class="ps-amount-label">Pay</div>
+        <div class="ps-amount-value"><%= currency %> <%= amount %></div>
+      </div>
+    </div>
+
+    <div class="ps-channels">
+      <button type="button" class="ps-channel-btn active" id="tabCard" onclick="selectChannel('card')">💳 Card</button>
+      <button type="button" class="ps-channel-btn" id="tabEft" onclick="selectChannel('eft')">🏦 Instant EFT</button>
+      <button type="button" class="ps-channel-btn" id="tabQr" onclick="selectChannel('qr')">📱 Scan to Pay</button>
+    </div>
+
+    <div class="ps-body">
+      <div class="order-pill">
+        <span>Order <strong><%= order.order_number %></strong></span>
+        <span>Ref: <strong><%= reference.slice(0, 18) %></strong></span>
+      </div>
+
+      <!-- CARD PANE -->
+      <form id="cardPane" onsubmit="completePaystackCheckout(event, 'card')">
+        <span class="test-badge">🔒 Paystack Secured Checkout</span>
+        <div class="form-group">
+          <label class="form-label">Card Number</label>
+          <input type="text" class="form-input" id="cardNumber" value="4084 0840 8408 4081" maxlength="19" required placeholder="0000 0000 0000 0000">
+        </div>
+        <div class="row-2">
+          <div class="form-group">
+            <label class="form-label">Card Expiry</label>
+            <input type="text" class="form-input" id="cardExpiry" value="09 / 29" maxlength="7" required placeholder="MM / YY">
+          </div>
+          <div class="form-group">
+            <label class="form-label">CVV</label>
+            <input type="password" class="form-input" id="cardCvv" value="408" maxlength="4" required placeholder="123">
+          </div>
+        </div>
+        <button type="submit" class="pay-btn" id="payCardBtn">
+          Pay <%= currency %> <%= amount %>
+        </button>
+      </form>
+
+      <!-- INSTANT EFT PANE -->
+      <div id="eftPane" style="display:none;">
+        <span class="test-badge">🏦 Paystack Instant EFT (Ozow / SiD / Bank)</span>
+        <div class="form-group">
+          <label class="form-label">Select Your South African Bank</label>
+          <select class="form-input" id="eftBank">
+            <option value="Capitec Bank">Capitec Bank</option>
+            <option value="FNB (First National Bank)">FNB (First National Bank)</option>
+            <option value="Standard Bank">Standard Bank</option>
+            <option value="Nedbank">Nedbank</option>
+            <option value="ABSA">ABSA</option>
+            <option value="TymeBank">TymeBank</option>
+            <option value="Discovery Bank">Discovery Bank</option>
+          </select>
+        </div>
+        <button type="button" class="pay-btn" onclick="completePaystackCheckout(event, 'eft')">
+          Authorize EFT • <%= currency %> <%= amount %>
+        </button>
+      </div>
+
+      <!-- QR PANE -->
+      <div id="qrPane" style="display:none;text-align:center;">
+        <span class="test-badge">📱 SnapScan / Zapper / Masterpass</span>
+        <p style="font-size:13px;color:#475569;margin-bottom:16px;">
+          Click below to confirm instant QR payment for Order <strong><%= order.order_number %></strong>.
+        </p>
+        <button type="button" class="pay-btn" onclick="completePaystackCheckout(event, 'qr')">
+          Confirm QR Payment • <%= currency %> <%= amount %>
+        </button>
+      </div>
+    </div>
+
+    <div class="ps-footer">
+      <span>🔒 Secured by <strong>Paystack</strong></span>
+    </div>
+  </div>
+
+  <script>
+    function selectChannel(ch) {
+      document.getElementById('cardPane').style.display = ch === 'card' ? 'block' : 'none';
+      document.getElementById('eftPane').style.display = ch === 'eft' ? 'block' : 'none';
+      document.getElementById('qrPane').style.display = ch === 'qr' ? 'block' : 'none';
+      document.getElementById('tabCard').classList.toggle('active', ch === 'card');
+      document.getElementById('tabEft').classList.toggle('active', ch === 'eft');
+      document.getElementById('tabQr').classList.toggle('active', ch === 'qr');
+    }
+
+    function completePaystackCheckout(e, channel) {
+      if (e) e.preventDefault();
+      const publicKey = "<%= publicKey %>";
+      const callbackUrl = "<%- callbackUrl %>&channel=" + encodeURIComponent(channel);
+
+      if (publicKey && window.PaystackPop) {
+        const handler = PaystackPop.setup({
+          key: publicKey,
+          email: "<%= email %>",
+          amount: <%= amountSubunit %>,
+          currency: "<%= currency %>",
+          ref: "<%= reference %>",
+          callback: function(response) {
+            window.location.href = callbackUrl + "&trxref=" + encodeURIComponent(response.reference);
+          }
+        });
+        handler.openIframe();
+        return;
+      }
+
+      const btn = document.getElementById('payCardBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Processing with Paystack...';
+      }
+      window.location.href = callbackUrl;
+    }
+  </script>
+</body>
+</html>

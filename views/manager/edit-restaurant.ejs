@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Restaurant - Restaurant Manager</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/main.css">
+  <style>
+
+    :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.75rem;
+    --sidebar-width: 16rem;
+    }
+
+    * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    border-color: hsl(var(--border));
+    }
+
+    body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    line-height: 1.5;
+    min-height: 100vh;
+    }
+
+    /* Layout */
+    .app-container {
+    display: flex;
+    min-height: 100vh;
+    width: 100%;
+    }
+
+    /* Sidebar */
+    .sidebar {
+    width: var(--sidebar-width);
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    background: hsl(var(--card));
+    border-right: 1px solid hsl(var(--border));
+    display: flex;
+    flex-direction: column;
+    z-index: 50;
+    transition: transform 0.2s ease;
+    }
+
+    .sidebar-header {
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    }
+
+    .sidebar-logo {
+    width: 2rem;
+    height: 2rem;
+    background: url('./logo.jpg');
+    background-size: cover;
+    background-repeat: no-repeat;
+    border-radius: 0.25rem;
+    }
+
+    .sidebar-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    }
+
+    .sidebar-content {
+    flex: 1;
+    padding: 0.5rem;
+    overflow-y: auto;
+    }
+
+    .sidebar-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    }
+
+    .sidebar-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: hsl(var(--foreground));
+    transition: background-color 0.15s, color 0.15s;
+    text-decoration: none;
+    }
+
+    .sidebar-menu-item:hover {
+    background: hsl(var(--accent));
+    }
+
+    .sidebar-menu-item.active {
+    background: hsl(var(--accent));
+    font-weight: 500;
+    }
+
+    .sidebar-menu-item svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    }
+
+    .sidebar-footer {
+    padding: 1rem;
+    border-top: 1px solid hsl(var(--border));
+    }
+
+    .sidebar-user {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    }
+
+    .sidebar-user-avatar {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    object-fit: cover;
+    }
+
+    .sidebar-user-info {
+    display: flex;
+    flex-direction: column;
+    }
+
+    .sidebar-user-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    }
+
+    .sidebar-user-role {
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+    }
+
+    /* Main Content */
+    .main-content {
+    flex: 1;
+    margin-left: var(--sidebar-width);
+    overflow: auto;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem;
+      border-bottom: 1px solid hsl(var(--border));
+      background: hsl(var(--background));
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .topbar-search { flex: 1; max-width: 28rem; }
+    .search-input-wrapper { position: relative; }
+    .search-input-wrapper svg {
+      position: absolute; left: 0.75rem; top: 50%;
+      transform: translateY(-50%);
+      width: 1rem; height: 1rem;
+      color: hsl(var(--muted-foreground));
+    }
+    .search-input {
+      width: 100%; padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+      border: 1px solid hsl(var(--input)); border-radius: var(--radius);
+      font-size: 0.875rem; background: hsl(var(--background));
+      color: hsl(var(--foreground)); outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .search-input:focus {
+      border-color: hsl(var(--ring));
+      box-shadow: 0 0 0 2px hsla(var(--ring), 0.2);
+    }
+    .search-input::placeholder { color: hsl(var(--muted-foreground)); }
+    .topbar-actions { display: flex; align-items: center; gap: 1rem; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius);
+      font-size: 0.875rem; font-weight: 500; cursor: pointer;
+      transition: background-color 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s;
+      border: none; text-decoration: none;
+    }
+    .btn svg { width: 1rem; height: 1rem; }
+    .btn-primary {
+      background: hsl(var(--primary));
+      color: hsl(var(--primary-foreground));
+    }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary {
+      background: hsl(var(--secondary));
+      color: hsl(var(--secondary-foreground));
+    }
+    .btn-secondary:hover { background: hsl(var(--accent)); }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid hsl(var(--input));
+      color: hsl(var(--foreground));
+    }
+    .btn-outline:hover { background: hsl(var(--accent)); }
+    .btn-ghost {
+      background: transparent; color: hsl(var(--foreground));
+    }
+    .btn-ghost:hover { background: hsl(var(--accent)); }
+    .btn-icon { padding: 0.5rem; width: 2rem; height: 2rem; }
+    .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; }
+    .btn-destructive {
+      background: transparent;
+      border: 1px solid hsl(var(--destructive));
+      color: hsl(var(--destructive));
+    }
+    .btn-destructive:hover { background: hsl(var(--destructive)); color: hsl(var(--destructive-foreground)); }
+
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 0.125rem 0.625rem; border-radius: 9999px;
+      font-size: 0.75rem; font-weight: 500;
+    }
+    .badge-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-yellow { background: #fef3c7; color: #92400e; }
+    .badge-red { background: #fee2e2; color: #991b1b; }
+
+    .notification-btn { position: relative; }
+    .notification-badge {
+      position: absolute; top: -0.25rem; right: -0.25rem;
+      width: 1.25rem; height: 1.25rem;
+      background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+      border-radius: 50%; font-size: 0.625rem;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 500;
+    }
+    .avatar {
+      width: 2rem; height: 2rem; border-radius: 50%; overflow: hidden;
+      background: hsl(var(--muted));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 500;
+      color: hsl(var(--muted-foreground));
+    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .avatar-xl { width: 5rem; height: 5rem; font-size: 1.5rem; }
+    .avatar-lg { width: 3rem; height: 3rem; font-size: 1rem; }
+
+    .card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 1.5rem;
+      display: flex; flex-direction: column; gap: 0.375rem;
+    }
+    .card-header-row {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+    }
+    .card-title { font-size: 1rem; font-weight: 600; line-height: 1.5; }
+    .card-title-lg { font-size: 1.125rem; }
+    .card-description { font-size: 0.875rem; color: hsl(var(--muted-foreground)); }
+    .card-content { padding: 0 1.5rem 1.5rem; }
+    .card-content-full { padding: 0; }
+
+    .page-container {
+      padding: 1.5rem 2rem;
+      display: flex; flex-direction: column; gap: 1.5rem;
+    }
+    .page-title {
+      font-size: 1.875rem; font-weight: 700; letter-spacing: -0.025em;
+    }
+
+    .settings-tabs {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 0.125rem; padding: 0.25rem;
+      background: hsl(var(--muted));
+      border-radius: var(--radius);
+    }
+    .settings-tab {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0.5rem; padding: 0.5rem 0.75rem;
+      border-radius: calc(var(--radius) - 0.125rem);
+      font-size: 0.875rem; font-weight: 500; cursor: pointer;
+      background: transparent; border: none;
+      color: hsl(var(--muted-foreground));
+      transition: background-color 0.15s, color 0.15s;
+    }
+    .settings-tab:hover { color: hsl(var(--foreground)); }
+    .settings-tab.active {
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+    .settings-tab svg { width: 1rem; height: 1rem; }
+    .settings-section { display: none; }
+    .settings-section.active { display: block; }
+
+    .grid { display: grid; gap: 1rem; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+
+    input[type="text"], input[type="email"], input[type="password"],
+    input[type="number"], input[type="tel"], input[type="url"], input[type="date"],
+    textarea, select {
+      width: 100%; padding: 0.5rem 0.75rem;
+      border: 1px solid hsl(var(--input));
+      border-radius: var(--radius); font-size: 0.875rem;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground)); outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      font-family: inherit;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: hsl(var(--ring));
+      box-shadow: 0 0 0 2px hsla(var(--ring), 0.2);
+    }
+    select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.5rem center;
+      padding-right: 2rem;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    .form-label { font-size: 0.875rem; font-weight: 500; }
+    .form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+    .form-hint { font-size: 0.75rem; color: hsl(var(--muted-foreground)); }
+
+    .switch {
+      position: relative; width: 2.75rem; height: 1.5rem;
+      background: hsl(var(--input)); border-radius: 9999px;
+      cursor: pointer; transition: background-color 0.2s;
+    }
+    .switch.active { background: hsl(var(--primary)); }
+    .switch-thumb {
+      position: absolute; top: 0.125rem; left: 0.125rem;
+      width: 1.25rem; height: 1.25rem;
+      background: white; border-radius: 50%;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .switch.active .switch-thumb { transform: translateX(1.25rem); }
+    .switch-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.75rem 0;
+    }
+    .switch-info { display: flex; flex-direction: column; gap: 0.25rem; }
+    .switch-label { font-weight: 500; }
+    .switch-description { font-size: 0.875rem; color: hsl(var(--muted-foreground)); }
+
+    .dropdown { position: relative; }
+    .dropdown-content {
+      position: absolute; top: 100%; right: 0;
+      background: hsl(var(--background));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      min-width: 12rem; z-index: 50; display: none; padding: 0.25rem;
+    }
+    .dropdown.active .dropdown-content { display: block; }
+    .dropdown-label { padding: 0.5rem 0.75rem; font-size: 0.875rem; font-weight: 500; }
+    .dropdown-item {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.5rem 0.75rem; font-size: 0.875rem;
+      cursor: pointer; border-radius: 0.25rem;
+      transition: background-color 0.15s;
+    }
+    .dropdown-item:hover { background: hsl(var(--accent)); }
+    .dropdown-separator { height: 1px; background: hsl(var(--border)); margin: 0.25rem 0; }
+
+    .toast-container {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      z-index: 200; display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .toast {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius); padding: 1rem 1.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      min-width: 20rem;
+      transform: translateX(100%); opacity: 0;
+      transition: transform 0.3s, opacity 0.3s;
+    }
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast-title { font-weight: 500; margin-bottom: 0.25rem; }
+    .toast-description { font-size: 0.875rem; color: hsl(var(--muted-foreground)); }
+
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,0.45);
+      display: none; align-items: center; justify-content: center;
+      padding: 1rem; backdrop-filter: blur(2px);
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      width: 100%; max-width: 28rem;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+      animation: modalIn 0.2s ease-out;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .modal-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid hsl(var(--border));
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-title { font-weight: 600; font-size: 1.125rem; }
+    .modal-body { padding: 1.25rem 1.5rem; }
+    .modal-footer {
+      padding: 1.25rem 1.5rem;
+      border-top: 1px solid hsl(var(--border));
+      display: flex; justify-content: flex-end; gap: 0.75rem;
+    }
+
+    .hidden { display: none !important; }
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .gap-1 { gap: 0.25rem; }
+    .gap-2 { gap: 0.5rem; }
+    .gap-3 { gap: 0.75rem; }
+    .gap-4 { gap: 1rem; }
+    .text-muted { color: hsl(var(--muted-foreground)); }
+    .font-medium { font-weight: 500; }
+    .font-semibold { font-weight: 600; }
+    .mt-1 { margin-top: 0.25rem; }
+    .mt-2 { margin-top: 0.5rem; }
+    .mt-4 { margin-top: 1rem; }
+    .mb-1 { margin-bottom: 0.25rem; }
+    .mb-2 { margin-bottom: 0.5rem; }
+    .mb-3 { margin-bottom: 0.75rem; }
+    .mb-4 { margin-bottom: 1rem; }
+    .w-full { width: 100%; }
+
+    .map-preview {
+      height: 300px; border-radius: var(--radius);
+      overflow: hidden; border: 1px solid hsl(var(--border));
+      background: hsl(var(--muted));
+      display: flex; align-items: center; justify-content: center;
+    }
+    .image-preview {
+      max-width: 100%; max-height: 220px; border-radius: var(--radius);
+      object-fit: cover; margin-top: 0.75rem;
+      border: 1px solid hsl(var(--border));
+    }
+
+    .stat-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;
+    }
+    .stat-card {
+      text-align: center; padding: 1rem;
+      background: hsl(var(--muted));
+      border-radius: var(--radius);
+    }
+    .stat-value {
+      font-size: 1.5rem; font-weight: 700;
+      color: hsl(var(--primary)); line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.75rem; color: hsl(var(--muted-foreground));
+      margin-top: 0.25rem;
+    }
+
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+      .main-content { margin-left: 0; }
+      .settings-tabs { grid-template-columns: repeat(2, 1fr); }
+      .topbar { padding: 1rem; }
+      .topbar-search { display: none; }
+      .page-container { padding: 1rem; }
+      .form-row { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo"></div>
+        <span class="sidebar-title">Happy Deliveries</span>
+      </div>
+      <nav class="sidebar-content">
+        <ul class="sidebar-menu">
+          <li>
+            <a href="/manager/dashboard" class="sidebar-menu-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              <span>Dashboard</span>
+            </a>
+          </li>
+          <li>
+            <a href="/manager/restaurants" class="sidebar-menu-item active">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v11H3z"/><path d="M8 10V7a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v3"/></svg>
+              <span>Restaurants</span>
+            </a>
+          </li>
+          <li>
+            <a href="/manager/menus" class="sidebar-menu-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg>
+              <span>Menus</span>
+            </a>
+          </li>
+          <li>
+            <a href="/manager/orders" class="sidebar-menu-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+              <span>Orders</span>
+            </a>
+          </li>
+          <li>
+            <a href="/manager/analytics" class="sidebar-menu-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+              <span>Analytics</span>
+            </a>
+          </li>
+          <li>
+            <a href="/manager/settings" class="sidebar-menu-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>Settings</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="avatar">
+            <%= manager ? (manager.first_name?.[0] || 'M') + (manager.last_name?.[0] || 'R') : 'MR' %>
+          </div>
+          <div class="sidebar-user-info">
+            <span class="sidebar-user-name">
+              <%= manager ? (manager.first_name + ' ' + manager.last_name) : 'Manager User' %>
+            </span>
+            <span class="sidebar-user-role">Restaurant Manager</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Topbar -->
+      <div class="topbar">
+        <div class="topbar-search">
+          <div class="search-input-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" class="search-input" placeholder="Search restaurants, menus, orders...">
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <div class="dropdown">
+            <button class="btn btn-ghost btn-icon notification-btn" onclick="toggleDropdown(this)">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+              <span class="notification-badge">3</span>
+            </button>
+            <div class="dropdown-content" style="width: 20rem;">
+              <div class="dropdown-label">Notifications</div>
+              <div class="dropdown-separator"></div>
+              <div class="dropdown-item" style="flex-direction: column; align-items: flex-start;">
+                <span class="font-medium">New order received</span>
+                <span class="text-muted" style="font-size: 0.75rem;">Order #1024 from TechCorp</span>
+              </div>
+              <div class="dropdown-item" style="flex-direction: column; align-items: flex-start;">
+                <span class="font-medium">Menu item out of stock</span>
+                <span class="text-muted" style="font-size: 0.75rem;">Grilled Salmon marked unavailable</span>
+              </div>
+              <div class="dropdown-item" style="flex-direction: column; align-items: flex-start;">
+                <span class="font-medium">Review submitted</span>
+                <span class="text-muted" style="font-size: 0.75rem;">5-star review from Sarah J.</span>
+              </div>
+            </div>
+          </div>
+          <div class="dropdown">
+            <button class="btn btn-ghost btn-icon" onclick="toggleDropdown(this)" style="border-radius: 50%;">
+              <div class="avatar">
+                <%= manager ? (manager.first_name?.[0] || 'M') + (manager.last_name?.[0] || 'R') : 'MR' %>
+              </div>
+            </button>
+            <div class="dropdown-content">
+              <div class="dropdown-label">My Account</div>
+              <div class="dropdown-separator"></div>
+              <div class="dropdown-item">Profile</div>
+              <div class="dropdown-item">Settings</div>
+              <div class="dropdown-separator"></div>
+              <a href="/manager/logout" class="dropdown-item" style="text-decoration:none;color:inherit;">Log out</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Page Content -->
+      <div class="page-container">
+        <div>
+          <h1 class="page-title">Edit Restaurant</h1>
+          <p class="text-muted">Update restaurant details, location, and operational settings</p>
+        </div>
+
+        <!-- Restaurant Info Card -->
+        <div class="card">
+          <div class="card-content" style="padding: 1.5rem;">
+            <div style="display: flex; align-items: flex-start; gap: 1.5rem; flex-wrap: wrap;">
+              <div class="avatar avatar-xl">
+                <img src="<%= restaurant.logo_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80' %>" alt="<%= restaurant.name %>" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.textContent='<%= restaurant.name?.[0] || 'R' %>';">
+              </div>
+              <div style="flex: 1; min-width: 16rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+                  <h2 style="font-size: 1.25rem; font-weight: 600;"><%= restaurant.name %></h2>
+                  <% if (restaurant.is_active) { %>
+                    <span class="badge badge-green">Active</span>
+                  <% } else { %>
+                    <span class="badge badge-red">Inactive</span>
+                  <% } %>
+                  <span class="badge" style="background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));">
+                    <%= restaurant.cuisine_type || 'Multi-cuisine' %>
+                  </span>
+                </div>
+                <p class="text-muted" style="margin-bottom: 0.75rem;"><%= restaurant.description || 'No description available' %></p>
+                <div style="display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.875rem;">
+                  <div class="flex items-center gap-2 text-muted">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <%= restaurant.address %>
+                  </div>
+                  <div class="flex items-center gap-2 text-muted">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    <%= restaurant.phone_number || 'Not set' %>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="stat-grid" style="margin-top: 1.5rem;">
+              <div class="stat-card">
+                <span class="stat-value"><%= restaurant.total_orders || '0' %></span>
+                <span class="stat-label">Total Orders</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-value">ZAR <%= restaurant.total_revenue || '0' %></span>
+                <span class="stat-label">Total Revenue</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-value"><%= restaurant.average_rating || '0.0' %></span>
+                <span class="stat-label">Average Rating</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-value"><%= restaurant.total_ratings || '0' %></span>
+                <span class="stat-label">Total Reviews</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="settings-tabs">
+          <button class="settings-tab active" data-settings="basic">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Basic Info
+          </button>
+          <button class="settings-tab" data-settings="location">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+            Location
+          </button>
+          <button class="settings-tab" data-settings="settings">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            Settings
+          </button>
+          <button class="settings-tab" data-settings="images">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+            Images
+          </button>
+        </div>
+
+        <!-- Edit Form -->
+        <form method="POST" action="/manager/restaurants/edit/<%= restaurant.id %>">
+          <input type="hidden" name="id" value="<%= restaurant.id %>">
+
+          <!-- Basic Info -->
+          <div class="settings-section active" id="settings-basic">
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">Basic Information</h3>
+                <p class="card-description">Update your restaurant name, contact details, and cuisine type</p>
+              </div>
+              <div class="card-content">
+                <div class="form-group mb-3">
+                  <label class="form-label">Restaurant Name <span style="color: hsl(var(--destructive)); font-size: 0.75rem;">* Required</span></label>
+                  <input type="text" name="name" required value="<%= restaurant.name %>" placeholder="e.g. The Burger Joint">
+                </div>
+
+                <div class="form-group mb-3">
+                  <label class="form-label">Description</label>
+                  <textarea name="description" rows="4" placeholder="Describe your restaurant, specialties, and ambiance"><%= restaurant.description || '' %></textarea>
+                </div>
+
+                <div class="form-row mb-3">
+                  <div class="form-group">
+                    <label class="form-label">Cuisine Type</label>
+                    <input type="text" name="cuisine_type" value="<%= restaurant.cuisine_type || '' %>" placeholder="e.g. South African Braai, Fast Food">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Phone Number <span style="color: hsl(var(--destructive)); font-size: 0.75rem;">* Required</span></label>
+                    <input type="tel" name="phone_number" pattern="[0-9]{10}" required value="<%= restaurant.phone_number || '' %>" placeholder="10 digits, e.g. 0831234567">
+                  </div>
+                </div>
+
+                <div class="form-row mb-3">
+                  <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" name="email" value="<%= restaurant.email || '' %>" placeholder="contact@restaurant.com">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Opening Hours</label>
+                    <% 
+                      let hoursDisplay = '08:00 - 21:00';
+                      if (restaurant.opening_hours) {
+                        if (typeof restaurant.opening_hours === 'object') {
+                          hoursDisplay = restaurant.opening_hours.display || hoursDisplay;
+                        } else {
+                          try { hoursDisplay = JSON.parse(restaurant.opening_hours).display || hoursDisplay; } catch(e) {}
+                        }
+                      }
+                    %>
+                    <input type="text" name="opening_hours_display" value="<%= hoursDisplay %>" placeholder="e.g. 08:00 - 21:00">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Location -->
+          <div class="settings-section" id="settings-location">
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">Location</h3>
+                <p class="card-description">Set your address and pin your location on the map</p>
+              </div>
+              <div class="card-content">
+                <div class="form-group mb-3">
+                  <label class="form-label">Full Address <span style="color: hsl(var(--destructive)); font-size: 0.75rem;">* Required</span></label>
+                  <textarea name="address" rows="3" required placeholder="123 Main Street, Johannesburg"><%= restaurant.address %></textarea>
+                </div>
+
+                <div class="form-row mb-3">
+                  <div class="form-group">
+                    <label class="form-label">Latitude</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                      <input type="number" step="any" id="latitude" name="latitude" value="<%= restaurant.lat || '' %>" placeholder="-26.2041">
+                      <button type="button" class="btn btn-outline btn-icon" id="btnGetLoc" title="Use my location">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Longitude</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                      <input type="number" step="any" id="longitude" name="longitude" value="<%= restaurant.lng || '' %>" placeholder="28.0473">
+                      <button type="button" class="btn btn-outline btn-icon" id="btnGetLoc2" title="Use my location">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Map Preview</label>
+                  <div class="map-preview" id="mapPreview">
+                    <div style="text-align: center; color: hsl(var(--muted-foreground));">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 0.5rem;"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                      <p class="mb-0">Enter coordinates to see map preview</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Settings -->
+          <div class="settings-section" id="settings-settings">
+            <div class="grid grid-2">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Operational</h3>
+                  <p class="card-description">Preparation and delivery settings</p>
+                </div>
+                <div class="card-content">
+                  <div class="form-group mb-3">
+                    <label class="form-label">Preparation Time (minutes)</label>
+                    <input type="number" name="preparation_time_minutes" value="<%= restaurant.preparation_time_minutes || 20 %>" min="5" max="120">
+                    <span class="form-hint">Estimated time to prepare an order</span>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Delivery Radius (km)</label>
+                    <input type="number" name="delivery_radius" value="<%= restaurant.delivery_radius_km || 5 %>" min="1" max="20" step="0.5">
+                    <span class="form-hint">Maximum distance for delivery orders</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Status</h3>
+                  <p class="card-description">Control restaurant visibility and order acceptance</p>
+                </div>
+                <div class="card-content">
+                  <div class="switch-row">
+                    <div class="switch-info">
+                      <span class="switch-label">Restaurant is Active</span>
+                      <span class="switch-description">Make restaurant visible to customers</span>
+                    </div>
+                    <div class="switch <%= restaurant.is_active ? 'active' : '' %>" onclick="toggleSwitch(this, 'is_active_hidden')">
+                      <div class="switch-thumb"></div>
+                    </div>
+                    <input type="hidden" name="is_active" id="is_active_hidden" value="<%= restaurant.is_active ? 'on' : '' %>">
+                  </div>
+                  <div class="switch-row">
+                    <div class="switch-info">
+                      <span class="switch-label">Accepting Orders</span>
+                      <span class="switch-description">Allow customers to place new orders</span>
+                    </div>
+                    <div class="switch <%= restaurant.is_accepting_orders ? 'active' : '' %>" onclick="toggleSwitch(this, 'is_accepting_orders_hidden')">
+                      <div class="switch-thumb"></div>
+                    </div>
+                    <input type="hidden" name="is_accepting_orders" id="is_accepting_orders_hidden" value="<%= restaurant.is_accepting_orders ? 'on' : '' %>">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Images -->
+          <div class="settings-section" id="settings-images">
+            <div class="grid grid-2">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Logo Image</h3>
+                  <p class="card-description">Displayed on restaurant listings and cards</p>
+                </div>
+                <div class="card-content">
+                  <div class="form-group">
+                    <label class="form-label">Logo URL</label>
+                    <input type="text" id="logoUrl" name="logo_url" value="<%= restaurant.logo_url || '' %>" placeholder="https://...">
+                    <img id="logoPreview" class="image-preview" src="<%= restaurant.logo_url || '' %>" style="<%= restaurant.logo_url ? 'display:block;' : 'display:none;' %>" alt="Logo Preview">
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Cover Image</h3>
+                  <p class="card-description">Large banner image for the restaurant page</p>
+                </div>
+                <div class="card-content">
+                  <div class="form-group">
+                    <label class="form-label">Cover URL</label>
+                    <input type="text" id="coverUrl" name="cover_image_url" value="<%= restaurant.cover_image_url || '' %>" placeholder="https://...">
+                    <img id="coverPreview" class="image-preview" src="<%= restaurant.cover_image_url || '' %>" style="<%= restaurant.cover_image_url ? 'display:block;' : 'display:none;' %>" alt="Cover Preview">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-top: 0.5rem;">
+            <a href="/manager/restaurants" class="btn btn-secondary">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              Cancel
+            </a>
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+              <button type="button" class="btn btn-destructive" onclick="openModal('deleteModal')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                Delete
+              </button>
+              <button type="submit" class="btn btn-primary" onclick="showToast('Saving...', 'Your changes are being saved.')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+
+  <!-- Delete Modal -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 0.75rem; color: hsl(var(--destructive));">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+          <span class="modal-title">Delete Restaurant</span>
+        </div>
+        <button class="btn btn-ghost btn-icon" onclick="closeModal('deleteModal')">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete <strong><%= restaurant.name %></strong>?</p>
+        <p class="text-muted mt-2" style="font-size: 0.875rem;">This action cannot be undone. All menus, items, and orders linked to this restaurant will be permanently removed.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+        <form method="POST" action="/manager/restaurants/delete/<%= restaurant.id %>" style="display: inline;">
+          <button type="submit" class="btn btn-destructive">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            Delete Restaurant
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    // Settings tabs
+    document.querySelectorAll('.settings-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const settingsId = tab.dataset.settings;
+        document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+        document.getElementById('settings-' + settingsId).classList.add('active');
+      });
+    });
+
+    // Dropdown
+    function toggleDropdown(btn) {
+      const dropdown = btn.closest('.dropdown');
+      document.querySelectorAll('.dropdown').forEach(d => {
+        if (d !== dropdown) d.classList.remove('active');
+      });
+      dropdown.classList.toggle('active');
+    }
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.dropdown')) {
+        document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('active'));
+      }
+    });
+
+    // Toast
+    function showToast(title, description) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.innerHTML = `
+        <div class="toast-title">${title}</div>
+        <div class="toast-description">${description}</div>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.add('show'), 10);
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Switch toggle with hidden input
+    function toggleSwitch(el, inputId) {
+      el.classList.toggle('active');
+      if (inputId) {
+        const input = document.getElementById(inputId);
+        input.value = el.classList.contains('active') ? 'on' : '';
+      }
+    }
+
+    // Modal
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.classList.remove('active');
+      });
+    });
+
+    // Map preview
+    function updateMapPreview() {
+      const lat = document.getElementById('latitude').value;
+      const lng = document.getElementById('longitude').value;
+      const container = document.getElementById('mapPreview');
+      if (lat && lng) {
+        container.innerHTML =
+          '<iframe width="100%" height="100%" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" ' +
+          'src="https://maps.google.com/maps?q=' + lat + ',' + lng + '&z=15&output=embed" style="border:none;"></iframe>';
+      } else {
+        container.innerHTML =
+          '<div style="text-align:center;color:hsl(var(--muted-foreground));">' +
+          '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom:0.5rem;"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>' +
+          '<p>Enter coordinates to see map preview</p></div>';
+      }
+    }
+    document.getElementById('latitude').addEventListener('input', updateMapPreview);
+    document.getElementById('longitude').addEventListener('input', updateMapPreview);
+    if (document.getElementById('latitude').value) updateMapPreview();
+
+    // Geolocation
+    function getLoc() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(pos) {
+          document.getElementById('latitude').value = pos.coords.latitude.toFixed(6);
+          document.getElementById('longitude').value = pos.coords.longitude.toFixed(6);
+          updateMapPreview();
+          showToast('Location detected', 'Coordinates filled automatically.');
+        }, function() {
+          showToast('Location error', 'Unable to retrieve your location.');
+        });
+      }
+    }
+    document.getElementById('btnGetLoc').addEventListener('click', getLoc);
+    document.getElementById('btnGetLoc2').addEventListener('click', getLoc);
+
+    // Image previews
+    document.getElementById('logoUrl').addEventListener('input', function() {
+      const img = document.getElementById('logoPreview');
+      if (this.value) { img.src = this.value; img.style.display = 'block'; }
+      else { img.style.display = 'none'; }
+    });
+    document.getElementById('coverUrl').addEventListener('input', function() {
+      const img = document.getElementById('coverPreview');
+      if (this.value) { img.src = this.value; img.style.display = 'block'; }
+      else { img.style.display = 'none'; }
+    });
+  </script>
+</body>
+</html>

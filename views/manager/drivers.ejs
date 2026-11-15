@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Drivers - Restaurant Manager</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem;
+      border-bottom: 1px solid hsl(var(--border));
+      background: hsl(var(--background));
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .topbar-search { flex: 1; max-width: 28rem; }
+    .search-input-wrapper { position: relative; }
+    .search-input-wrapper svg {
+      position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%);
+      width: 1rem; height: 1rem; color: hsl(var(--muted-foreground));
+    }
+    .search-input {
+      width: 100%; padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+      border: 1px solid hsl(var(--input)); border-radius: var(--radius);
+      font-size: 0.875rem; background: hsl(var(--background));
+      color: hsl(var(--foreground)); outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .search-input:focus {
+      border-color: hsl(var(--ring));
+      box-shadow: 0 0 0 2px hsla(var(--ring), 0.2);
+    }
+    .topbar-actions { display: flex; align-items: center; gap: 1rem; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.875rem;
+      font-weight: 500; cursor: pointer; transition: all 0.15s;
+      border: none; text-decoration: none; line-height: 1;
+    }
+    .btn svg { width: 1rem; height: 1rem; }
+    .btn-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-success { background: #16a34a; color: #ffffff; }
+    .btn-success:hover { background: #15803d; }
+    .btn-danger { background: #dc2626; color: #ffffff; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-outline {
+      background: transparent; border: 1px solid hsl(var(--input));
+      color: hsl(var(--foreground));
+    }
+    .btn-outline:hover { background: hsl(var(--accent)); }
+    .btn-ghost { background: transparent; color: hsl(var(--foreground)); }
+    .btn-ghost:hover { background: hsl(var(--accent)); }
+    .btn-icon { padding: 0.5rem; width: 2rem; height: 2rem; }
+    .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.375rem;
+      padding: 0.25rem 0.65rem; border-radius: 9999px;
+      font-size: 0.75rem; font-weight: 600;
+    }
+    .badge-yellow { background: #fef3c7; color: #92400e; }
+    .badge-green  { background: #dcfce7; color: #166534; }
+    .badge-red    { background: #fee2e2; color: #991b1b; }
+    .badge-blue   { background: #dbeafe; color: #1e40af; }
+    .badge-gray   { background: #f3f4f6; color: #374151; }
+
+    .avatar {
+      width: 2rem; height: 2rem; border-radius: 50%; overflow: hidden;
+      background: hsl(var(--muted)); display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 600; color: hsl(var(--muted-foreground));
+    }
+
+    .card {
+      background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .card-header { padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 0.25rem; }
+    .card-title { font-size: 1rem; font-weight: 600; }
+    .card-content { padding: 0 1.5rem 1.5rem; }
+    .card-content-full { padding: 0; }
+    .stat-card .card-header {
+      display: flex; flex-direction: row; align-items: center; justify-content: space-between;
+      padding-bottom: 0.5rem;
+    }
+    .stat-card .card-title { font-size: 0.875rem; font-weight: 500; }
+    .stat-value { font-size: 1.6rem; font-weight: 700; }
+    .stat-description { font-size: 0.75rem; color: hsl(var(--muted-foreground)); margin-top: 0.2rem; }
+
+    .page-container { padding: 1.5rem 2rem; display: flex; flex-direction: column; gap: 1.5rem; }
+    .page-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+    .page-title { font-size: 1.875rem; font-weight: 700; letter-spacing: -0.025em; }
+    .page-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+    @media (max-width: 1024px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 640px)  { .grid-4 { grid-template-columns: 1fr; } }
+
+    .filters-card {
+      background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+      border-radius: var(--radius); padding: 1.25rem 1.5rem;
+      display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;
+    }
+    .filter-group { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 0.375rem; }
+    .filter-label { font-size: 0.75rem; font-weight: 600; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: 0.04em; }
+    .form-select, .form-input {
+      width: 100%; padding: 0.5rem 0.75rem; border: 1px solid hsl(var(--input));
+      border-radius: var(--radius); font-size: 0.875rem; background: hsl(var(--background));
+      color: hsl(var(--foreground)); outline: none;
+    }
+
+    .table-wrapper { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    thead th {
+      text-align: left; padding: 0.85rem 1rem; font-size: 0.75rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.04em; color: hsl(var(--muted-foreground));
+      border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--muted) / 0.4);
+    }
+    tbody td {
+      padding: 0.9rem 1rem; border-bottom: 1px solid hsl(var(--border)); vertical-align: middle;
+    }
+    tbody tr:hover { background: hsl(var(--muted) / 0.25); }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55);
+      display: none; align-items: center; justify-content: center;
+      z-index: 100; padding: 1.25rem;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-box {
+      background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+      border-radius: 14px; width: 100%; max-width: 820px; max-height: 90vh;
+      display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+    }
+    .modal-header {
+      padding: 1.25rem 1.5rem; border-bottom: 1px solid hsl(var(--border));
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-body { padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.25rem; }
+    .modal-footer {
+      padding: 1rem 1.5rem; border-top: 1px solid hsl(var(--border));
+      display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem; flex-wrap: wrap;
+      background: hsl(var(--muted) / 0.3);
+    }
+
+    .detail-section {
+      border: 1px solid hsl(var(--border)); border-radius: 10px; padding: 1rem 1.25rem;
+    }
+    .detail-section h4 {
+      font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+      color: hsl(var(--muted-foreground)); margin-bottom: 0.75rem;
+    }
+    .detail-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem 1rem;
+    }
+    @media (max-width: 640px) { .detail-grid { grid-template-columns: 1fr; } }
+    .detail-item .lbl { font-size: 0.72rem; color: hsl(var(--muted-foreground)); }
+    .detail-item .val { font-size: 0.875rem; font-weight: 600; color: hsl(var(--foreground)); word-break: break-word; }
+
+    .reason-chip {
+      padding: 0.35rem 0.7rem; border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+      border: 1px solid hsl(var(--border)); background: hsl(var(--muted) / 0.5);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .reason-chip:hover { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+
+    .toast-container {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 200;
+      display: flex; flex-direction: column; gap: 0.5rem; max-width: 420px;
+    }
+    .toast {
+      background: #0f172a; color: #fff; padding: 0.9rem 1.15rem; border-radius: 10px;
+      font-size: 0.85rem; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      display: flex; flex-direction: column; gap: 0.35rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  <!-- ═════════════════════════ SIDEBAR ═════════════════════════ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo"></div>
+      <span class="sidebar-title">Happy Deliveries</span>
+    </div>
+    <nav class="sidebar-content">
+      <ul class="sidebar-menu">
+        <li>
+          <a href="/manager/dashboard" class="sidebar-menu-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a href="/manager/restaurants" class="sidebar-menu-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg>
+            <span>Restaurants</span>
+          </a>
+        </li>
+        <li>
+          <a href="/manager/menus" class="sidebar-menu-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 2-2.3 2.3a3 3 0 0 0 0 4.2l1.8 1.8a3 3 0 0 0 4.2 0L22 8"/><path d="M15 15 3.3 3.3a4.2 4.2 0 0 0 0 6l7.3 7.3c.7.7 2 .7 2.8 0L15 15Zm0 0 7 7"/><path d="m2.1 21.8 6.4-6.3"/><path d="m19 5-7 7"/></svg>
+            <span>Menus</span>
+          </a>
+        </li>
+        <li>
+          <a href="/manager/orders" class="sidebar-menu-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 16H8"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg>
+            <span>Orders</span>
+          </a>
+        </li>
+        <li>
+          <a href="/manager/drivers" class="sidebar-menu-item active">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>
+            <span>Manage Drivers</span>
+          </a>
+        </li>
+        <li>
+          <a href="/manager/analytics" class="sidebar-menu-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+            <span>Analytics</span>
+          </a>
+        </li>
+        <li>
+          <a href="/manager/settings" class="sidebar-menu-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>Settings</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="avatar"><%= manager.first_name ? manager.first_name[0] : 'M' %><%= manager.last_name ? manager.last_name[0] : '' %></div>
+        <div class="sidebar-user-info">
+          <span class="sidebar-user-name"><%= manager.first_name || 'Manager' %> <%= manager.last_name || '' %></span>
+          <span class="sidebar-user-role">Restaurant Manager</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════ MAIN CONTENT ═══════════════════════ -->
+  <main class="main-content">
+    <div class="topbar">
+      <div class="topbar-search">
+        <div class="search-input-wrapper">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" class="search-input" id="topSearchInput" placeholder="Search drivers by name, email, license #, plate..." oninput="syncSearch(this.value)">
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <a href="/driver/register" target="_blank" class="btn btn-outline btn-sm" title="Open Public Driver Registration Portal">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+          Driver Registration Portal
+        </a>
+        <a href="/manager/logout" class="btn btn-ghost btn-sm">Log out</a>
+      </div>
+    </div>
+
+    <div class="page-container">
+      <!-- Page Header -->
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Manage Drivers & Applications</h1>
+          <p style="font-size:0.875rem;color:hsl(var(--muted-foreground));margin-top:0.25rem;">
+            Review new driver registrations, inspect vehicle & license information, and approve or reject applications via email.
+          </p>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-outline" onclick="copyRegistrationLink()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            Copy Registration Link
+          </button>
+          <button class="btn btn-primary" onclick="loadDrivers()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Stat Cards -->
+      <div class="grid-4">
+        <div class="card stat-card" style="cursor:pointer;" onclick="filterByStatusCard('all')">
+          <div class="card-header">
+            <span class="card-title">Total Registered Drivers</span>
+          </div>
+          <div class="card-content">
+            <div class="stat-value" id="statTotal">0</div>
+            <p class="stat-description"><span id="statOnline">0</span> currently online</p>
+          </div>
+        </div>
+
+        <div class="card stat-card" style="cursor:pointer;border-left:4px solid #f59e0b;" onclick="filterByStatusCard('pending')">
+          <div class="card-header">
+            <span class="card-title">Pending Review</span>
+          </div>
+          <div class="card-content">
+            <div class="stat-value" id="statPending" style="color:#d97706;">0</div>
+            <p class="stat-description">Awaiting manager approval</p>
+          </div>
+        </div>
+
+        <div class="card stat-card" style="cursor:pointer;border-left:4px solid #16a34a;" onclick="filterByStatusCard('approved')">
+          <div class="card-header">
+            <span class="card-title">Approved Drivers</span>
+          </div>
+          <div class="card-content">
+            <div class="stat-value" id="statApproved" style="color:#16a34a;">0</div>
+            <p class="stat-description">Can sign in to Driver App</p>
+          </div>
+        </div>
+
+        <div class="card stat-card" style="cursor:pointer;border-left:4px solid #dc2626;" onclick="filterByStatusCard('rejected')">
+          <div class="card-header">
+            <span class="card-title">Rejected Applications</span>
+          </div>
+          <div class="card-content">
+            <div class="stat-value" id="statRejected" style="color:#dc2626;">0</div>
+            <p class="stat-description">Feedback emailed to applicant</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters Bar -->
+      <div class="filters-card">
+        <div class="filter-group" style="flex:2;">
+          <label class="filter-label">Search Applicant / Vehicle / License</label>
+          <input type="text" class="form-input" id="filterSearch" placeholder="Name, email, phone, ID #, license #, registration plate..." oninput="debounceLoadDrivers()">
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Application Status</label>
+          <select class="form-select" id="filterStatus" onchange="loadDrivers()">
+            <option value="all">All Statuses</option>
+            <option value="pending">Pending Review</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Vehicle Type</label>
+          <select class="form-select" id="filterVehicle" onchange="loadDrivers()">
+            <option value="all">All Vehicles</option>
+            <option value="Motorcycle">Motorcycle</option>
+            <option value="Scooter">Scooter</option>
+            <option value="Car">Car</option>
+            <option value="Bicycle">Bicycle</option>
+            <option value="Van">Van</option>
+          </select>
+        </div>
+        <button class="btn btn-outline" onclick="resetFilters()">Reset</button>
+      </div>
+
+      <!-- Drivers Table -->
+      <div class="card">
+        <div class="card-header" style="flex-direction:row;align-items:center;justify-content:space-between;">
+          <div>
+            <div class="card-title">Driver Applications & Roster</div>
+            <div style="font-size:0.8rem;color:hsl(var(--muted-foreground));" id="tableCountLabel">Loading drivers...</div>
+          </div>
+        </div>
+        <div class="card-content-full table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Applicant</th>
+                <th>Contact & ID</th>
+                <th>Vehicle Details</th>
+                <th>Driver's License</th>
+                <th>Approval Status</th>
+                <th>Submitted</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="driversTableBody">
+              <tr>
+                <td colspan="7" style="text-align:center;padding:2.5rem;color:hsl(var(--muted-foreground));">
+                  Loading driver applications...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ═════════════════════ FULL DRIVER APPLICATION DETAILS MODAL ═════════════════════ -->
+<div class="modal-backdrop" id="driverDetailModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div>
+        <h3 style="font-size:1.15rem;font-weight:700;" id="modalDriverName">Driver Application Details</h3>
+        <p style="font-size:0.8rem;color:hsl(var(--muted-foreground));" id="modalDriverSub">Full registration & compliance dossier</p>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeDetailModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modalDriverBody"></div>
+    <div class="modal-footer" id="modalDriverFooter"></div>
+  </div>
+</div>
+
+<!-- ═════════════════════ REJECT APPLICATION & EMAIL FEEDBACK MODAL ═════════════════════ -->
+<div class="modal-backdrop" id="rejectDriverModal">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-header">
+      <div>
+        <h3 style="font-size:1.1rem;font-weight:700;color:#dc2626;">Reject Driver Application & Send Email</h3>
+        <p style="font-size:0.8rem;color:hsl(var(--muted-foreground));" id="rejectModalSub">Explain what was wrong so the applicant can fix their registration.</p>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeRejectModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div>
+        <label class="filter-label" style="display:block;margin-bottom:0.4rem;">Quick Issue Templates (Click to insert)</label>
+        <div style="display:flex;flex-wrap:wrap;gap:0.4rem;">
+          <button type="button" class="reason-chip" onclick="appendRejectReason('Driver license number could not be verified or has expired.')">Expired / invalid license</button>
+          <button type="button" class="reason-chip" onclick="appendRejectReason('Vehicle registration plate or vehicle details are incomplete or mismatched.')">Vehicle registration mismatch</button>
+          <button type="button" class="reason-chip" onclick="appendRejectReason('National ID / Passport number is incomplete or invalid.')">Invalid ID / Passport</button>
+          <button type="button" class="reason-chip" onclick="appendRejectReason('Bank account payout details are incomplete or invalid.')">Incomplete bank details</button>
+          <button type="button" class="reason-chip" onclick="appendRejectReason('An insulated thermal food delivery bag is required to deliver orders.')">Insulated bag required</button>
+        </div>
+      </div>
+
+      <div>
+        <label class="filter-label" style="display:block;margin-bottom:0.4rem;">Detailed Message to Applicant (Sent via Email) *</label>
+        <textarea id="rejectReasonInput" rows="5" class="form-input" style="resize:vertical;" placeholder="Explain clearly what was wrong with the application and what the driver should fix before resubmitting..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeRejectModal()">Cancel</button>
+      <button class="btn btn-danger" id="confirmRejectBtn" onclick="confirmRejectDriver()">
+        Reject Application & Send Email
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  let allDrivers = [];
+  let selectedDriverId = null;
+  let searchDebounce = null;
+
+  function showToast(title, subtitle, mailtoUrl) {
+    const container = document.getElementById('toastContainer');
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.innerHTML = `
+      <div style="font-weight:700;">${title}</div>
+      ${subtitle ? `<div style="font-size:0.78rem;color:#cbd5e1;">${subtitle}</div>` : ''}
+      ${mailtoUrl ? `<a href="${mailtoUrl}" style="margin-top:4px;color:#fb923c;font-size:0.78rem;font-weight:600;text-decoration:underline;">Open in Default Email App ↗</a>` : ''}
+    `;
+    container.appendChild(el);
+    setTimeout(() => el.remove(), 7000);
+  }
+
+  function copyRegistrationLink() {
+    const url = window.location.origin + '/driver/register';
+    navigator.clipboard?.writeText(url);
+    showToast('Driver Registration Portal Link Copied!', url);
+  }
+
+  function syncSearch(val) {
+    document.getElementById('filterSearch').value = val;
+    debounceLoadDrivers();
+  }
+
+  function debounceLoadDrivers() {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(loadDrivers, 250);
+  }
+
+  function filterByStatusCard(status) {
+    document.getElementById('filterStatus').value = status;
+    loadDrivers();
+  }
+
+  function resetFilters() {
+    document.getElementById('filterSearch').value = '';
+    document.getElementById('topSearchInput').value = '';
+    document.getElementById('filterStatus').value = 'all';
+    document.getElementById('filterVehicle').value = 'all';
+    loadDrivers();
+  }
+
+  function renderStatusBadge(driver) {
+    const st = driver.approval_status || 'pending';
+    if (st === 'approved') {
+      return `<span class="badge badge-green">● Approved</span>`;
+    }
+    if (st === 'rejected') {
+      return `<span class="badge badge-red">✕ Rejected</span>`;
+    }
+    return `<span class="badge badge-yellow">⏳ Pending Review</span>`;
+  }
+
+  async function loadDrivers() {
+    const search = document.getElementById('filterSearch').value.trim();
+    const status = document.getElementById('filterStatus').value;
+    const vehicle_type = document.getElementById('filterVehicle').value;
+
+    const params = new URLSearchParams({ search, status, vehicle_type });
+    try {
+      const res = await fetch(`/manager/api/drivers?${params.toString()}`);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to load drivers');
+
+      allDrivers = data.drivers || [];
+      const stats = data.stats || { total: 0, pending: 0, approved: 0, rejected: 0, online: 0 };
+
+      document.getElementById('statTotal').textContent = stats.total;
+      document.getElementById('statPending').textContent = stats.pending;
+      document.getElementById('statApproved').textContent = stats.approved;
+      document.getElementById('statRejected').textContent = stats.rejected;
+      document.getElementById('statOnline').textContent = stats.online;
+
+      document.getElementById('tableCountLabel').textContent = `Showing ${allDrivers.length} driver record(s)`;
+
+      const tbody = document.getElementById('driversTableBody');
+      if (!allDrivers.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align:center;padding:3rem;color:hsl(var(--muted-foreground));">
+              No driver applications match the current filters.<br>
+              <a href="/driver/register" target="_blank" style="color:hsl(var(--primary));font-weight:600;font-size:0.82rem;">Open Driver Registration Portal ↗</a>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = allDrivers.map(d => {
+        const details = d.application_details || {};
+        const submittedDate = d.created_at ? new Date(d.created_at).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+        const expiryDate = d.license_expiry_date ? new Date(d.license_expiry_date).toLocaleDateString('en-ZA') : '—';
+        const st = d.approval_status || 'pending';
+
+        return `
+          <tr>
+            <td>
+              <div style="font-weight:700;color:hsl(var(--foreground));">${escapeHtml(d.first_name || '')} ${escapeHtml(d.last_name || '')}</div>
+              <div style="font-size:0.78rem;color:hsl(var(--muted-foreground));">${escapeHtml(d.email || '')}</div>
+              ${details.city ? `<div style="font-size:0.74rem;color:hsl(var(--muted-foreground));">📍 ${escapeHtml(details.city)}</div>` : ''}
+            </td>
+            <td>
+              <div style="font-weight:500;">${escapeHtml(d.phone_number || '—')}</div>
+              <div style="font-size:0.75rem;color:hsl(var(--muted-foreground));">ID: ${escapeHtml(details.id_number || 'Not provided')}</div>
+            </td>
+            <td>
+              <div style="font-weight:600;">${escapeHtml(d.vehicle_type || '—')} · ${escapeHtml(details.vehicle_make || '')} ${escapeHtml(d.vehicle_model || '')}</div>
+              <div style="font-size:0.75rem;color:hsl(var(--muted-foreground));">
+                Plate: <strong>${escapeHtml(d.vehicle_registration || '—')}</strong> · ${escapeHtml(d.vehicle_color || '')}
+              </div>
+            </td>
+            <td>
+              <div style="font-weight:600;">${escapeHtml(d.driver_license_number || '—')}</div>
+              <div style="font-size:0.75rem;color:hsl(var(--muted-foreground));">
+                ${escapeHtml(details.license_code || 'Standard')} · Exp: ${expiryDate}
+              </div>
+            </td>
+            <td>
+              ${renderStatusBadge(d)}
+              ${st === 'rejected' && d.rejection_reason ? `
+                <div style="font-size:0.72rem;color:#991b1b;max-width:210px;margin-top:4px;line-height:1.3;">
+                  Reason: "${escapeHtml(d.rejection_reason.slice(0, 75))}${d.rejection_reason.length > 75 ? '...' : ''}"
+                </div>
+              ` : ''}
+            </td>
+            <td style="font-size:0.8rem;color:hsl(var(--muted-foreground));">${submittedDate}</td>
+            <td style="text-align:right;white-space:nowrap;">
+              <button class="btn btn-outline btn-sm" onclick="openDetailModal('${d.id}')">Review Details</button>
+              ${st !== 'approved' ? `
+                <button class="btn btn-success btn-sm" onclick="approveDriver('${d.id}')">Approve</button>
+              ` : ''}
+              ${st !== 'rejected' ? `
+                <button class="btn btn-danger btn-sm" onclick="openRejectModal('${d.id}')">Reject</button>
+              ` : ''}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    } catch (err) {
+      console.error('Error loading drivers:', err);
+    }
+  }
+
+  function escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function openDetailModal(driverId) {
+    const d = allDrivers.find(item => item.id === driverId);
+    if (!d) return;
+    selectedDriverId = driverId;
+    const details = d.application_details || {};
+    const st = d.approval_status || 'pending';
+
+    document.getElementById('modalDriverName').textContent = `${d.first_name || ''} ${d.last_name || ''} — Driver Application`;
+    document.getElementById('modalDriverSub').innerHTML = `${escapeHtml(d.email)} · ${escapeHtml(d.phone_number || '')} · ${renderStatusBadge(d)}`;
+
+    const body = document.getElementById('modalDriverBody');
+    body.innerHTML = `
+      ${st === 'rejected' && d.rejection_reason ? `
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #dc2626;padding:0.9rem 1rem;border-radius:8px;color:#991b1b;font-size:0.85rem;">
+          <strong>Previous Rejection Feedback Sent to Driver:</strong><br>
+          ${escapeHtml(d.rejection_reason)}
+        </div>
+      ` : ''}
+
+      <div class="detail-section">
+        <h4>1. Personal & Identity Details</h4>
+        <div class="detail-grid">
+          <div class="detail-item"><div class="lbl">Full Name</div><div class="val">${escapeHtml(d.first_name)} ${escapeHtml(d.last_name)}</div></div>
+          <div class="detail-item"><div class="lbl">Email Address</div><div class="val">${escapeHtml(d.email)}</div></div>
+          <div class="detail-item"><div class="lbl">Phone Number</div><div class="val">${escapeHtml(d.phone_number || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">National ID / Passport</div><div class="val">${escapeHtml(details.id_number || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">Date of Birth</div><div class="val">${escapeHtml(details.date_of_birth || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">City & Postal Code</div><div class="val">${escapeHtml(details.city || '—')} ${escapeHtml(details.postal_code || '')}</div></div>
+          <div class="detail-item" style="grid-column:1 / -1;"><div class="lbl">Residential Street Address</div><div class="val">${escapeHtml(details.street_address || '—')}</div></div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <h4>2. Emergency Contact</h4>
+        <div class="detail-grid">
+          <div class="detail-item"><div class="lbl">Contact Name</div><div class="val">${escapeHtml(details.emergency_contact_name || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">Contact Phone</div><div class="val">${escapeHtml(details.emergency_contact_phone || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">Relationship</div><div class="val">${escapeHtml(details.emergency_contact_relationship || '—')}</div></div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <h4>3. Driver's License & Compliance</h4>
+        <div class="detail-grid">
+          <div class="detail-item"><div class="lbl">License Number</div><div class="val">${escapeHtml(d.driver_license_number || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">License Code</div><div class="val">${escapeHtml(details.license_code || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">License Expiry Date</div><div class="val">${d.license_expiry_date ? new Date(d.license_expiry_date).toLocaleDateString('en-ZA') : '—'}</div></div>
+          <div class="detail-item"><div class="lbl">PrDP Number</div><div class="val">${escapeHtml(details.prdp_number || 'None')}</div></div>
+          <div class="detail-item"><div class="lbl">Driving Experience</div><div class="val">${details.years_experience ?? '—'} year(s)</div></div>
+          <div class="detail-item"><div class="lbl">Insulated Delivery Bag</div><div class="val">${details.has_insulated_bag ? '✅ Yes' : '❌ No'}</div></div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <h4>4. Delivery Vehicle Information</h4>
+        <div class="detail-grid">
+          <div class="detail-item"><div class="lbl">Vehicle Type</div><div class="val">${escapeHtml(d.vehicle_type || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">Make & Model</div><div class="val">${escapeHtml(details.vehicle_make || '')} ${escapeHtml(d.vehicle_model || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">Year & Color</div><div class="val">${escapeHtml(details.vehicle_year || '—')} · ${escapeHtml(d.vehicle_color || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">Registration / License Plate</div><div class="val">${escapeHtml(d.vehicle_registration || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">Service Radius</div><div class="val">${d.service_radius_km || 10} km</div></div>
+          <div class="detail-item"><div class="lbl">Preferred Working Areas</div><div class="val">${escapeHtml(details.preferred_working_areas || 'Any')}</div></div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <h4>5. Banking & Payout Details</h4>
+        <div class="detail-grid">
+          <div class="detail-item"><div class="lbl">Bank Name</div><div class="val">${escapeHtml(details.bank_name || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">Account Holder</div><div class="val">${escapeHtml(details.account_holder_name || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">Account Number</div><div class="val">${escapeHtml(details.account_number || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">Branch Code</div><div class="val">${escapeHtml(details.branch_code || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">Account Type</div><div class="val">${escapeHtml(details.account_type || '—')}</div></div>
+          <div class="detail-item"><div class="lbl">Applicant Notes</div><div class="val">${escapeHtml(details.applicant_notes || 'None')}</div></div>
+        </div>
+      </div>
+    `;
+
+    const footer = document.getElementById('modalDriverFooter');
+    footer.innerHTML = `
+      <button class="btn btn-outline" onclick="closeDetailModal()">Close</button>
+      <button class="btn btn-danger" onclick="closeDetailModal(); openRejectModal('${d.id}');">
+        Reject & Email Feedback
+      </button>
+      <button class="btn btn-success" onclick="approveDriver('${d.id}')">
+        Approve Driver & Send Welcome Email
+      </button>
+    `;
+
+    document.getElementById('driverDetailModal').classList.add('open');
+  }
+
+  function closeDetailModal() {
+    document.getElementById('driverDetailModal').classList.remove('open');
+  }
+
+  async function approveDriver(driverId) {
+    const d = allDrivers.find(item => item.id === driverId);
+    const name = d ? `${d.first_name} ${d.last_name}` : 'this driver';
+    if (!confirm(`Approve ${name}'s driver account? They will receive an approval email and will immediately be able to log into the Driver side of the mobile app.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/manager/api/drivers/${driverId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.error || 'Failed to approve driver');
+        return;
+      }
+
+      closeDetailModal();
+      showToast(
+        'Driver Approved & Email Sent!',
+        data.message,
+        data.emailResult?.mailtoUrl
+      );
+      loadDrivers();
+    } catch (err) {
+      alert('Network error while approving driver.');
+    }
+  }
+
+  function openRejectModal(driverId) {
+    selectedDriverId = driverId;
+    const d = allDrivers.find(item => item.id === driverId);
+    document.getElementById('rejectModalSub').textContent = d
+      ? `Applicant: ${d.first_name} ${d.last_name} (${d.email})`
+      : 'Explain what was wrong so the applicant can fix their registration.';
+    document.getElementById('rejectReasonInput').value = d?.rejection_reason || '';
+    document.getElementById('rejectDriverModal').classList.add('open');
+  }
+
+  function closeRejectModal() {
+    document.getElementById('rejectDriverModal').classList.remove('open');
+  }
+
+  function appendRejectReason(text) {
+    const box = document.getElementById('rejectReasonInput');
+    box.value = box.value.trim() ? `${box.value.trim()}\n• ${text}` : `• ${text}`;
+    box.focus();
+  }
+
+  async function confirmRejectDriver() {
+    const reason = document.getElementById('rejectReasonInput').value.trim();
+    if (!reason) {
+      alert('Please write what was wrong with the application so we can send it to the driver via email.');
+      return;
+    }
+
+    const btn = document.getElementById('confirmRejectBtn');
+    btn.disabled = true;
+    btn.textContent = 'Sending Rejection Email...';
+
+    try {
+      const res = await fetch(`/manager/api/drivers/${selectedDriverId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.error || 'Failed to reject driver application');
+        return;
+      }
+
+      closeRejectModal();
+      showToast(
+        'Application Rejected & Email Sent',
+        data.message,
+        data.emailResult?.mailtoUrl
+      );
+      loadDrivers();
+    } catch (err) {
+      alert('Network error while rejecting application.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Reject Application & Send Email';
+    }
+  }
+
+  // Real-time updates when a new driver registers
+  try {
+    const socket = io();
+    socket.emit('join_manager_room');
+    socket.on('new_driver_application', (payload) => {
+      showToast(
+        payload?.resubmitted ? 'Driver Application Resubmitted!' : 'New Driver Application Received!',
+        'Refreshing driver applications list...'
+      );
+      loadDrivers();
+    });
+  } catch (e) {}
+
+  document.addEventListener('DOMContentLoaded', loadDrivers);
+</script>
+</body>
+</html>

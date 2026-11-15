@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restaurant Manager Login</title>
+  <link rel="shortcut icon" href="https://res.cloudinary.com/dpdira4rd/image/upload/v1794689689/logo-square_gmpkuq.png" type="image/x-icon">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --background: 220 13% 95%;
+      --foreground: 222.2 84% 4.9%;
+      --card: 0 0% 100%;
+      --card-foreground: 222.2 84% 4.9%;
+      --primary: 221.2 83.2% 53.3%;
+      --primary-foreground: 210 40% 98%;
+      --secondary: 210 40% 96%;
+      --secondary-foreground: 222.2 84% 4.9%;
+      --muted: 210 40% 96%;
+      --muted-foreground: 215.4 16.3% 46.9%;
+      --accent: 210 40% 96%;
+      --accent-foreground: 222.2 84% 4.9%;
+      --destructive: 0 84.2% 60.2%;
+      --destructive-foreground: 210 40% 98%;
+      --border: 214.3 31.8% 91.4%;
+      --input: 214.3 31.8% 91.4%;
+      --ring: 221.2 83.2% 53.3%;
+      --radius: 0.75rem;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: hsl(220 13% 95%);
+      color: hsl(var(--foreground));
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Subtle background pattern */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 10% 20%, hsla(var(--primary), 0.04) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, hsla(var(--primary), 0.03) 0%, transparent 40%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Main Container */
+    .login-wrapper {
+      width: 100%;
+      max-width: 1000px;
+      padding: 1.5rem;
+      position: relative;
+      z-index: 1;
+      animation: fadeIn 0.6s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Split Card */
+    .login-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 1rem;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.01);
+    }
+
+    /* Left Side - Form */
+    .login-form-side {
+      padding: 2.5rem 2.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .login-form-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2.5rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-icon {
+      width: 4.25rem;
+      height: 4.25rem;
+      background: url('https://res.cloudinary.com/dpdira4rd/image/upload/v1794689123/logo-square_pzavip.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      border-radius: 50%;
+      box-shadow: 0 0 0 1px rgba(234, 234, 234, 1);
+    }
+
+    .brand-icon svg {
+      width: 1.25rem;
+      height: 1.25rem;
+    }
+
+    .brand-text {
+      font-size: 1.125rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      color: hsl(var(--foreground));
+    }
+
+    .smart-signin {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.375rem 0.875rem;
+      background: hsl(var(--primary));
+      color: hsl(var(--primary-foreground));
+      border: none;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      text-decoration: none;
+    }
+
+    .smart-signin:hover {
+      opacity: 0.9;
+    }
+
+    .smart-signin svg {
+      width: 0.875rem;
+      height: 0.875rem;
+    }
+
+    .login-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      margin-bottom: 0.25rem;
+    }
+
+    .login-subtitle {
+      font-size: 0.9375rem;
+      color: hsl(var(--muted-foreground));
+      margin-bottom: 1.75rem;
+    }
+
+    /* Alerts */
+    .alert {
+      padding: 0.875rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      animation: slideDown 0.3s ease-out;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .alert-danger {
+      background: hsl(var(--destructive) / 0.08);
+      border: 1px solid hsl(var(--destructive) / 0.15);
+      color: hsl(var(--destructive));
+    }
+
+    .alert-success {
+      background: hsl(142.1 76.2% 36.3% / 0.08);
+      border: 1px solid hsl(142.1 76.2% 36.3% / 0.15);
+      color: hsl(142.1 76.2% 36.3%);
+    }
+
+    .alert svg {
+      width: 1rem;
+      height: 1rem;
+      flex-shrink: 0;
+    }
+
+    /* Form Elements */
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 0.875rem 1rem;
+      border: 1px solid hsl(var(--input));
+      border-radius: 0.5rem;
+      font-size: 0.9375rem;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      font-family: inherit;
+    }
+
+    .form-control:focus {
+      border-color: hsl(var(--ring));
+      box-shadow: 0 0 0 3px hsla(var(--ring), 0.15);
+    }
+
+    .form-control::placeholder {
+      color: hsl(var(--muted-foreground));
+      opacity: 0.6;
+    }
+
+    .password-wrapper {
+      position: relative;
+    }
+
+    .password-toggle {
+      position: absolute;
+      right: 0.875rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: hsl(var(--muted-foreground));
+      cursor: pointer;
+      padding: 0.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.15s;
+    }
+
+    .password-toggle:hover {
+      color: hsl(var(--foreground));
+    }
+
+    .password-toggle svg {
+      width: 1.125rem;
+      height: 1.125rem;
+    }
+
+    /* Button */
+    .btn-login {
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.875rem 1.5rem;
+      border-radius: 0.5rem;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: none;
+      background: hsl(var(--primary));
+      color: hsl(var(--primary-foreground));
+      font-family: inherit;
+      margin-top: 0.5rem;
+    }
+
+    .btn-login:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px hsla(var(--primary), 0.25);
+    }
+
+    .btn-login:active {
+      transform: translateY(0);
+    }
+
+    .btn-login:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-login svg {
+      width: 1.125rem;
+      height: 1.125rem;
+    }
+
+    /* Social Login */
+    .social-login {
+      margin-top: 2rem;
+    }
+
+    .social-label {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: hsl(var(--foreground));
+      margin-bottom: 0.875rem;
+    }
+
+    .social-icons {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .social-btn {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 0.5rem;
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--background));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      color: hsl(var(--foreground));
+      text-decoration: none;
+    }
+
+    .social-btn:hover {
+      background: hsl(var(--accent));
+      border-color: hsl(var(--ring));
+      transform: translateY(-2px);
+    }
+
+    .social-btn svg {
+      width: 1.125rem;
+      height: 1.125rem;
+    }
+
+    /* Footer */
+    .login-footer {
+      margin-top: auto;
+      padding-top: 2rem;
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      text-align: center;
+    }
+
+    .login-footer a {
+      color: hsl(var(--primary));
+      text-decoration: none;
+      font-weight: 600;
+      transition: opacity 0.15s;
+    }
+
+    .login-footer a:hover {
+      text-decoration: underline;
+      opacity: 0.8;
+    }
+
+    /* Right Side - Hero */
+    .login-hero-side {
+      background: linear-gradient(135deg, hsl(220 20% 98%) 0%, hsl(220 15% 96%) 100%);
+      border-left: 1px solid hsl(var(--border));
+      padding: 2.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-illustration {
+      width: 100%;
+      max-width: 280px;
+      margin-bottom: 2rem;
+      position: relative;
+    }
+
+    .hero-illustration svg {
+      width: 100%;
+      height: auto;
+      filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.05));
+    }
+
+    .hero-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      color: hsl(var(--foreground));
+    }
+
+    .hero-description {
+      font-size: 0.9375rem;
+      color: hsl(var(--muted-foreground));
+      line-height: 1.6;
+      max-width: 280px;
+      margin-bottom: 1.5rem;
+    }
+
+    .btn-learn-more {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1.25rem;
+      border-radius: 9999px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--card));
+      color: hsl(var(--primary));
+      text-decoration: none;
+    }
+
+    .btn-learn-more:hover {
+      background: hsl(var(--accent));
+      border-color: hsl(var(--ring));
+    }
+
+    /* Pagination dots */
+    .hero-dots {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 2rem;
+    }
+
+    .dot {
+      width: 1.5rem;
+      height: 0.25rem;
+      border-radius: 9999px;
+      background: hsl(var(--border));
+      transition: background 0.3s;
+    }
+
+    .dot.active {
+      background: hsl(var(--primary));
+    }
+
+    /* Page Footer */
+    .page-footer {
+      position: relative;
+      z-index: 1;
+      margin-top: 2rem;
+      text-align: center;
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+    }
+
+    /* Spinner */
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .spinner {
+      animation: spin 1s linear infinite;
+      width: 1.125rem;
+      height: 1.125rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .login-card {
+        grid-template-columns: 1fr;
+        max-width: 420px;
+        margin: 0 auto;
+      }
+
+      .login-hero-side {
+        display: none;
+      }
+
+      .login-form-side {
+        padding: 2rem 1.75rem 1.75rem;
+      }
+
+      .login-title {
+        font-size: 1.5rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .login-wrapper {
+        padding: 1rem;
+      }
+
+      .login-form-side {
+        padding: 1.5rem 1.25rem 1.25rem;
+      }
+
+      .login-form-header {
+        margin-bottom: 1.75rem;
+      }
+
+      .smart-signin {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="login-wrapper">
+    <div class="login-card">
+      <!-- Left Side: Form -->
+      <div class="login-form-side">
+        <div class="login-form-header">
+          <div class="brand">
+            <div class="brand-icon">
+              <%# <img src="https://res.cloudinary.com/dpdira4rd/image/upload/v1794689123/logo-square_pzavip.png" alt="Logo" class="brand-logo-img"> %>
+            </div>
+            <span class="brand-text">Restaurant Manager</span>
+          </div>
+        </div>
+
+        <h1 class="login-title">Sign in</h1>
+        <p class="login-subtitle">to access Restaurant Manager</p>
+
+        <% if (locals.error) { %>
+        <div class="alert alert-danger">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" x2="12" y1="8" y2="12" />
+            <line x1="12" x2="12.01" y1="16" y2="16" />
+          </svg>
+          <%= locals.error %>
+        </div>
+        <% } %>
+
+        <% if (locals.success) { %>
+        <div class="alert alert-success">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+            <polyline points="22 4 12 14.01 9 11.01" />
+          </svg>
+          <%= locals.success %>
+        </div>
+        <% } %>
+
+        <form id="loginForm" action="/manager/login" method="POST">
+          <div class="form-group">
+            <input type="email" class="form-control" name="email" placeholder="Email address" required>
+          </div>
+
+          <div class="form-group">
+            <div class="password-wrapper">
+              <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
+              <button type="button" class="password-toggle" onclick="togglePassword()" aria-label="Toggle password visibility">
+                <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                <svg id="eyeOffIcon" style="display: none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                  <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                  <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                  <line x1="2" x2="22" y1="2" y2="22" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-login" id="submitBtn">
+            <svg id="btnIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14" />
+              <path d="m12 5 7 7-7 7" />
+            </svg>
+            <span id="btnText">Sign in</span>
+          </button>
+        </form>
+
+        <div style="margin-top: 1.25rem; text-align: center; padding-top: 1rem; border-top: 1px solid hsl(var(--border));">
+          <span style="font-size: 0.85rem; color: hsl(var(--muted-foreground));">Want to become a delivery driver?</span>
+          <a href="/driver/register" style="display: inline-block; margin-left: 0.35rem; font-size: 0.85rem; font-weight: 600; color: hsl(var(--primary)); text-decoration: none;">
+            Apply on the Driver Registration Portal &rarr;
+          </a>
+        </div>
+
+        <div class="social-login">
+          <p class="social-label">Sign in using</p>
+          <div class="social-icons">
+            <a href="#" class="social-btn" title="Google">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+              </svg>
+            </a>
+            <a href="#" class="social-btn" title="Microsoft">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M0 0h11.5v11.5H0zm12.5 0H24v11.5H12.5zM0 12.5h11.5V24H0zm12.5 0H24V24H12.5z" />
+              </svg>
+            </a>
+            <a href="#" class="social-btn" title="Apple">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-2.96 1.78-2.47 5.98.22 7.13-.57 1.5-1.31 2.99-2.27 4.08zm-5.85-15.1c.07-2.04 1.76-3.79 3.78-3.94.29 2.32-1.93 4.48-3.78 3.94z" />
+              </svg>
+            </a>
+            <a href="#" class="social-btn" title="Facebook">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+              </svg>
+            </a>
+          </div>
+        </div>
+
+        <div class="login-footer">
+          <p>Need help? <a href="#">Contact Support</a></p>
+        </div>
+      </div>
+
+      <!-- Right Side: Hero -->
+      <div class="login-hero-side">
+        <div class="hero-illustration">
+          <svg viewBox="0 0 400 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Background shapes -->
+            <circle cx="200" cy="150" r="120" fill="hsla(221, 83%, 53%, 0.06)" />
+            <circle cx="200" cy="150" r="90" fill="hsla(221, 83%, 53%, 0.04)" />
+
+            <!-- Laptop base -->
+            <rect x="100" y="180" width="200" height="12" rx="6" fill="hsl(220 13% 85%)" />
+            <rect x="120" y="120" width="160" height="70" rx="8" fill="hsl(220 13% 92%)" />
+            <rect x="125" y="125" width="150" height="60" rx="4" fill="hsl(0 0% 100%)" />
+
+            <!-- Screen content -->
+            <rect x="135" y="135" width="40" height="8" rx="4" fill="hsl(221 83% 53%)" />
+            <rect x="135" y="150" width="80" height="4" rx="2" fill="hsl(220 13% 85%)" />
+            <rect x="135" y="158" width="60" height="4" rx="2" fill="hsl(220 13% 90%)" />
+            <rect x="135" y="166" width="70" height="4" rx="2" fill="hsl(220 13% 90%)" />
+
+            <!-- Checkmark -->
+            <circle cx="245" cy="155" r="16" fill="hsl(142 76% 36%)" />
+            <path d="M237 155l6 6 10-10" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+
+            <!-- Floating elements -->
+            <rect x="80" y="100" width="32" height="32" rx="8" fill="hsl(0 0% 100%)" stroke="hsl(220 13% 90%)" stroke-width="1.5" />
+            <path d="M88 116h16M88 120h12" stroke="hsl(220 13% 85%)" stroke-width="2" stroke-linecap="round" />
+
+            <rect x="280" y="90" width="36" height="36" rx="10" fill="hsl(0 0% 100%)" stroke="hsl(220 13% 90%)" stroke-width="1.5" />
+            <circle cx="298" cy="108" r="8" fill="hsl(221 83% 53% / 0.15)" />
+            <path d="M294 108l3 3 5-5" stroke="hsl(221 83% 53%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+
+            <!-- Person 1 (left) -->
+            <circle cx="140" cy="80" r="16" fill="hsl(25 95% 53%)" />
+            <path d="M140 64c-4 0-7 3-7 7s3 7 7 7" fill="hsl(25 90% 45%)" />
+            <rect x="128" y="96" width="24" height="35" rx="8" fill="hsl(221 83% 53%)" />
+            <circle cx="140" cy="80" r="14" fill="hsl(25 85% 65%)" />
+            <path d="M133 78a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-8a3 3 0 0 1-3-3z" fill="hsl(25 70% 40%)" />
+
+            <!-- Person 2 (right) -->
+            <circle cx="260" cy="85" r="16" fill="hsl(340 75% 55%)" />
+            <rect x="248" y="101" width="24" height="32" rx="8" fill="hsl(340 60% 45%)" />
+            <circle cx="260" cy="85" r="14" fill="hsl(340 80% 70%)" />
+            <path d="M253 83a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-8a3 3 0 0 1-3-3z" fill="hsl(340 60% 35%)" />
+
+            <!-- Decorative sparkles -->
+            <path d="M320 140l2-2 2 2-2 2z" fill="hsl(45 93% 47%)" />
+            <path d="M70 160l2-2 2 2-2 2z" fill="hsl(45 93% 47%)" />
+            <circle cx="310" cy="180" r="3" fill="hsl(221 83% 53% / 0.3)" />
+            <circle cx="90" cy="130" r="2" fill="hsl(142 76% 36% / 0.4)" />
+          </svg>
+        </div>
+
+        <h3 class="hero-title">Manage everything in one place</h3>
+        <p class="hero-description">Track orders, manage menus, and monitor your restaurant performance from a single dashboard.</p>
+
+        <a href="#" class="btn-learn-more">Learn more</a>
+
+        <div class="hero-dots">
+          <div class="dot active"></div>
+          <div class="dot"></div>
+          <div class="dot"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    Restaurant Manager. All Rights Reserved.
+  </div>
+
+  <script>
+    function togglePassword() {
+      const passwordField = document.getElementById('password');
+      const eyeIcon = document.getElementById('eyeIcon');
+      const eyeOffIcon = document.getElementById('eyeOffIcon');
+
+      if (passwordField.type === 'password') {
+        passwordField.type = 'text';
+        eyeIcon.style.display = 'none';
+        eyeOffIcon.style.display = 'block';
+      } else {
+        passwordField.type = 'password';
+        eyeIcon.style.display = 'block';
+        eyeOffIcon.style.display = 'none';
+      }
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+      const email = this.email.value;
+      const password = this.password.value;
+
+      if (!email || !password) {
+        e.preventDefault();
+        alert('Please fill in all fields');
+        return false;
+      }
+
+      const submitBtn = document.getElementById('submitBtn');
+      const btnText = document.getElementById('btnText');
+      const btnIcon = document.getElementById('btnIcon');
+
+      btnText.textContent = 'Signing in...';
+      btnIcon.innerHTML = '<circle class="spinner" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="60" stroke-dashoffset="10"/>';
+      submitBtn.disabled = true;
+    });
+  </script>
+</body>
+
+</html>

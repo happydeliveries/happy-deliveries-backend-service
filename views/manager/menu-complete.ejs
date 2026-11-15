@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu Management - Restaurant Manager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4a6fa5;
+            --secondary-color: #166088;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 250px;
+            background: linear-gradient(180deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            position: fixed;
+            height: 100vh;
+            padding-top: 20px;
+            left: 0;
+            top: 0;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 0 20px 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 15px 20px;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: white;
+            background: rgba(255,255,255,0.1);
+            border-left-color: white;
+        }
+
+        .main-content {
+            margin-left: 250px;
+            padding: 30px;
+        }
+
+        .page-header {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .page-header h2 {
+            margin: 0;
+            color: var(--primary-color);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .restaurant-selector {
+            min-width: 250px;
+        }
+
+        .form-select {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+        }
+
+        .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(74, 111, 165, 0.15);
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 25px;
+        }
+
+        .sidebar-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+
+        .sidebar-card-header {
+            background-color: #f8f9fa;
+            padding: 15px;
+            font-weight: 600;
+            color: #555;
+            border-bottom: 2px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .menu-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .menu-item {
+            border-bottom: 1px solid #eee;
+            padding: 0;
+        }
+
+        .menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .menu-link {
+            display: block;
+            padding: 12px 15px;
+            color: #555;
+            text-decoration: none;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .menu-link:hover {
+            background-color: #f8f9fa;
+            color: var(--primary-color);
+            padding-left: 20px;
+        }
+
+        .menu-link.active {
+            background-color: rgba(74, 111, 165, 0.1);
+            color: var(--primary-color);
+            border-left: 4px solid var(--primary-color);
+            padding-left: 11px;
+        }
+
+        .main-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .main-card-header {
+            padding: 20px;
+            border-bottom: 2px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .main-card-header h5 {
+            margin: 0;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .table-responsive {
+            margin: 0;
+        }
+
+        .table {
+            margin: 0;
+        }
+
+        .table thead th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+            border-bottom: 2px solid #dee2e6;
+            padding: 15px;
+        }
+
+        .table tbody td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            vertical-align: middle;
+        }
+
+        .item-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .item-description {
+            font-size: 0.85rem;
+            color: #999;
+            margin-top: 3px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-danger { background: #f8d7da; color: #721c24; }
+        .badge-primary { background: #cce5ff; color: #004085; }
+
+        .btn {
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.8rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 30px;
+            color: #999;
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            color: #ddd;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { width: 60px; }
+            .main-content { margin-left: 60px; }
+            .content-grid { grid-template-columns: 1fr; }
+            .page-header { flex-direction: column; gap: 15px; }
+            .header-actions { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-utensils"></i> Manager</h3>
+        </div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" href="/manager/dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/manager/restaurants">
+                    <i class="fas fa-store"></i> Restaurants
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/manager/orders">
+                    <i class="fas fa-receipt"></i> Orders
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" href="/manager/menus">
+                    <i class="fas fa-utensils"></i> Menus
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/manager/analytics">
+                    <i class="fas fa-chart-line"></i> Analytics
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/manager/settings">
+                    <i class="fas fa-cog"></i> Settings
+                </a>
+            </li>
+            <li class="nav-item" style="position: absolute; bottom: 20px; width: 100%;">
+                <a class="nav-link text-danger" href="/manager/logout">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="page-header">
+            <div>
+                <h2><i class="fas fa-utensils me-2"></i>Menu Management</h2>
+            </div>
+            <div class="header-actions">
+                <select class="form-select restaurant-selector" id="restaurantSelect" onchange="loadMenus()">
+                    <% restaurants.forEach(restaurant => { %>
+                        <option value="<%= restaurant.id %>"><%= restaurant.name %></option>
+                    <% }) %>
+                </select>
+                <button class="btn btn-primary" onclick="addNewMenu()">
+                    <i class="fas fa-plus me-2"></i>Add Menu
+                </button>
+                <button class="btn btn-success" onclick="addNewItem()">
+                    <i class="fas fa-plus me-2"></i>Add Item
+                </button>
+            </div>
+        </div>
+
+        <!-- Content Grid -->
+        <div class="content-grid">
+            <!-- Menus Sidebar -->
+            <div class="sidebar-card">
+                <div class="sidebar-card-header">
+                    <span>Menus</span>
+                    <span id="menuCount" class="badge bg-primary">0</span>
+                </div>
+                <ul class="menu-list" id="menusList">
+                    <li class="menu-item">
+                        <div class="menu-link text-muted text-center py-4">
+                            <small>Select a restaurant to view menus</small>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Items Grid -->
+            <div class="main-card">
+                <div class="main-card-header">
+                    <h5 id="menuTitle">Menu Items</h5>
+                    <div>
+                        <input type="text" class="form-control form-control-sm d-inline-block" placeholder="Search items..." id="searchItems" style="width: 200px;">
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">
+                                    <input type="checkbox" id="selectAll">
+                                </th>
+                                <th>Item Name</th>
+                                <th>Price</th>
+                                <th>Category</th>
+                                <th>Status</th>
+                                <th>Available</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsList">
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">Select a menu to view items</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Menu Modal -->
+    <div class="modal fade" id="addMenuModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #4a6fa5, #166088); color: white; border: none;">
+                    <h5 class="modal-title">Add New Menu</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter: invert(1);"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Menu Name</label>
+                        <input type="text" class="form-control" id="menuName" placeholder="e.g., Main Menu">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="menuDescription" rows="3" placeholder="Menu description"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveMenu()">Create Menu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Item Modal -->
+    <div class="modal fade" id="addItemModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #4a6fa5, #166088); color: white; border: none;">
+                    <h5 class="modal-title">Add Menu Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter: invert(1);"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Item Name</label>
+                            <input type="text" class="form-control" id="itemName" placeholder="Item name">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Price (₹)</label>
+                            <input type="number" class="form-control" id="itemPrice" placeholder="0.00" step="0.01">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="itemDescription" rows="3" placeholder="Item description"></textarea>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Category</label>
+                            <input type="text" class="form-control" id="itemCategory" placeholder="e.g., Appetizers">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Preparation Time (minutes)</label>
+                            <input type="number" class="form-control" id="itemPreparationTime" placeholder="15">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveItem()">Add Item</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = '/api/manager';
+        let selectedMenu = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMenus();
+        });
+
+        async function loadMenus() {
+            try {
+                const restaurantId = document.getElementById('restaurantSelect').value;
+                if (!restaurantId) return;
+
+                // In a real app, this would fetch from the API
+                // For now, we'll show a placeholder
+                const menusList = document.getElementById('menusList');
+                menusList.innerHTML = `
+                    <li class="menu-item">
+                        <div class="menu-link text-muted text-center py-4">
+                            <small>No menus found</small>
+                        </div>
+                    </li>
+                `;
+                document.getElementById('menuCount').textContent = 0;
+            } catch (error) {
+                console.error('Error loading menus:', error);
+            }
+        }
+
+        function addNewMenu() {
+            const modal = new bootstrap.Modal(document.getElementById('addMenuModal'));
+            modal.show();
+        }
+
+        function addNewItem() {
+            const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
+            modal.show();
+        }
+
+        function saveMenu() {
+            const name = document.getElementById('menuName').value;
+            if (!name) {
+                alert('Please enter a menu name');
+                return;
+            }
+            alert('Menu created successfully!');
+            bootstrap.Modal.getInstance(document.getElementById('addMenuModal')).hide();
+            document.getElementById('menuName').value = '';
+            document.getElementById('menuDescription').value = '';
+        }
+
+        function saveItem() {
+            const name = document.getElementById('itemName').value;
+            const price = document.getElementById('itemPrice').value;
+            
+            if (!name || !price) {
+                alert('Please fill in all required fields');
+                return;
+            }
+            alert('Item added successfully!');
+            bootstrap.Modal.getInstance(document.getElementById('addItemModal')).hide();
+            document.getElementById('itemName').value = '';
+            document.getElementById('itemPrice').value = '';
+            document.getElementById('itemDescription').value = '';
+            document.getElementById('itemCategory').value = '';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,2441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu Management - Restaurant Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    <style>
+        /* Topbar */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid hsl(var(--border));
+            background: hsl(var(--background));
+            position: sticky;
+            top: 0;
+            z-index: 40;
+        }
+
+        .topbar-search {
+            flex: 1;
+            max-width: 28rem;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+        }
+
+        .search-input-wrapper i {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: hsl(var(--muted-foreground));
+            font-size: 0.875rem;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+            border: 1px solid hsl(var(--input));
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            background: hsl(var(--background));
+            color: hsl(var(--foreground));
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            font-family: inherit;
+        }
+
+        .search-input:focus {
+            border-color: hsl(var(--ring));
+            box-shadow: 0 0 0 2px hsla(var(--ring), 0.2);
+        }
+
+        .search-input::placeholder {
+            color: hsl(var(--muted-foreground));
+        }
+
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s, transform 0.1s;
+            border: 1px solid transparent;
+            text-decoration: none;
+            font-family: inherit;
+            line-height: 1.25;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+            border-color: hsl(var(--primary));
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .btn-secondary {
+            background: hsl(var(--secondary));
+            color: hsl(var(--secondary-foreground));
+            border-color: hsl(var(--secondary));
+        }
+
+        .btn-secondary:hover {
+            background: hsl(var(--accent));
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid hsl(var(--input));
+            color: hsl(var(--foreground));
+        }
+
+        .btn-outline:hover {
+            background: hsl(var(--accent));
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: hsl(var(--foreground));
+            border-color: transparent;
+        }
+
+        .btn-ghost:hover {
+            background: hsl(var(--accent));
+        }
+
+        .btn-danger {
+            background: hsl(var(--destructive));
+            color: hsl(var(--destructive-foreground));
+            border-color: hsl(var(--destructive));
+        }
+
+        .btn-danger:hover {
+            opacity: 0.9;
+        }
+
+        .btn-icon {
+            padding: 0.5rem;
+            width: 2.25rem;
+            height: 2.25rem;
+        }
+
+        .btn-sm {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.125rem 0.625rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-green {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-orange {
+            background: #ffedd5;
+            color: #9a3412;
+        }
+
+        .badge-yellow {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-blue {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-red {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-gray {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        /* Cards */
+        .card {
+            background: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.375rem;
+            border-bottom: 1px solid hsl(var(--border));
+        }
+
+        .card-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            line-height: 1.5;
+            color: hsl(var(--foreground));
+        }
+
+        .card-description {
+            font-size: 0.875rem;
+            color: hsl(var(--muted-foreground));
+        }
+
+        .card-content {
+            padding: 1.25rem 1.5rem;
+        }
+
+        /* Page Layout */
+        .page-container {
+            padding: 1.5rem 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            max-width: 1400px;
+        }
+
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .page-title {
+            font-size: 1.875rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            color: hsl(var(--foreground));
+        }
+
+        .page-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Forms */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: hsl(var(--foreground));
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .form-row-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="password"],
+        input[type="number"],
+        input[type="url"],
+        input[type="date"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid hsl(var(--input));
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            background: hsl(var(--background));
+            color: hsl(var(--foreground));
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            font-family: inherit;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            border-color: hsl(var(--ring));
+            box-shadow: 0 0 0 2px hsla(var(--ring), 0.2);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 5rem;
+        }
+
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            padding-right: 2rem;
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            appearance: none;
+            width: 2.5rem;
+            height: 1.25rem;
+            background: hsl(var(--input));
+            border-radius: 9999px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.15s;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 1rem;
+            height: 1rem;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.15s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .toggle-switch:checked {
+            background: hsl(var(--primary));
+        }
+
+        .toggle-switch:checked::after {
+            transform: translateX(1.25rem);
+        }
+
+        .toggle-label {
+            font-size: 0.875rem;
+            color: hsl(var(--foreground));
+            cursor: pointer;
+            user-select: none;
+        }
+
+        /* Modals */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.2s;
+            padding: 1rem;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal {
+            background: hsl(var(--background));
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 28rem;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: scale(0.95);
+            transition: transform 0.2s;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            position: relative;
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal-lg {
+            max-width: 54rem;
+        }
+
+        .modal-sm {
+            max-width: 24rem;
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid hsl(var(--border));
+            position: relative;
+        }
+
+        .modal-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+
+        .modal-description {
+            font-size: 0.875rem;
+            color: hsl(var(--muted-foreground));
+            margin-top: 0.25rem;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid hsl(var(--border));
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
+        .modal-close {
+            position: absolute;
+            right: 1rem;
+            top: 1rem;
+            width: 2rem;
+            height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius);
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: hsl(var(--muted-foreground));
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .modal-close:hover {
+            background: hsl(var(--accent));
+            color: hsl(var(--foreground));
+        }
+
+        /* Dropdown */
+        .dropdown {
+            position: relative;
+        }
+
+        .dropdown-content {
+            position: absolute;
+            top: calc(100% + 0.5rem);
+            right: 0;
+            background: hsl(var(--background));
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            min-width: 14rem;
+            z-index: 50;
+            display: none;
+            padding: 0.375rem;
+        }
+
+        .dropdown.active .dropdown-content {
+            display: block;
+        }
+
+        .dropdown-label {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: hsl(var(--muted-foreground));
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            border-radius: 0.375rem;
+            transition: background-color 0.15s;
+            color: hsl(var(--foreground));
+            text-decoration: none;
+        }
+
+        .dropdown-item:hover {
+            background: hsl(var(--accent));
+        }
+
+        .dropdown-item.danger {
+            color: hsl(var(--destructive));
+        }
+
+        .dropdown-separator {
+            height: 1px;
+            background: hsl(var(--border));
+            margin: 0.375rem 0;
+        }
+
+        /* Toasts */
+        .toast-container {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .toast {
+            background: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            padding: 1rem 1.25rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            min-width: 20rem;
+            max-width: 28rem;
+            transform: translateX(120%);
+            opacity: 0;
+            transition: transform 0.3s, opacity 0.3s;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            font-size: 0.875rem;
+        }
+
+        .toast-description {
+            font-size: 0.875rem;
+            color: hsl(var(--muted-foreground));
+        }
+
+        /* Notification badge */
+        .notification-btn {
+            position: relative;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -0.25rem;
+            right: -0.25rem;
+            width: 1.125rem;
+            height: 1.125rem;
+            background: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+            border-radius: 50%;
+            font-size: 0.625rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+
+        /* Avatar */
+        .avatar {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            overflow: hidden;
+            background: hsl(var(--muted));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: hsl(var(--muted-foreground));
+            flex-shrink: 0;
+        }
+
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Menu Specific Styles */
+        .menu-container {
+            margin-bottom: 1.5rem;
+        }
+
+        .menu-container .card-header {
+            background: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+            border-bottom: none;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .menu-container .card-header .card-title {
+            color: hsl(var(--primary-foreground));
+            font-size: 1rem;
+        }
+
+        .menu-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .menu-actions .btn {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border-color: transparent;
+        }
+
+        .menu-actions .btn:hover {
+            background: rgba(255,255,255,0.25);
+        }
+
+        .menu-items-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .menu-item-card {
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            transition: all 0.2s;
+            background: hsl(var(--card));
+            display: flex;
+            flex-direction: column;
+        }
+
+        .menu-item-card:hover {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            transform: translateY(-2px);
+            border-color: hsl(var(--ring));
+        }
+
+        .menu-item-card.unavailable {
+            opacity: 0.6;
+            background: hsl(var(--muted));
+        }
+
+        .item-image {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            border-radius: calc(var(--radius) - 0.25rem);
+            margin-bottom: 1rem;
+            background: hsl(var(--muted));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: hsl(var(--muted-foreground));
+            font-size: 2.5rem;
+            overflow: hidden;
+        }
+
+        .item-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+            gap: 0.5rem;
+        }
+
+        .item-name {
+            font-weight: 600;
+            color: hsl(var(--foreground));
+            margin: 0;
+            font-size: 1rem;
+            line-height: 1.4;
+        }
+
+        .item-badges {
+            display: flex;
+            gap: 0.375rem;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+
+        .badge-veg {
+            background: #22c55e;
+            color: white;
+            font-size: 0.65rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            font-weight: 500;
+        }
+
+        .badge-popular {
+            background: #f59e0b;
+            color: white;
+            font-size: 0.65rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            font-weight: 500;
+        }
+
+        .item-category {
+            color: hsl(var(--primary));
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .item-description {
+            color: hsl(var(--muted-foreground));
+            font-size: 0.875rem;
+            margin-bottom: 0.75rem;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .item-meta {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.8rem;
+            color: hsl(var(--muted-foreground));
+            flex-wrap: wrap;
+        }
+
+        .item-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .item-price-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            margin-top: auto;
+        }
+
+        .price-current {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #16a34a;
+        }
+
+        .price-original {
+            font-size: 0.875rem;
+            color: hsl(var(--muted-foreground));
+            text-decoration: line-through;
+            margin-left: 0.5rem;
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .item-actions .btn {
+            flex: 1;
+            font-size: 0.8rem;
+            padding: 0.375rem 0.5rem;
+        }
+
+        /* Category Pills */
+        .category-filter {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .category-pill {
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            border: 1px solid hsl(var(--border));
+            background: hsl(var(--background));
+            color: hsl(var(--foreground));
+            cursor: pointer;
+            transition: all 0.15s;
+            font-weight: 500;
+            font-size: 0.875rem;
+            user-select: none;
+        }
+
+        .category-pill:hover {
+            border-color: hsl(var(--primary));
+            color: hsl(var(--primary));
+        }
+
+        .category-pill.active {
+            background: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+            border-color: hsl(var(--primary));
+        }
+
+        /* Tag Inputs */
+        .tag-input-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            border: 1px solid hsl(var(--input));
+            border-radius: var(--radius);
+            min-height: 2.75rem;
+            align-items: center;
+            background: hsl(var(--background));
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .tag-input-container:focus-within {
+            border-color: hsl(var(--ring));
+            box-shadow: 0 0 0 2px hsla(var(--ring), 0.2);
+        }
+
+        .tag-chip {
+            background: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            font-weight: 500;
+        }
+
+        .tag-chip button {
+            background: none;
+            border: none;
+            color: inherit;
+            cursor: pointer;
+            font-size: 1rem;
+            line-height: 1;
+            padding: 0;
+            margin-left: 0.125rem;
+        }
+
+        .tag-input {
+            border: none;
+            outline: none;
+            flex: 1;
+            min-width: 100px;
+            padding: 0.25rem;
+            font-size: 0.875rem;
+            background: transparent;
+            color: hsl(var(--foreground));
+            font-family: inherit;
+        }
+
+        /* Nutrition */
+        .nutrition-info {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px dashed hsl(var(--border));
+            flex-wrap: wrap;
+        }
+
+        .nutrition-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.625rem;
+            border-radius: 9999px;
+            background: hsl(var(--muted));
+            color: hsl(var(--muted-foreground));
+            font-weight: 500;
+        }
+
+        /* Empty States */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: hsl(var(--muted-foreground));
+        }
+
+        .empty-state i {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: hsl(var(--border));
+        }
+
+        .empty-state h5 {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: hsl(var(--foreground));
+        }
+
+        .empty-state p {
+            font-size: 0.875rem;
+            max-width: 24rem;
+            margin: 0 auto;
+        }
+
+        /* Loading */
+        .spinner-container {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.9);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid hsl(var(--border));
+            border-top: 3px solid hsl(var(--primary));
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Lists */
+        .list-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .list-group-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.625rem 0.875rem;
+            border-radius: 0.5rem;
+            border: 1px solid hsl(var(--border));
+            font-size: 0.875rem;
+        }
+
+        /* Utilities */
+        .text-muted {
+            color: hsl(var(--muted-foreground));
+        }
+
+        .font-medium {
+            font-weight: 500;
+        }
+
+        .font-semibold {
+            font-weight: 600;
+        }
+
+        .flex {
+            display: flex;
+        }
+
+        .items-center {
+            align-items: center;
+        }
+
+        .justify-between {
+            justify-content: space-between;
+        }
+
+        .gap-1 { gap: 0.25rem; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-3 { gap: 0.75rem; }
+        .gap-4 { gap: 1rem; }
+
+        .mt-1 { margin-top: 0.25rem; }
+        .mt-2 { margin-top: 0.5rem; }
+        .mt-4 { margin-top: 1rem; }
+
+        .mb-0 { margin-bottom: 0; }
+        .mb-1 { margin-bottom: 0.25rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-3 { margin-bottom: 0.75rem; }
+        .mb-4 { margin-bottom: 1rem; }
+
+        .ml-auto { margin-left: auto; }
+
+        .truncate {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .menu-items-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .page-container {
+                padding: 1rem;
+            }
+            .menu-items-grid {
+                grid-template-columns: 1fr;
+            }
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            .form-row-3 {
+                grid-template-columns: 1fr;
+            }
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .topbar-search {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="spinner-container" id="loadingSpinner">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                </div>
+                <span class="sidebar-title">Happy Deliveries</span>
+            </div>
+            <nav class="sidebar-content">
+                <ul class="sidebar-menu">
+                    <li>
+                        <a class="sidebar-menu-item" href="/manager/dashboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard-icon lucide-layout-dashboard"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="sidebar-menu-item" href="/manager/restaurants">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-store-icon lucide-store"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg>
+                            <span>Restaurants</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="sidebar-menu-item active" href="/manager/menus">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-utensils-crossed-icon lucide-utensils-crossed"><path d="m16 2-2.3 2.3a3 3 0 0 0 0 4.2l1.8 1.8a3 3 0 0 0 4.2 0L22 8"/><path d="M15 15 3.3 3.3a4.2 4.2 0 0 0 0 6l7.3 7.3c.7.7 2 .7 2.8 0L15 15Zm0 0 7 7"/><path d="m2.1 21.8 6.4-6.3"/><path d="m19 5-7 7"/></svg>
+                            <span>Menus</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="sidebar-menu-item" href="/manager/orders">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-receipt-text-icon lucide-receipt-text"><path d="M13 16H8"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg>
+                            <span>Orders</span></a></li><li><a class="sidebar-menu-item" href="/manager/drivers"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg><span>Manage Drivers</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="sidebar-menu-item" href="/manager/analytics">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+                            <span>Analytics</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="sidebar-menu-item" href="/manager/settings">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="avatar avatar-lg">
+                        <%= manager.first_name ? manager.first_name[0] : 'M' %><%= manager.last_name ? manager.last_name[0] : '' %>
+                    </div>
+                    <div class="sidebar-user-info">
+                        <span class="sidebar-user-name"><%= manager.first_name %> <%= manager.last_name %></span>
+                        <span class="sidebar-user-role">Restaurant Manager</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Topbar -->
+            <div class="topbar">
+                <div class="topbar-search">
+                    <div class="search-input-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="search-input" placeholder="Search menu items..." id="menuSearchInput">
+                    </div>
+                </div>
+                <div class="topbar-actions">
+                    <div class="dropdown">
+                        <button class="btn btn-ghost btn-icon notification-btn" onclick="toggleDropdown(this)">
+                            <i class="fas fa-bell"></i>
+                            <span class="notification-badge">0</span>
+                        </button>
+                        <div class="dropdown-content" style="width: 20rem;">
+                            <div class="dropdown-label">Notifications</div>
+                            <div class="dropdown-separator"></div>
+                            <div class="dropdown-item" style="flex-direction: column; align-items: flex-start;">
+                                <span class="font-medium">Welcome back!</span>
+                                <span class="text-muted" style="font-size: 0.75rem;">Manage your restaurant menus here.</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-ghost btn-icon" onclick="toggleDropdown(this)" style="border-radius: 50%;">
+                            <div class="avatar" style="background: hsl(var(--primary)); color: white;">
+                                <i class="fas fa-user" style="font-size: 0.75rem;"></i>
+                            </div>
+                        </button>
+                        <div class="dropdown-content">
+                            <div class="dropdown-label"><%= manager.first_name %> <%= manager.last_name %></div>
+                            <div class="dropdown-separator"></div>
+                            <a href="/manager/settings" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
+                            <div class="dropdown-separator"></div>
+                            <a href="/manager/logout" class="dropdown-item danger"><i class="fas fa-sign-out-alt"></i> Log out</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page Content -->
+            <div class="page-container">
+                <!-- Header -->
+                <div class="page-header">
+                    <div>
+                        <h2 class="page-title">Menu Management</h2>
+                        <p class="text-muted mt-1" style="font-size: 0.875rem;">Manage menus, categories, and customizable items for your restaurants.</p>
+                    </div>
+                    <div class="page-actions">
+                        <button class="btn btn-outline btn-sm" onclick="openCategoryModal()">
+                            <i class="fas fa-tags"></i> Manage Categories
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Restaurant Selector -->
+                <div class="card">
+                    <div class="card-content">
+                        <div class="flex items-center gap-4" style="flex-wrap: wrap;">
+                            <div class="flex items-center gap-2" style="white-space: nowrap;">
+                                <i class="fas fa-store text-muted"></i>
+                                <span class="font-medium">Select Restaurant:</span>
+                            </div>
+                            <select id="restaurantSelect" style="max-width: 400px; flex: 1; min-width: 200px;">
+                                <option value="">Loading restaurants...</option>
+                            </select>
+                            <button class="btn btn-primary" id="addMenuBtn" disabled onclick="openMenuModal()">
+                                <i class="fas fa-plus"></i> New Menu
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Categories Filter -->
+                <div class="card" id="categoriesCard" style="display: none;">
+                    <div class="card-content">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="card-title" style="font-size: 0.875rem;">
+                                <i class="fas fa-filter" style="margin-right: 0.5rem;"></i>Filter by Category
+                            </h3>
+                            <button class="btn btn-sm btn-outline" onclick="openCategoryModal()">
+                                <i class="fas fa-tags"></i> Manage Categories
+                            </button>
+                        </div>
+                        <div class="category-filter" id="categoryFilter">
+                            <div class="category-pill active" data-category="all">All Items</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Menus Container -->
+                <div id="menusContainer">
+                    <div class="empty-state">
+                        <i class="fas fa-utensils"></i>
+                        <h5>Select a Restaurant</h5>
+                        <p>Choose a restaurant above to view and manage its menus.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Menu Modal -->
+    <div class="modal-overlay" id="menuModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title" id="menuModalTitle">Add New Menu</h3>
+                    <p class="modal-description">Create a new menu for your restaurant.</p>
+                </div>
+                <button class="modal-close" onclick="closeModal('menuModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="menuForm">
+                    <input type="hidden" id="menuId">
+                    <div class="form-group">
+                        <label class="form-label">Menu Name *</label>
+                        <input type="text" id="menuName" required placeholder="e.g., Main Menu, Lunch Specials">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea id="menuDescription" rows="2" placeholder="Brief description of this menu"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Display Order</label>
+                            <input type="number" id="menuDisplayOrder" value="0" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Status</label>
+                            <div class="flex items-center gap-3" style="height: 2.25rem;">
+                                <input type="checkbox" class="toggle-switch" id="menuIsActive" checked>
+                                <label class="toggle-label" for="menuIsActive">Active</label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('menuModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveMenu()">
+                    <i class="fas fa-save"></i> Save Menu
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Menu Item Modal -->
+    <div class="modal-overlay" id="itemModal">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title" id="itemModalTitle">Add Menu Item</h3>
+                    <p class="modal-description">Add or edit a menu item and its customization options.</p>
+                </div>
+                <button class="modal-close" onclick="closeModal('itemModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="itemForm">
+                    <input type="hidden" id="itemId">
+                    <input type="hidden" id="itemMenuId">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Item Name *</label>
+                            <input type="text" id="itemName" required placeholder="e.g., Double Cheese Burger">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Category *</label>
+                            <input type="text" id="itemCategory" required list="categoryList" placeholder="e.g., Burgers, Starters, Drinks">
+                            <datalist id="categoryList"></datalist>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea id="itemDescription" rows="2" placeholder="Describe ingredients, portion size, or preparation style..."></textarea>
+                    </div>
+
+                    <div class="form-row form-row-3">
+                        <div class="form-group">
+                            <label class="form-label">Base Price *</label>
+                            <div style="position: relative;">
+                                <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: hsl(var(--muted-foreground)); font-size: 0.875rem;">R</span>
+                                <input type="number" id="itemPrice" required step="0.01" min="0" style="padding-left: 1.75rem;">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Discounted Price</label>
+                            <div style="position: relative;">
+                                <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: hsl(var(--muted-foreground)); font-size: 0.875rem;">R</span>
+                                <input type="number" id="itemDiscountedPrice" step="0.01" min="0" style="padding-left: 1.75rem;">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Prep Time (min)</label>
+                            <input type="number" id="itemPrepTime" value="15" min="1">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Calories</label>
+                            <input type="number" id="itemCalories" min="0" placeholder="kcal">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Image URL</label>
+                            <input type="url" id="itemImageUrl" placeholder="https://...">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Ingredients</label>
+                        <div class="tag-input-container" id="ingredientsContainer">
+                            <input type="text" class="tag-input" id="ingredientsInput" placeholder="Type ingredient and press Enter...">
+                        </div>
+                        <small class="text-muted">Press Enter to add each ingredient</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Dietary &amp; Highlight Tags</label>
+                        <div class="tag-input-container" id="tagsContainer">
+                            <input type="text" class="tag-input" id="tagsInput" placeholder="Type tag and press Enter...">
+                        </div>
+                        <small class="text-muted">e.g., spicy, gluten-free, halaal, vegan, bestseller</small>
+                    </div>
+
+                    <!-- Customizations & Option Groups Builder -->
+                    <div class="form-group" style="border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 1rem; background: hsl(var(--muted) / 0.35);">
+                        <div class="flex items-center justify-between mb-2" style="flex-wrap: wrap; gap: 0.5rem;">
+                            <div>
+                                <label class="form-label mb-0" style="font-size: 0.95rem; font-weight: 600;">
+                                    <i class="fas fa-sliders-h" style="margin-right: 0.4rem; color: hsl(var(--primary));"></i>
+                                    Customization &amp; Option Groups
+                                </label>
+                                <div class="text-muted" style="font-size: 0.78rem;">
+                                    Configure sizes, preparation styles, required side choices, or paid extras/add-ons.
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-primary" onclick="addCustomizationGroup()">
+                                <i class="fas fa-plus"></i> Add Option Group
+                            </button>
+                        </div>
+
+                        <div class="flex items-center gap-2 mb-3" style="flex-wrap: wrap;">
+                            <span class="text-muted" style="font-size: 0.75rem; font-weight: 500;">Quick Presets:</span>
+                            <button type="button" class="btn btn-sm btn-outline" style="height: 1.75rem; font-size: 0.75rem; padding: 0 0.6rem;" onclick="addPresetGroup('size')">+ Size (Reg/Med/Lrg)</button>
+                            <button type="button" class="btn btn-sm btn-outline" style="height: 1.75rem; font-size: 0.75rem; padding: 0 0.6rem;" onclick="addPresetGroup('spice')">+ Spice Level</button>
+                            <button type="button" class="btn btn-sm btn-outline" style="height: 1.75rem; font-size: 0.75rem; padding: 0 0.6rem;" onclick="addPresetGroup('side')">+ Choice of Side</button>
+                            <button type="button" class="btn btn-sm btn-outline" style="height: 1.75rem; font-size: 0.75rem; padding: 0 0.6rem;" onclick="addPresetGroup('extras')">+ Extra Toppings / Add-ons</button>
+                        </div>
+
+                        <div id="customizationsContainer" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="form-row form-row-3">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" class="toggle-switch" id="itemIsAvailable" checked>
+                            <label class="toggle-label" for="itemIsAvailable">Available</label>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" class="toggle-switch" id="itemIsVeg">
+                            <label class="toggle-label" for="itemIsVeg">Vegetarian</label>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" class="toggle-switch" id="itemIsPopular">
+                            <label class="toggle-label" for="itemIsPopular">Popular Item</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('itemModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveItem()">
+                    <i class="fas fa-save"></i> Save Item
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Management Modal -->
+    <div class="modal-overlay" id="categoryModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title">Manage Categories</h3>
+                    <p class="modal-description">Add or remove item categories.</p>
+                </div>
+                <button class="modal-close" onclick="closeModal('categoryModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Add New Category</label>
+                    <div class="flex items-center gap-2">
+                        <input type="text" id="newCategoryName" placeholder="Category name" style="flex: 1;">
+                        <button class="btn btn-primary btn-icon" onclick="addCategory()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="categoriesList" class="list-group">
+                    <!-- Categories populated dynamically -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('categoryModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal modal-sm">
+            <div class="modal-header" style="border-bottom: none; text-align: center; padding-bottom: 0;">
+                <div style="margin: 0 auto;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 2.5rem; color: #f59e0b; margin-bottom: 1rem; display: block;"></i>
+                    <h3 class="modal-title">Confirm Delete</h3>
+                </div>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <p id="deleteMessage" style="color: hsl(var(--muted-foreground));">Are you sure you want to delete this?</p>
+            </div>
+            <div class="modal-footer" style="justify-content: center;">
+                <button class="btn btn-outline" onclick="closeModal('deleteModal')">Cancel</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/manager.js"></script>
+    <script>
+        // ─── Globals ─────────────────────────────────────────────────────────
+        const API_BASE = '/manager/api';
+        let currentRestaurantId = null;
+        let restaurants = [];
+        let menus = [];
+        let allCategories = new Set();
+        let activeCategory = 'all';
+        let deleteCallback = null;
+        let currentCustomizationGroups = [];
+
+        // ─── Init ────────────────────────────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadRestaurants();
+            setupTagInputs();
+        });
+
+        // ─── Modal Helpers ───────────────────────────────────────────────────
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // Close modal on overlay click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) closeModal(overlay.id);
+            });
+        });
+
+        // ─── Dropdown ──────────────────────────────────────────────────────────
+        function toggleDropdown(btn) {
+            const dropdown = btn.closest('.dropdown');
+            document.querySelectorAll('.dropdown').forEach(d => {
+                if (d !== dropdown) d.classList.remove('active');
+            });
+            dropdown.classList.toggle('active');
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.dropdown')) {
+                document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('active'));
+            }
+        });
+
+        // ─── Loading ─────────────────────────────────────────────────────────
+        function showLoading() {
+            document.getElementById('loadingSpinner').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+
+        // ─── Notifications ───────────────────────────────────────────────────
+        function showNotification(title, message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+
+            const colors = {
+                success: 'border-left: 4px solid #22c55e;',
+                error: 'border-left: 4px solid #ef4444;',
+                warning: 'border-left: 4px solid #f59e0b;',
+                info: 'border-left: 4px solid hsl(var(--primary));'
+            };
+
+            toast.style = colors[type] || colors.info;
+            toast.innerHTML = `
+                <div class="toast-title">${escapeHtml(title)}</div>
+                <div class="toast-description">${escapeHtml(message)}</div>
+            `;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => toast.classList.add('show'));
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // ─── Restaurants ───────────────────────────────────────────────────────
+        async function loadRestaurants() {
+            try {
+                showLoading();
+                const res = await fetch(`${API_BASE}/restaurants/my`, { credentials: 'same-origin' });
+                const data = await res.json();
+
+                if (data.success) {
+                    restaurants = data.restaurants || [];
+                    const select = document.getElementById('restaurantSelect');
+                    select.innerHTML = '<option value="">-- Select Restaurant --</option>';
+
+                    restaurants.forEach(r => {
+                        const opt = document.createElement('option');
+                        opt.value = r.id;
+                        opt.textContent = r.name;
+                        select.appendChild(opt);
+                    });
+
+                    select.addEventListener('change', (e) => {
+                        currentRestaurantId = e.target.value;
+                        document.getElementById('addMenuBtn').disabled = !currentRestaurantId;
+                        if (currentRestaurantId) loadMenus();
+                        else {
+                            document.getElementById('menusContainer').innerHTML = `
+                                <div class="empty-state">
+                                    <i class="fas fa-utensils"></i>
+                                    <h5>Select a Restaurant</h5>
+                                    <p>Choose a restaurant above to view and manage its menus.</p>
+                                </div>`;
+                            document.getElementById('categoriesCard').style.display = 'none';
+                        }
+                    });
+
+                    // Auto-select the first restaurant so menus appear right away
+                    if (restaurants.length > 0 && !currentRestaurantId) {
+                        select.value = restaurants[0].id;
+                        currentRestaurantId = restaurants[0].id;
+                        document.getElementById('addMenuBtn').disabled = false;
+                        await loadMenus();
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                showNotification('Error', 'Failed to load restaurants', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ─── Menus ─────────────────────────────────────────────────────────────
+        async function loadMenus() {
+            if (!currentRestaurantId) return;
+            try {
+                showLoading();
+                const res = await fetch(`${API_BASE}/menus?restaurantId=${currentRestaurantId}`, {
+                    credentials: 'same-origin'
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    menus = data.menus || [];
+                    allCategories = new Set();
+                    menus.forEach(m => {
+                        (m.items || []).forEach(i => {
+                            if (i.category) allCategories.add(i.category);
+                        });
+                    });
+                    renderMenus();
+                    document.getElementById('categoriesCard').style.display = 'block';
+                }
+            } catch (err) {
+                console.error(err);
+                showNotification('Error', 'Failed to load menus', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function renderMenus() {
+            const container = document.getElementById('menusContainer');
+
+            if (!menus.length) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-clipboard-list"></i>
+                        <h5>No Menus Yet</h5>
+                        <p>Create your first menu to start adding items.</p>
+                        <button class="btn btn-primary mt-4" onclick="openMenuModal()">
+                            <i class="fas fa-plus"></i> Create Menu
+                        </button>
+                    </div>`;
+                renderCategories();
+                return;
+            }
+
+            container.innerHTML = menus.map(menu => `
+                <div class="card menu-container" data-menu-id="${menu.id}">
+                    <div class="card-header">
+                        <div class="flex items-center gap-3">
+                            <h3 class="card-title">${escapeHtml(menu.name)}</h3>
+                            ${menu.is_active 
+                                ? '<span class="badge" style="background: #22c55e; color: white;">Active</span>' 
+                                : '<span class="badge" style="background: hsl(var(--muted-foreground)); color: white;">Inactive</span>'}
+                        </div>
+                        <div class="menu-actions">
+                            <button class="btn btn-sm" onclick="openItemModal('${menu.id}')" title="Add Item">
+                                <i class="fas fa-plus"></i> Add Item
+                            </button>
+                            <button class="btn btn-icon" onclick="editMenu('${menu.id}')" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-icon" onclick="confirmDeleteMenu('${menu.id}')" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        ${menu.description ? `<p class="text-muted mb-3" style="font-size: 0.875rem;">${escapeHtml(menu.description)}</p>` : ''}
+                        <div class="menu-items-grid">
+                            ${renderMenuItems(menu.items || [], menu.id)}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            renderCategories();
+        }
+
+        function renderMenuItems(items, menuId) {
+            let filtered = items;
+            if (activeCategory !== 'all') {
+                filtered = items.filter(i => i.category === activeCategory);
+            }
+
+            if (!filtered.length) {
+                return activeCategory === 'all' 
+                    ? `<div class="empty-state" style="grid-column: 1 / -1; padding: 2rem;">
+                        <i class="fas fa-inbox" style="font-size: 2rem;"></i>
+                        <p>No items in this menu yet</p>
+                        <button class="btn btn-sm btn-outline mt-2" onclick="openItemModal('${menuId}')">
+                            Add First Item
+                        </button>
+                       </div>`
+                    : `<div class="empty-state" style="grid-column: 1 / -1; padding: 2rem;">
+                        <p>No items in category "${escapeHtml(activeCategory)}"</p>
+                       </div>`;
+            }
+
+            return filtered.map(item => {
+                if (item.category) allCategories.add(item.category);
+                const hasDiscount = item.discounted_price && Number(item.discounted_price) < Number(item.price);
+                const customGroups = Array.isArray(item.customizations) ? item.customizations : [];
+                const totalOptionChoices = customGroups.reduce((acc, g) => acc + (Array.isArray(g.options) ? g.options.length : 0), 0);
+
+                return `
+                <div class="menu-item-card ${item.is_available ? '' : 'unavailable'}">
+                    <div class="item-image">
+                        ${item.image_url 
+                            ? `<img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.name)}" onerror="this.parentElement.innerHTML='<i class=\'fas fa-utensils\'></i>'">` 
+                            : '<i class="fas fa-utensils"></i>'}
+                    </div>
+                    <div class="item-header">
+                        <h6 class="item-name">${escapeHtml(item.name)}</h6>
+                        <div class="item-badges">
+                            ${item.is_veg ? '<span class="badge-veg"><i class="fas fa-leaf"></i> Veg</span>' : ''}
+                            ${item.is_popular ? '<span class="badge-popular"><i class="fas fa-fire"></i> Popular</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="item-category">${escapeHtml(item.category || 'General')}</div>
+                    <div class="item-description">${escapeHtml(item.description || '')}</div>
+                    <div class="item-meta">
+                        ${item.calories ? `<span><i class="fas fa-fire-alt"></i> ${item.calories} kcal</span>` : ''}
+                        ${item.preparation_time_minutes ? `<span><i class="fas fa-clock"></i> ${item.preparation_time_minutes} min</span>` : ''}
+                        ${customGroups.length ? `<span style="color: hsl(var(--primary)); font-weight: 600;"><i class="fas fa-sliders-h"></i> ${customGroups.length} option group${customGroups.length > 1 ? 's' : ''} (${totalOptionChoices} choices)</span>` : ''}
+                    </div>
+                    <div class="item-price-row">
+                        <div>
+                            <span class="price-current">R ${hasDiscount ? item.discounted_price : item.price}</span>
+                            ${hasDiscount ? `<span class="price-original">R ${item.price}</span>` : ''}
+                        </div>
+                        <span class="badge ${item.is_available ? 'badge-green' : 'badge-gray'}">
+                            ${item.is_available ? 'Available' : 'Unavailable'}
+                        </span>
+                    </div>
+                    <div class="item-actions">
+                        <button class="btn btn-outline btn-sm" onclick="editItem('${item.id}')">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button class="btn btn-outline btn-sm" 
+                            style="${item.is_available ? 'color: #92400e; border-color: #fcd34d; background: #fef3c7;' : 'color: #166534; border-color: #86efac; background: #dcfce7;'}"
+                            onclick="toggleItemAvailability('${item.id}', ${!item.is_available})">
+                            <i class="fas fa-${item.is_available ? 'eye-slash' : 'eye'}"></i>
+                            ${item.is_available ? 'Disable' : 'Enable'}
+                        </button>
+                        <button class="btn btn-outline btn-sm" style="color: #991b1b; border-color: #fca5a5;" onclick="confirmDeleteItem('${item.id}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    ${(item.ingredients && item.ingredients.length) || (item.tags && item.tags.length) ? `
+                    <div class="nutrition-info">
+                        ${(item.ingredients || []).slice(0, 3).map(ing => `<span class="nutrition-badge">${escapeHtml(ing)}</span>`).join('')}
+                        ${(item.ingredients || []).length > 3 ? `<span class="nutrition-badge">+${item.ingredients.length - 3} more</span>` : ''}
+                        ${(item.tags || []).slice(0, 2).map(tag => `<span class="nutrition-badge" style="background: #eff6ff; color: #1d4ed8;">#${escapeHtml(tag)}</span>`).join('')}
+                    </div>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        function renderCategories() {
+            const container = document.getElementById('categoryFilter');
+            const datalist = document.getElementById('categoryList');
+
+            let html = `<div class="category-pill ${activeCategory === 'all' ? 'active' : ''}" data-category="all">All Items</div>`;
+            Array.from(allCategories).sort().forEach(cat => {
+                html += `<div class="category-pill ${activeCategory === cat ? 'active' : ''}" data-category="${escapeHtml(cat)}">${escapeHtml(cat)}</div>`;
+            });
+            container.innerHTML = html;
+
+            container.querySelectorAll('.category-pill').forEach(pill => {
+                pill.addEventListener('click', () => {
+                    activeCategory = pill.dataset.category;
+                    renderMenus();
+                });
+            });
+
+            datalist.innerHTML = Array.from(allCategories).sort()
+                .map(cat => `<option value="${escapeHtml(cat)}">`)
+                .join('');
+        }
+
+        // ─── Menu CRUD ───────────────────────────────────────────────────────
+        function openMenuModal(menuId = null) {
+            document.getElementById('menuForm').reset();
+            document.getElementById('menuId').value = '';
+            document.getElementById('menuModalTitle').textContent = 'Add New Menu';
+            document.getElementById('menuModal').querySelector('.modal-description').textContent = 'Create a new menu for your restaurant.';
+
+            if (menuId) {
+                const menu = menus.find(m => m.id === menuId);
+                if (menu) {
+                    document.getElementById('menuId').value = menu.id;
+                    document.getElementById('menuName').value = menu.name;
+                    document.getElementById('menuDescription').value = menu.description || '';
+                    document.getElementById('menuDisplayOrder').value = menu.display_order || 0;
+                    document.getElementById('menuIsActive').checked = menu.is_active !== false;
+                    document.getElementById('menuModalTitle').textContent = 'Edit Menu';
+                    document.getElementById('menuModal').querySelector('.modal-description').textContent = 'Update menu details.';
+                }
+            }
+            openModal('menuModal');
+        }
+
+        async function saveMenu() {
+            const menuId = document.getElementById('menuId').value;
+            const body = {
+                restaurantId: currentRestaurantId,
+                name: document.getElementById('menuName').value.trim(),
+                description: document.getElementById('menuDescription').value.trim(),
+                display_order: parseInt(document.getElementById('menuDisplayOrder').value) || 0,
+                is_active: document.getElementById('menuIsActive').checked
+            };
+
+            if (!body.name) {
+                showNotification('Validation', 'Menu name is required', 'warning');
+                return;
+            }
+
+            try {
+                showLoading();
+                const url = menuId ? `${API_BASE}/menus/${menuId}` : `${API_BASE}/menus`;
+                const method = menuId ? 'PUT' : 'POST';
+
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(body)
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    showNotification('Success', `Menu ${menuId ? 'updated' : 'created'} successfully`, 'success');
+                    closeModal('menuModal');
+                    await loadMenus();
+                } else {
+                    showNotification('Error', data.error || 'Failed to save menu', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showNotification('Error', 'Failed to save menu', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function editMenu(menuId) {
+            openMenuModal(menuId);
+        }
+
+        function confirmDeleteMenu(menuId) {
+            document.getElementById('deleteMessage').textContent = 
+                'Delete this menu and all its items? This cannot be undone.';
+            deleteCallback = () => deleteMenu(menuId);
+            openModal('deleteModal');
+        }
+
+        async function deleteMenu(menuId) {
+            try {
+                showLoading();
+                const res = await fetch(`${API_BASE}/menus/${menuId}`, {
+                    method: 'DELETE',
+                    credentials: 'same-origin'
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showNotification('Success', 'Menu deleted successfully', 'success');
+                    closeModal('deleteModal');
+                    await loadMenus();
+                } else {
+                    showNotification('Error', data.error || 'Failed to delete menu', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showNotification('Error', 'Failed to delete menu', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ─── Customization Option Groups Builder ─────────────────────────────
+        function normalizeCustomizationGroup(raw, idx = 0) {
+            const type = raw?.type === 'multiple' || Number(raw?.max_select) > 1 ? 'multiple' : 'single';
+            const options = Array.isArray(raw?.options)
+                ? raw.options.map((opt, optIdx) => {
+                    if (typeof opt === 'string') {
+                        return { id: `opt_${idx}_${optIdx}`, name: opt, price: 0, is_available: true };
+                    }
+                    return {
+                        id: opt?.id || `opt_${idx}_${optIdx}`,
+                        name: String(opt?.name || opt?.label || '').trim(),
+                        price: Number(opt?.price ?? opt?.priceDelta ?? 0) || 0,
+                        is_available: opt?.is_available !== false
+                    };
+                })
+                : [];
+            return {
+                id: raw?.id || `grp_${Date.now()}_${idx}`,
+                name: String(raw?.name || '').trim(),
+                required: Boolean(raw?.required),
+                type,
+                min_select: raw?.required ? Math.max(1, Number(raw?.min_select) || 1) : 0,
+                max_select: type === 'multiple' ? (Number(raw?.max_select) || Math.max(options.length, 3)) : 1,
+                options
+            };
+        }
+
+        function syncCustomizationDomToState() {
+            const container = document.getElementById('customizationsContainer');
+            if (!container) return;
+            const groupCards = container.querySelectorAll('.cust-group-card');
+            if (!groupCards.length) return;
+
+            currentCustomizationGroups = Array.from(groupCards).map((card, gIdx) => {
+                const name = card.querySelector('.cust-group-name')?.value?.trim() || '';
+                const required = Boolean(card.querySelector('.cust-group-required')?.checked);
+                const type = card.querySelector('.cust-group-type')?.value || 'single';
+                const maxSelectVal = parseInt(card.querySelector('.cust-group-max')?.value, 10) || 1;
+                const optionRows = card.querySelectorAll('.cust-option-row');
+                const options = Array.from(optionRows).map((row, oIdx) => ({
+                    id: row.dataset.optId || `opt_${gIdx}_${oIdx}`,
+                    name: row.querySelector('.cust-opt-name')?.value?.trim() || '',
+                    price: parseFloat(row.querySelector('.cust-opt-price')?.value) || 0,
+                    is_available: Boolean(row.querySelector('.cust-opt-avail')?.checked)
+                }));
+                return {
+                    id: card.dataset.groupId || `grp_${gIdx}`,
+                    name,
+                    required,
+                    type,
+                    min_select: required ? 1 : 0,
+                    max_select: type === 'multiple' ? Math.max(1, maxSelectVal) : 1,
+                    options
+                };
+            });
+        }
+
+        function renderCustomizationGroups() {
+            const container = document.getElementById('customizationsContainer');
+            if (!container) return;
+
+            if (!currentCustomizationGroups.length) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 1rem; border: 1px dashed hsl(var(--border)); border-radius: var(--radius); color: hsl(var(--muted-foreground)); font-size: 0.82rem;">
+                        No option groups added yet. Click <strong>Add Option Group</strong> or choose a preset above to make this item customizable.
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = currentCustomizationGroups.map((group, gIdx) => `
+                <div class="cust-group-card" data-group-id="${escapeHtml(group.id)}" style="background: hsl(var(--background)); border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 0.875rem;">
+                    <div class="flex items-center justify-between gap-2 mb-2" style="flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 180px;">
+                            <label class="form-label" style="font-size: 0.75rem; margin-bottom: 0.25rem;">Group Title *</label>
+                            <input type="text" class="cust-group-name" value="${escapeHtml(group.name)}" placeholder="e.g., Choose Size, Extra Toppings">
+                        </div>
+                        <div style="width: 165px;">
+                            <label class="form-label" style="font-size: 0.75rem; margin-bottom: 0.25rem;">Selection Mode</label>
+                            <select class="cust-group-type" onchange="onGroupTypeChange(${gIdx}, this.value)">
+                                <option value="single" ${group.type === 'single' ? 'selected' : ''}>Single Choice (1)</option>
+                                <option value="multiple" ${group.type === 'multiple' ? 'selected' : ''}>Multiple Choice</option>
+                            </select>
+                        </div>
+                        <div style="width: 90px; ${group.type === 'multiple' ? '' : 'display:none;'}" class="cust-group-max-wrap">
+                            <label class="form-label" style="font-size: 0.75rem; margin-bottom: 0.25rem;">Max Pick</label>
+                            <input type="number" class="cust-group-max" min="1" max="20" value="${group.max_select || 3}">
+                        </div>
+                        <div class="flex items-center gap-2" style="padding-top: 1.1rem;">
+                            <input type="checkbox" class="toggle-switch cust-group-required" id="custReq_${gIdx}" ${group.required ? 'checked' : ''}>
+                            <label class="toggle-label" for="custReq_${gIdx}" style="font-size: 0.78rem;">Required</label>
+                        </div>
+                        <div style="padding-top: 1.1rem;">
+                            <button type="button" class="btn btn-ghost btn-icon" style="color: hsl(var(--destructive));" onclick="removeCustomizationGroup(${gIdx})" title="Remove Group">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed hsl(var(--border));">
+                        <div class="flex items-center justify-between mb-2">
+                            <span style="font-size: 0.75rem; font-weight: 600; color: hsl(var(--muted-foreground));">OPTIONS &amp; PRICE MODIFIERS</span>
+                            <button type="button" class="btn btn-sm btn-outline" style="height: 1.75rem; font-size: 0.75rem;" onclick="addOptionToGroup(${gIdx})">
+                                <i class="fas fa-plus"></i> Add Choice
+                            </button>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 0.45rem;">
+                            ${(group.options || []).map((opt, oIdx) => `
+                                <div class="cust-option-row flex items-center gap-2" data-opt-id="${escapeHtml(opt.id || `opt_${gIdx}_${oIdx}`)}">
+                                    <input type="text" class="cust-opt-name" style="flex: 1;" value="${escapeHtml(opt.name)}" placeholder="Option name (e.g., Large, Extra Cheese)">
+                                    <div style="position: relative; width: 120px;">
+                                        <span style="position: absolute; left: 0.6rem; top: 50%; transform: translateY(-50%); color: hsl(var(--muted-foreground)); font-size: 0.78rem;">+R</span>
+                                        <input type="number" class="cust-opt-price" step="0.50" min="0" style="padding-left: 1.85rem;" value="${Number(opt.price || 0)}" placeholder="0.00">
+                                    </div>
+                                    <label class="flex items-center gap-1" style="font-size: 0.75rem; white-space: nowrap; cursor: pointer;" title="Option In Stock">
+                                        <input type="checkbox" class="cust-opt-avail" ${opt.is_available !== false ? 'checked' : ''} style="width: auto; height: auto;">
+                                        <span>In Stock</span>
+                                    </label>
+                                    <button type="button" class="btn btn-ghost btn-icon" style="color: hsl(var(--destructive)); width: 1.75rem; height: 1.75rem;" onclick="removeOptionFromGroup(${gIdx}, ${oIdx})" title="Remove choice">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function addCustomizationGroup(initialGroup = null) {
+            syncCustomizationDomToState();
+            const newGroup = initialGroup
+                ? normalizeCustomizationGroup(initialGroup, currentCustomizationGroups.length)
+                : {
+                    id: `grp_${Date.now()}_${currentCustomizationGroups.length}`,
+                    name: '',
+                    required: false,
+                    type: 'single',
+                    min_select: 0,
+                    max_select: 1,
+                    options: [
+                        { id: `opt_${Date.now()}_0`, name: '', price: 0, is_available: true },
+                        { id: `opt_${Date.now()}_1`, name: '', price: 0, is_available: true }
+                    ]
+                };
+            currentCustomizationGroups.push(newGroup);
+            renderCustomizationGroups();
+        }
+
+        function addPresetGroup(presetKey) {
+            const presets = {
+                size: {
+                    name: 'Choose Size',
+                    required: true,
+                    type: 'single',
+                    min_select: 1,
+                    max_select: 1,
+                    options: [
+                        { name: 'Regular', price: 0, is_available: true },
+                        { name: 'Medium', price: 15, is_available: true },
+                        { name: 'Large', price: 25, is_available: true }
+                    ]
+                },
+                spice: {
+                    name: 'Spice / Heat Level',
+                    required: true,
+                    type: 'single',
+                    min_select: 1,
+                    max_select: 1,
+                    options: [
+                        { name: 'Lemon & Herb', price: 0, is_available: true },
+                        { name: 'Mild', price: 0, is_available: true },
+                        { name: 'Hot', price: 0, is_available: true },
+                        { name: 'Extra Hot', price: 0, is_available: true }
+                    ]
+                },
+                side: {
+                    name: 'Choice of Side',
+                    required: true,
+                    type: 'single',
+                    min_select: 1,
+                    max_select: 1,
+                    options: [
+                        { name: 'Regular Chips', price: 0, is_available: true },
+                        { name: 'Spicy Rice', price: 0, is_available: true },
+                        { name: 'Garden Salad', price: 5, is_available: true },
+                        { name: 'Sweet Potato Fries', price: 18, is_available: true }
+                    ]
+                },
+                extras: {
+                    name: 'Extra Toppings & Add-ons',
+                    required: false,
+                    type: 'multiple',
+                    min_select: 0,
+                    max_select: 5,
+                    options: [
+                        { name: 'Extra Cheese', price: 15, is_available: true },
+                        { name: 'Crispy Bacon', price: 22, is_available: true },
+                        { name: 'Fresh Avocado', price: 20, is_available: true },
+                        { name: 'Extra Sauce', price: 10, is_available: true }
+                    ]
+                }
+            };
+            if (presets[presetKey]) {
+                addCustomizationGroup(presets[presetKey]);
+            }
+        }
+
+        function onGroupTypeChange(groupIdx, newType) {
+            syncCustomizationDomToState();
+            if (currentCustomizationGroups[groupIdx]) {
+                currentCustomizationGroups[groupIdx].type = newType;
+                currentCustomizationGroups[groupIdx].max_select = newType === 'multiple'
+                    ? Math.max(2, currentCustomizationGroups[groupIdx].options.length || 3)
+                    : 1;
+                renderCustomizationGroups();
+            }
+        }
+
+        function removeCustomizationGroup(groupIdx) {
+            syncCustomizationDomToState();
+            currentCustomizationGroups.splice(groupIdx, 1);
+            renderCustomizationGroups();
+        }
+
+        function addOptionToGroup(groupIdx) {
+            syncCustomizationDomToState();
+            if (!currentCustomizationGroups[groupIdx]) return;
+            currentCustomizationGroups[groupIdx].options.push({
+                id: `opt_${Date.now()}_${currentCustomizationGroups[groupIdx].options.length}`,
+                name: '',
+                price: 0,
+                is_available: true
+            });
+            renderCustomizationGroups();
+        }
+
+        function removeOptionFromGroup(groupIdx, optIdx) {
+            syncCustomizationDomToState();
+            if (!currentCustomizationGroups[groupIdx]) return;
+            currentCustomizationGroups[groupIdx].options.splice(optIdx, 1);
+            renderCustomizationGroups();
+        }
+
+        function getValidatedCustomizations() {
+            syncCustomizationDomToState();
+            return currentCustomizationGroups
+                .map((grp, gIdx) => {
+                    const validOptions = (grp.options || [])
+                        .filter(o => o.name && o.name.trim().length > 0)
+                        .map((o, oIdx) => ({
+                            id: o.id || `opt_${gIdx}_${oIdx}`,
+                            name: o.name.trim(),
+                            price: Number(o.price) || 0,
+                            is_available: o.is_available !== false
+                        }));
+                    return {
+                        id: grp.id || `grp_${gIdx}`,
+                        name: (grp.name || '').trim(),
+                        required: Boolean(grp.required),
+                        type: grp.type === 'multiple' ? 'multiple' : 'single',
+                        min_select: grp.required ? 1 : 0,
+                        max_select: grp.type === 'multiple' ? Math.max(1, Number(grp.max_select) || validOptions.length || 1) : 1,
+                        options: validOptions
+                    };
+                })
+                .filter(grp => grp.name.length > 0 && grp.options.length > 0);
+        }
+
+        // ─── Item CRUD ───────────────────────────────────────────────────────
+        function openItemModal(menuId, itemId = null) {
+            document.getElementById('itemForm').reset();
+            document.getElementById('itemId').value = '';
+            document.getElementById('itemMenuId').value = menuId;
+            document.getElementById('itemModalTitle').textContent = 'Add Menu Item';
+            document.getElementById('itemModal').querySelector('.modal-description').textContent = 'Add a new item to this menu.';
+
+            document.getElementById('ingredientsContainer').querySelectorAll('.tag-chip').forEach(c => c.remove());
+            document.getElementById('tagsContainer').querySelectorAll('.tag-chip').forEach(c => c.remove());
+
+            currentCustomizationGroups = [];
+            renderCustomizationGroups();
+
+            openModal('itemModal');
+        }
+
+        async function editItem(itemId) {
+            try {
+                showLoading();
+                const res = await fetch(`${API_BASE}/menu-items/${itemId}`, { credentials: 'same-origin' });
+                const data = await res.json();
+
+                if (data.success && data.item) {
+                    const item = data.item;
+                    document.getElementById('itemId').value = item.id;
+                    document.getElementById('itemMenuId').value = item.menu_id;
+                    document.getElementById('itemName').value = item.name;
+                    document.getElementById('itemCategory').value = item.category || '';
+                    document.getElementById('itemDescription').value = item.description || '';
+                    document.getElementById('itemPrice').value = item.price;
+                    document.getElementById('itemDiscountedPrice').value = item.discounted_price || '';
+                    document.getElementById('itemPrepTime').value = item.preparation_time_minutes || 15;
+                    document.getElementById('itemCalories').value = item.calories || '';
+                    document.getElementById('itemImageUrl').value = item.image_url || '';
+                    document.getElementById('itemIsAvailable').checked = item.is_available !== false;
+                    document.getElementById('itemIsVeg').checked = item.is_veg === true;
+                    document.getElementById('itemIsPopular').checked = item.is_popular === true;
+                    document.getElementById('itemModalTitle').textContent = 'Edit Menu Item';
+                    document.getElementById('itemModal').querySelector('.modal-description').textContent = 'Update item details and customization options.';
+
+                    setTags('ingredientsContainer', Array.isArray(item.ingredients) ? item.ingredients : []);
+                    setTags('tagsContainer', Array.isArray(item.tags) ? item.tags : []);
+
+                    const rawCustomizations = Array.isArray(item.customizations)
+                        ? item.customizations
+                        : (typeof item.customizations === 'string' && item.customizations.trim()
+                            ? JSON.parse(item.customizations)
+                            : []);
+                    currentCustomizationGroups = rawCustomizations.map((g, idx) => normalizeCustomizationGroup(g, idx));
+                    renderCustomizationGroups();
+
+                    openModal('itemModal');
+                }
+            } catch (err) {
+                console.error(err);
+                showNotification('Error', 'Failed to load item details', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function saveItem() {
+            const itemId = document.getElementById('itemId').value;
+            const menuId = document.getElementById('itemMenuId').value;
+            const customizations = getValidatedCustomizations();
+
+            const body = {
+                menuId: menuId,
+                restaurantId: currentRestaurantId,
+                name: document.getElementById('itemName').value.trim(),
+                category: document.getElementById('itemCategory').value.trim(),
+                description: document.getElementById('itemDescription').value.trim(),
+                price: parseFloat(document.getElementById('itemPrice').value),
+                discounted_price: parseFloat(document.getElementById('itemDiscountedPrice').value) || null,
+                preparation_time_minutes: parseInt(document.getElementById('itemPrepTime').value) || 15,
+                calories: parseInt(document.getElementById('itemCalories').value) || null,
+                image_url: document.getElementById('itemImageUrl').value.trim() || null,
+                is_available: document.getElementById('itemIsAvailable').checked,
+                is_veg: document.getElementById('itemIsVeg').checked,
+                is_popular: document.getElementById('itemIsPopular').checked,
+                ingredients: getTags('ingredientsContainer'),
+                tags: getTags('tagsContainer'),
+                customizations: customizations
+            };
+
+            if (!body.name || !body.category || isNaN(body.price)) {
+                showNotification('Validation', 'Name, category, and price are required', 'warning');
+                return;
+            }
+
+            try {
+                showLoading();
+                const url = itemId ? `${API_BASE}/menu-items/${itemId}` : `${API_BASE}/menu-items`;
+                const method = itemId ? 'PUT' : 'POST';
+
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(body)
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    showNotification('Success', `Item ${itemId ? 'updated' : 'created'} successfully`, 'success');
+                    closeModal('itemModal');
+                    await loadMenus();
+                } else {
+                    showNotification('Error', data.error || 'Failed to save item', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showNotification('Error', 'Failed to save item', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function confirmDeleteItem(itemId) {
+            document.getElementById('deleteMessage').textContent = 'Delete this menu item?';
+            deleteCallback = () => deleteItem(itemId);
+            openModal('deleteModal');
+        }
+
+        async function deleteItem(itemId) {
+            try {
+                showLoading();
+                const res = await fetch(`${API_BASE}/menu-items/${itemId}`, {
+                    method: 'DELETE',
+                    credentials: 'same-origin'
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showNotification('Success', 'Item deleted successfully', 'success');
+                    closeModal('deleteModal');
+                    await loadMenus();
+                } else {
+                    showNotification('Error', data.error || 'Failed to delete item', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showNotification('Error', 'Failed to delete item', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function toggleItemAvailability(itemId, makeAvailable) {
+            try {
+                showLoading();
+                const res = await fetch(`${API_BASE}/menu-items/${itemId}/toggle-availability`, {
+                    method: 'PATCH',
+                    credentials: 'same-origin'
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showNotification('Success', `Item ${makeAvailable ? 'enabled' : 'disabled'}`, 'success');
+                    await loadMenus();
+                } else {
+                    showNotification('Error', data.error || 'Failed to toggle availability', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showNotification('Error', 'Failed to toggle availability', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ─── Categories ──────────────────────────────────────────────────────
+        function openCategoryModal() {
+            renderCategoriesList();
+            openModal('categoryModal');
+        }
+
+        function renderCategoriesList() {
+            const list = document.getElementById('categoriesList');
+            const cats = Array.from(allCategories).sort();
+
+            if (!cats.length) {
+                list.innerHTML = '<div class="empty-state" style="padding: 1rem;"><p style="font-size: 0.875rem;">No categories yet</p></div>';
+                return;
+            }
+
+            list.innerHTML = cats.map(cat => `
+                <div class="list-group-item">
+                    <span>${escapeHtml(cat)}</span>
+                    <button class="btn btn-ghost btn-icon" style="color: hsl(var(--destructive));" onclick="removeCategory('${escapeHtml(cat)}')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function addCategory() {
+            const input = document.getElementById('newCategoryName');
+            const name = input.value.trim();
+            if (!name) return;
+
+            allCategories.add(name);
+            input.value = '';
+            renderCategories();
+            renderCategoriesList();
+            showNotification('Success', 'Category added', 'success');
+        }
+
+        function removeCategory(category) {
+            allCategories.delete(category);
+            if (activeCategory === category) activeCategory = 'all';
+            renderCategories();
+            renderCategoriesList();
+        }
+
+        // ─── Tag Inputs ──────────────────────────────────────────────────────
+        function setupTagInputs() {
+            ['ingredients', 'tags'].forEach(type => {
+                const container = document.getElementById(type + 'Container');
+                const input = document.getElementById(type + 'Input');
+
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const val = input.value.trim();
+                        if (val) {
+                            addTagChip(container, val);
+                            input.value = '';
+                        }
+                    }
+                    if (e.key === 'Backspace' && !input.value) {
+                        const chips = container.querySelectorAll('.tag-chip');
+                        if (chips.length) chips[chips.length - 1].remove();
+                    }
+                });
+            });
+        }
+
+        function addTagChip(container, text) {
+            const chip = document.createElement('div');
+            chip.className = 'tag-chip';
+            chip.innerHTML = `${escapeHtml(text)} <button type="button" onclick="this.parentElement.remove()">&times;</button>`;
+            container.insertBefore(chip, container.querySelector('.tag-input'));
+        }
+
+        function getTags(containerId) {
+            const container = document.getElementById(containerId);
+            return Array.from(container.querySelectorAll('.tag-chip')).map(c => 
+                c.textContent.replace('×', '').trim()
+            );
+        }
+
+        function setTags(containerId, tags) {
+            const container = document.getElementById(containerId);
+            container.querySelectorAll('.tag-chip').forEach(c => c.remove());
+            tags.forEach(t => addTagChip(container, t));
+        }
+
+        // ─── Utilities ───────────────────────────────────────────────────────
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Wire up delete confirmation
+        document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
+            if (deleteCallback) deleteCallback();
+        });
+
+        // Search filter
+        document.getElementById('menuSearchInput').addEventListener('input', function(e) {
+            const term = e.target.value.toLowerCase();
+            document.querySelectorAll('.menu-item-card').forEach(card => {
+                const text = card.textContent.toLowerCase();
+                card.style.display = text.includes(term) ? '' : 'none';
+            });
+        });
+    </script>
+</body>
+</html>

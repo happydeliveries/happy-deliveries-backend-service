@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title || 'Driver Registration Portal · Happy Delivery' %></title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #FF6B35;
+            --primary-dark: #E55A2B;
+            --navy: #0f172a;
+            --slate: #334155;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --bg: #f8fafc;
+            --success: #16a34a;
+            --warning: #d97706;
+            --danger: #dc2626;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--navy);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+        .topbar {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #fff;
+            padding: 18px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 12px rgba(15, 23, 42, 0.18);
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: #fff;
+        }
+        .brand-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #fff;
+        }
+        .brand-title { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
+        .brand-sub { font-size: 12px; color: #94a3b8; }
+        .topbar-links a {
+            color: #cbd5e1;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 8px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.15);
+            transition: all 0.2s;
+        }
+        .topbar-links a:hover {
+            color: #fff;
+            border-color: rgba(255,255,255,0.35);
+            background: rgba(255,255,255,0.06);
+        }
+
+        .hero {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            color: #fff;
+            padding: 36px 24px 56px;
+            text-align: center;
+        }
+        .hero h1 {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+        .hero p {
+            color: #cbd5e1;
+            max-width: 640px;
+            margin: 0 auto;
+            font-size: 15px;
+        }
+        .steps-banner {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 22px;
+        }
+        .step-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.14);
+            padding: 7px 14px;
+            border-radius: 999px;
+            font-size: 12.5px;
+            color: #e2e8f0;
+        }
+        .step-pill span.num {
+            background: var(--primary);
+            color: #fff;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 11px;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: -32px auto 60px;
+            padding: 0 20px;
+        }
+
+        .tab-bar {
+            display: flex;
+            background: #fff;
+            border-radius: 14px;
+            padding: 6px;
+            box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 13px 18px;
+            border: none;
+            background: transparent;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 3px 10px rgba(255, 107, 53, 0.3);
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+            border: 1px solid var(--border);
+            padding: 28px;
+            margin-bottom: 22px;
+        }
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .section-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: #fff3ed;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        .section-header h2 {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--navy);
+        }
+        .section-header p {
+            font-size: 12.5px;
+            color: var(--muted);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+        @media (max-width: 720px) {
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .form-group.full {
+            grid-column: 1 / -1;
+        }
+        .form-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--slate);
+        }
+        .form-group label .req {
+            color: var(--danger);
+            margin-left: 2px;
+        }
+        .form-control {
+            padding: 11px 13px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 10px;
+            font-size: 14px;
+            color: var(--navy);
+            background: #fff;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.14);
+        }
+        .form-hint {
+            font-size: 11.5px;
+            color: var(--muted);
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 14px;
+            background: #f8fafc;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+        }
+        .checkbox-row input {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary);
+        }
+        .checkbox-row span {
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--slate);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            padding: 15px 28px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-primary:disabled { opacity: 0.65; cursor: not-allowed; }
+
+        .btn-outline {
+            background: #fff;
+            color: var(--navy);
+            border: 1.5px solid var(--border);
+            padding: 11px 20px;
+            border-radius: 10px;
+            font-size: 13.5px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-outline:hover { background: #f1f5f9; }
+
+        .alert {
+            padding: 16px 18px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: none;
+            align-items: flex-start;
+            gap: 12px;
+            font-size: 14px;
+        }
+        .alert.show { display: flex; }
+        .alert-success {
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+        }
+        .alert-error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+        }
+        .alert-info {
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            color: #9a3412;
+        }
+
+        .status-box {
+            border-radius: 14px;
+            padding: 22px;
+            margin-top: 20px;
+            border: 1.5px solid var(--border);
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 12.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .badge-pending { background: #fef3c7; color: #92400e; }
+        .badge-approved { background: #dcfce7; color: #166534; }
+        .badge-rejected { background: #fee2e2; color: #991b1b; }
+
+        .rejection-reason-card {
+            background: #fff1f2;
+            border-left: 4px solid #e11d48;
+            padding: 14px 16px;
+            border-radius: 8px;
+            margin: 14px 0;
+            color: #881337;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <header class="topbar">
+        <a href="/driver/register" class="brand">
+            <div class="brand-icon"><i class="fas fa-motorcycle"></i></div>
+            <div>
+                <div class="brand-title">Happy Delivery · Driver Portal</div>
+                <div class="brand-sub">Official Partner Driver Registration & Onboarding</div>
+            </div>
+        </a>
+        <div class="topbar-links">
+            <a href="/manager/login"><i class="fas fa-user-shield"></i> Manager Portal</a>
+        </div>
+    </header>
+
+    <section class="hero">
+        <h1>Become a Happy Delivery Driver Partner</h1>
+        <p>Complete your driver registration below. Our management team will review your documents and vehicle details and notify you by email as soon as your account is approved.</p>
+        <div class="steps-banner">
+            <div class="step-pill"><span class="num">1</span> Submit Registration Form</div>
+            <div class="step-pill"><span class="num">2</span> Admin Reviews Details</div>
+            <div class="step-pill"><span class="num">3</span> Receive Approval Email</div>
+            <div class="step-pill"><span class="num">4</span> Sign In to Driver Mobile App</div>
+        </div>
+    </section>
+
+    <main class="container">
+        <div class="tab-bar">
+            <button type="button" class="tab-btn active" id="tabRegisterBtn" onclick="switchTab('register')">
+                <i class="fas fa-file-signature"></i> Driver Application Form
+            </button>
+            <button type="button" class="tab-btn" id="tabStatusBtn" onclick="switchTab('status')">
+                <i class="fas fa-search"></i> Check Application Status / Resubmit
+            </button>
+        </div>
+
+        <div id="globalAlert" class="alert">
+            <i class="fas fa-info-circle" id="globalAlertIcon" style="margin-top:3px;font-size:18px;"></i>
+            <div id="globalAlertText" style="flex:1;"></div>
+        </div>
+
+        <!-- TAB 1: DRIVER REGISTRATION FORM -->
+        <div id="registerTabPane">
+            <div id="resubmitBanner" class="alert alert-info">
+                <i class="fas fa-pen-to-square" style="margin-top:3px;font-size:18px;"></i>
+                <div>
+                    <strong>Editing & Resubmitting Your Driver Application</strong>
+                    <div id="resubmitReasonText" style="margin-top:4px;font-size:13px;"></div>
+                </div>
+            </div>
+
+            <form id="driverApplicationForm" onsubmit="submitDriverApplication(event)">
+                <!-- 1. Personal & Identity Details -->
+                <div class="card">
+                    <div class="section-header">
+                        <div class="section-icon"><i class="fas fa-id-card"></i></div>
+                        <div>
+                            <h2>1. Personal & Identity Information</h2>
+                            <p>Your legal identity and contact details used for driver verification and email updates.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label>First Name <span class="req">*</span></label>
+                            <input type="text" class="form-control" name="first_name" id="f_first_name" required placeholder="e.g. Thabo">
+                        </div>
+                        <div class="form-group">
+                            <label>Last Name <span class="req">*</span></label>
+                            <input type="text" class="form-control" name="last_name" id="f_last_name" required placeholder="e.g. Mokoena">
+                        </div>
+                        <div class="form-group">
+                            <label>Email Address <span class="req">*</span></label>
+                            <input type="email" class="form-control" name="email" id="f_email" required placeholder="driver@example.com">
+                            <span class="form-hint">Approval & feedback emails will be sent to this address.</span>
+                        </div>
+                        <div class="form-group">
+                            <label>Mobile Phone Number <span class="req">*</span></label>
+                            <input type="tel" class="form-control" name="phone_number" id="f_phone_number" required placeholder="e.g. +27 82 123 4567">
+                        </div>
+                        <div class="form-group">
+                            <label>National ID / Passport Number <span class="req">*</span></label>
+                            <input type="text" class="form-control" name="id_number" id="f_id_number" required placeholder="13-digit SA ID or Passport Number">
+                        </div>
+                        <div class="form-group">
+                            <label>Date of Birth <span class="req">*</span></label>
+                            <input type="date" class="form-control" name="date_of_birth" id="f_date_of_birth" required>
+                        </div>
+                        <div class="form-group full">
+                            <label>Residential Street Address <span class="req">*</span></label>
+                            <input type="text" class="form-control" name="street_address" id="f_street_address" required placeholder="e.g. 42 Nelson Mandela Drive, Braamfontein">
+                        </div>
+                        <div class="form-group">
+                            <label>City / Town <span class="req">*</span></label>
+                            <input type="text" class="form-control" name="city" id="f_city" required placeholder="e.g. Johannesburg">
+                        </div>
+                        <div class="form-group">
+                            <label>Postal Code <span class="req">*</span></label>
+                            <input type="text" class="form-control" name="postal_code" id="f_postal_code" required placeholder="e.g. 2001">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Emergency Contact -->
+                <div class="card">
+                    <div class="section-header">
+                        <div class="section-icon"><i class="fas fa-phone-volume"></i></div>
+                        <div>
+                            <h2>2. Emergency Contact</h2>
+                            <p>Who should we contact in the event of an emergency while you are on delivery?</p>
+                        </div>
+                    </div>
+
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label>Emergency Contact Name <span class="req">*</span></label>
+                            <input type="text" class="form-control" name="emergency_contact_name" id="f_emergency_contact_name" required placeholder="Full Name">
+                        </div>
+                        <div class="form-group">
+                            <label>Emergency Contact Phone <span class="req">*</span></label>
+                            <input type="tel" class="form-control" name="emergency_contact_phone" id="f_emergency_contact_phone" required placeholder="+27 ...">
+                        </div>
+                        <div class="form-group">
+                            <label>Relationship <span class="req">*</span></label>
+                            <select class="form-control" name="emergency_contact_relationship" id="f_emergency_contact_relationship" required>
+                                <option value="">Select relationship...</option>
+                                <option value="Spouse / Partner">Spouse / Partner</option>
+                                <option value="Parent">Parent</option>
+                                <option value="Sibling">Sibling</option>
+                                <option value="Relative">Relative</option>
+                                <option value="Friend">Friend</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Driver's License & Compliance -->
+                <div class="card">
+                    <div class="section-header">
+                        <div class="section-icon"><i class="fas fa-id-badge"></i></div>
+                        <div>
+                            <h2>3. Driver's License & Experience</h2>
+                            <p>Valid driving credentials are mandatory before your driver account can be activated.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label>Driver's License Number <span class="req">*</span></label>
+                            <input type="text" class="form-control" name="driver_license_number" id="f_driver_license_number" required placeholder="e.g. DL-904829104">
+                        </div>
+                        <div class="form-group">
+                            <label>License Code <span class="req">*</span></label>
+                            <select class="form-control" name="license_code" id="f_license_code" required>
+                                <option value="">Select license code...</option>
+                                <option value="Code A / A1 (Motorcycle)">Code A / A1 (Motorcycle)</option>
+                                <option value="Code B (Light Motor Vehicle)">Code B (Light Motor Vehicle)</option>
+                                <option value="Code EB (Light Articulated)">Code EB (Light Articulated)</option>
+                                <option value="Code C1 / C (Heavy Vehicle)">Code C1 / C (Heavy Vehicle)</option>
+                                <option value="Bicycle / Non-Motorized">Bicycle / Non-Motorized</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>License Expiry Date <span class="req">*</span></label>
+                            <input type="date" class="form-control" name="license_expiry_date" id="f_license_expiry_date" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Years of Driving / Delivery Experience <span class="req">*</span></label>
+                            <input type="number" min="0" max="50" class="form-control" name="years_experience" id="f_years_experience" required value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>PrDP Number (Optional)</label>
+                            <input type="text" class="form-control" name="prdp_number" id="f_prdp_number" placeholder="Professional Driving Permit (if applicable)">
+                        </div>
+                        <div class="form-group" style="justify-content: flex-end;">
+                            <label class="checkbox-row">
+                                <input type="checkbox" name="has_insulated_bag" id="f_has_insulated_bag" checked>
+                                <span>I have an insulated thermal food delivery bag</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Vehicle Information -->
+                <div class="card">
+                    <div class="section-header">
+                        <div class="section-icon"><i class="fas fa-car-side"></i></div>
+                        <div>
+                            <h2>4. Delivery Vehicle Details</h2>
+                            <p>Tell us about the vehicle you will use to complete customer deliveries.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label>Vehicle Type <span class="req">*</span></label>
+                            <select class="form-control" name="vehicle_type" id="f_vehicle_type" required>
+                                <option value="Motorcycle">Motorcycle</option>
+                                <option value="Scooter">Scooter</option>
+                                <option value="Car">Car</option>
+                                <option value="Bicycle">Bicycle</option>
+                                <option value="Van">Van</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Vehicle Make <span class="req">*</span></label>
+                            <input type="text" class="form-control" name="vehicle_make" id="f_vehicle_make" required placeholder="e.g. Honda, Toyota, Big Boy">
+                        </div>
+                        <div class="form-group">
+                            <label>Vehicle Model <span class="req">*</span></label>
+                            <input type="text" class="form-control" name="vehicle_model" id="f_vehicle_model" required placeholder="e.g. Ace 125, Corolla, Veloce">
+                        </div>
+                        <div class="form-group">
+                            <label>Vehicle Year <span class="req">*</span></label>
+                            <input type="number" min="1995" max="2027" class="form-control" name="vehicle_year" id="f_vehicle_year" required placeholder="e.g. 2022">
+                        </div>
+                        <div class="form-group">
+                            <label>Vehicle Color <span class="req">*</span></label>
+                            <input type="text" class="form-control" name="vehicle_color" id="f_vehicle_color" required placeholder="e.g. White, Red, Silver">
+                        </div>
+                        <div class="form-group">
+                            <label>License Plate / Registration <span class="req">*</span></label>
+                            <input type="text" class="form-control" name="vehicle_Registration" id="f_vehicle_Registration" required placeholder="e.g. CA 123-456 or GP 99 AB">
+                        </div>
+                        <div class="form-group">
+                            <label>Service Radius (km) <span class="req">*</span></label>
+                            <input type="number" min="2" max="50" class="form-control" name="service_radius_km" id="f_service_radius_km" required value="10">
+                        </div>
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label>Preferred Working Areas / Suburbs</label>
+                            <input type="text" class="form-control" name="preferred_working_areas" id="f_preferred_working_areas" placeholder="e.g. Sandton, Rosebank, Midrand, CBD">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. Banking & Payout Details -->
+                <div class="card">
+                    <div class="section-header">
+                        <div class="section-icon"><i class="fas fa-building-columns"></i></div>
+                        <div>
+                            <h2>5. Banking & Payout Information</h2>
+                            <p>Where your delivery earnings and tips will be deposited.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label>Bank Name <span class="req">*</span></label>
+                            <select class="form-control" name="bank_name" id="f_bank_name" required>
+                                <option value="">Select bank...</option>
+                                <option value="Capitec Bank">Capitec Bank</option>
+                                <option value="FNB (First National Bank)">FNB (First National Bank)</option>
+                                <option value="Standard Bank">Standard Bank</option>
+                                <option value="Nedbank">Nedbank</option>
+                                <option value="ABSA">ABSA</option>
+                                <option value="TymeBank">TymeBank</option>
+                                <option value="Discovery Bank">Discovery Bank</option>
+                                <option value="African Bank">African Bank</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Account Holder Name <span class="req">*</span></label>
+                            <input type="text" class="form-control" name="account_holder_name" id="f_account_holder_name" required placeholder="Initials & Surname / Full Name">
+                        </div>
+                        <div class="form-group">
+                            <label>Account Number <span class="req">*</span></label>
+                            <input type="text" class="form-control" name="account_number" id="f_account_number" required placeholder="Bank Account Number">
+                        </div>
+                        <div class="form-group">
+                            <label>Branch Code <span class="req">*</span></label>
+                            <input type="text" class="form-control" name="branch_code" id="f_branch_code" required placeholder="e.g. 470010 / 250655">
+                        </div>
+                        <div class="form-group">
+                            <label>Account Type <span class="req">*</span></label>
+                            <select class="form-control" name="account_type" id="f_account_type" required>
+                                <option value="Savings / Transmission">Savings / Transmission</option>
+                                <option value="Cheque / Current">Cheque / Current</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Additional Notes for Reviewer (Optional)</label>
+                            <input type="text" class="form-control" name="applicant_notes" id="f_applicant_notes" placeholder="Any extra details about your availability or documents">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. App Login Password -->
+                <div class="card">
+                    <div class="section-header">
+                        <div class="section-icon"><i class="fas fa-lock"></i></div>
+                        <div>
+                            <h2>6. Driver App Login Credentials</h2>
+                            <p>Set the password you will use to check your application status and sign in to the Happy Delivery mobile app once approved.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label>Password <span class="req">*</span></label>
+                            <input type="password" class="form-control" name="password" id="f_password" required minlength="6" placeholder="At least 6 characters">
+                        </div>
+                        <div class="form-group">
+                            <label>Confirm Password <span class="req">*</span></label>
+                            <input type="password" class="form-control" id="f_confirm_password" required minlength="6" placeholder="Re-enter your password">
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 24px;">
+                        <button type="submit" class="btn-primary" id="submitAppBtn">
+                            <i class="fas fa-paper-plane"></i>
+                            <span id="submitAppBtnText">Submit Driver Application for Review</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- TAB 2: CHECK APPLICATION STATUS -->
+        <div id="statusTabPane" style="display: none;">
+            <div class="card">
+                <div class="section-header">
+                    <div class="section-icon"><i class="fas fa-clipboard-check"></i></div>
+                    <div>
+                        <h2>Check Your Driver Application Status</h2>
+                        <p>Enter the email address and password you registered with to view your live review status or update a rejected application.</p>
+                    </div>
+                </div>
+
+                <form id="checkStatusForm" onsubmit="checkApplicationStatus(event)">
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label>Registered Email Address <span class="req">*</span></label>
+                            <input type="email" class="form-control" id="status_email" required placeholder="driver@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Account Password <span class="req">*</span></label>
+                            <input type="password" class="form-control" id="status_password" required placeholder="Your password">
+                        </div>
+                    </div>
+                    <div style="margin-top: 18px;">
+                        <button type="submit" class="btn-primary" id="checkStatusBtn">
+                            <i class="fas fa-magnifying-glass"></i> Check Application Status
+                        </button>
+                    </div>
+                </form>
+
+                <div id="statusResultContainer" style="display: none;"></div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let lastCheckedDriver = null;
+        let lastCheckedPassword = '';
+
+        function switchTab(tab) {
+            const regPane = document.getElementById('registerTabPane');
+            const statusPane = document.getElementById('statusTabPane');
+            const regBtn = document.getElementById('tabRegisterBtn');
+            const statusBtn = document.getElementById('tabStatusBtn');
+
+            if (tab === 'status') {
+                regPane.style.display = 'none';
+                statusPane.style.display = 'block';
+                regBtn.classList.remove('active');
+                statusBtn.classList.add('active');
+            } else {
+                regPane.style.display = 'block';
+                statusPane.style.display = 'none';
+                regBtn.classList.add('active');
+                statusBtn.classList.remove('active');
+            }
+        }
+
+        function showAlert(type, htmlMessage) {
+            const el = document.getElementById('globalAlert');
+            const icon = document.getElementById('globalAlertIcon');
+            const text = document.getElementById('globalAlertText');
+            el.className = 'alert show ' + (type === 'success' ? 'alert-success' : type === 'error' ? 'alert-error' : 'alert-info');
+            icon.className = 'fas ' + (type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-info');
+            text.innerHTML = htmlMessage;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function submitDriverApplication(e) {
+            e.preventDefault();
+            const pw = document.getElementById('f_password').value;
+            const cpw = document.getElementById('f_confirm_password').value;
+
+            if (pw !== cpw) {
+                showAlert('error', '<strong>Passwords do not match.</strong> Please make sure both password fields match.');
+                return;
+            }
+
+            const btn = document.getElementById('submitAppBtn');
+            const btnText = document.getElementById('submitAppBtnText');
+            btn.disabled = true;
+            btnText.textContent = 'Submitting Application...';
+
+            const form = document.getElementById('driverApplicationForm');
+            const formData = new FormData(form);
+            const payload = {};
+            formData.forEach((value, key) => { payload[key] = value; });
+            payload.has_insulated_bag = document.getElementById('f_has_insulated_bag').checked;
+
+            try {
+                const res = await fetch('/manager/api/driver-applications', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+
+                if (!res.ok || !data.success) {
+                    showAlert('error', `<strong>Submission Error:</strong> ${data.error || 'Could not submit application.'}`);
+                    return;
+                }
+
+                showAlert(
+                    'success',
+                    `<strong>${data.resubmitted ? 'Application Updated & Resubmitted!' : 'Driver Application Submitted Successfully!'}</strong><br>` +
+                    `${data.message}<br><span style="font-size:12.5px;">A confirmation email has been sent to <strong>${payload.email}</strong>. You can check your review status anytime in the "Check Application Status" tab.</span>`
+                );
+
+                document.getElementById('status_email').value = payload.email;
+                document.getElementById('status_password').value = pw;
+                document.getElementById('resubmitBanner').classList.remove('show');
+            } catch (err) {
+                showAlert('error', '<strong>Network Error:</strong> Could not reach the server. Please try again.');
+            } finally {
+                btn.disabled = false;
+                btnText.textContent = 'Submit Driver Application for Review';
+            }
+        }
+
+        async function checkApplicationStatus(e) {
+            e.preventDefault();
+            const email = document.getElementById('status_email').value.trim();
+            const password = document.getElementById('status_password').value;
+            const btn = document.getElementById('checkStatusBtn');
+            const container = document.getElementById('statusResultContainer');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking Status...';
+
+            try {
+                const res = await fetch('/manager/api/driver-applications/status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                });
+                const data = await res.json();
+
+                if (!res.ok || !data.success) {
+                    container.style.display = 'block';
+                    container.innerHTML = `
+                        <div class="status-box" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;">
+                            <strong><i class="fas fa-circle-exclamation"></i> Could not load application:</strong> ${data.error || 'Unknown error'}
+                        </div>
+                    `;
+                    return;
+                }
+
+                const d = data.driver;
+                lastCheckedDriver = d;
+                lastCheckedPassword = password;
+
+                const status = d.approval_status || 'pending';
+                let badgeHtml = '';
+                let statusMessageHtml = '';
+
+                if (status === 'approved') {
+                    badgeHtml = '<span class="status-badge badge-approved"><i class="fas fa-check-circle"></i> Approved & Active</span>';
+                    statusMessageHtml = `
+                        <p style="margin-top:12px;color:#166534;font-weight:600;">
+                            🎉 Congratulations! Your driver account has been approved by management.
+                        </p>
+                        <p style="margin-top:6px;font-size:13.5px;color:#334155;">
+                            You can now open the <strong>Happy Delivery Mobile App</strong> and sign in with <strong>${d.email}</strong> and your password to go online and start accepting deliveries.
+                        </p>
+                    `;
+                } else if (status === 'rejected') {
+                    badgeHtml = '<span class="status-badge badge-rejected"><i class="fas fa-times-circle"></i> Action Required · Not Approved</span>';
+                    statusMessageHtml = `
+                        <p style="margin-top:12px;color:#991b1b;font-weight:600;">
+                            Your driver application was reviewed by management and requires changes before it can be approved:
+                        </p>
+                        <div class="rejection-reason-card">
+                            <strong><i class="fas fa-envelope-open-text"></i> Feedback from Management:</strong><br>
+                            ${d.rejection_reason || 'Please verify your driver license and vehicle details.'}
+                        </div>
+                        <button type="button" class="btn-primary" style="margin-top:10px;" onclick="loadApplicationForResubmit()">
+                            <i class="fas fa-pen-to-square"></i> Edit & Fix My Application Now
+                        </button>
+                    `;
+                } else {
+                    badgeHtml = '<span class="status-badge badge-pending"><i class="fas fa-clock"></i> Pending Management Review</span>';
+                    statusMessageHtml = `
+                        <p style="margin-top:12px;color:#92400e;font-weight:600;">
+                            Your application has been received and is currently in the review queue.
+                        </p>
+                        <p style="margin-top:6px;font-size:13.5px;color:#334155;">
+                            As soon as an administrator approves or reviews your registration, we will send an email to <strong>${d.email}</strong>.
+                        </p>
+                        <div style="margin-top:14px;">
+                            <button type="button" class="btn-outline" onclick="loadApplicationForResubmit()">
+                                <i class="fas fa-pen"></i> Update Application Details
+                            </button>
+                        </div>
+                    `;
+                }
+
+                container.style.display = 'block';
+                container.innerHTML = `
+                    <div class="status-box">
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                            <div>
+                                <div style="font-size:18px;font-weight:800;">${d.first_name} ${d.last_name}</div>
+                                <div style="font-size:13px;color:#64748b;">${d.email} · ${d.phone_number || ''}</div>
+                            </div>
+                            ${badgeHtml}
+                        </div>
+                        ${statusMessageHtml}
+                        <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;">
+                        <div class="grid-3" style="font-size:13px;color:#475569;">
+                            <div><strong>Vehicle:</strong> ${d.vehicle_type || '-'} (${d.application_details?.vehicle_make || ''} ${d.vehicle_model || ''})</div>
+                            <div><strong>Plate:</strong> ${d.vehicle_registration || '-'}</div>
+                            <div><strong>License #:</strong> ${d.driver_license_number || '-'}</div>
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                container.style.display = 'block';
+                container.innerHTML = `<div class="status-box" style="color:#991b1b;">Failed to check application status. Please try again.</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-magnifying-glass"></i> Check Application Status';
+            }
+        }
+
+        function loadApplicationForResubmit() {
+            if (!lastCheckedDriver) return;
+            const d = lastCheckedDriver;
+            const details = d.application_details || {};
+
+            const setVal = (id, val) => {
+                const el = document.getElementById(id);
+                if (el && val !== undefined && val !== null) el.value = val;
+            };
+
+            setVal('f_first_name', d.first_name);
+            setVal('f_last_name', d.last_name);
+            setVal('f_email', d.email);
+            setVal('f_phone_number', d.phone_number);
+            setVal('f_id_number', details.id_number);
+            setVal('f_date_of_birth', details.date_of_birth);
+            setVal('f_street_address', details.street_address);
+            setVal('f_city', details.city);
+            setVal('f_postal_code', details.postal_code);
+            setVal('f_emergency_contact_name', details.emergency_contact_name);
+            setVal('f_emergency_contact_phone', details.emergency_contact_phone);
+            setVal('f_emergency_contact_relationship', details.emergency_contact_relationship);
+            setVal('f_driver_license_number', d.driver_license_number);
+            setVal('f_license_code', details.license_code);
+            if (d.license_expiry_date) {
+                setVal('f_license_expiry_date', String(d.license_expiry_date).split('T')[0]);
+            }
+            setVal('f_prdp_number', details.prdp_number);
+            setVal('f_years_experience', details.years_experience ?? 1);
+            document.getElementById('f_has_insulated_bag').checked = details.has_insulated_bag !== false;
+
+            setVal('f_vehicle_type', d.vehicle_type);
+            setVal('f_vehicle_make', details.vehicle_make);
+            setVal('f_vehicle_model', d.vehicle_model);
+            setVal('f_vehicle_year', details.vehicle_year);
+            setVal('f_vehicle_color', d.vehicle_color);
+            setVal('f_vehicle_Registration', d.vehicle_registration);
+            setVal('f_service_radius_km', d.service_radius_km || 10);
+            setVal('f_preferred_working_areas', details.preferred_working_areas);
+
+            setVal('f_bank_name', details.bank_name);
+            setVal('f_account_holder_name', details.account_holder_name);
+            setVal('f_account_number', details.account_number);
+            setVal('f_branch_code', details.branch_code);
+            setVal('f_account_type', details.account_type || 'Savings / Transmission');
+            setVal('f_applicant_notes', details.applicant_notes);
+
+            setVal('f_password', lastCheckedPassword);
+            setVal('f_confirm_password', lastCheckedPassword);
+
+            const banner = document.getElementById('resubmitBanner');
+            const reasonText = document.getElementById('resubmitReasonText');
+            banner.classList.add('show');
+            reasonText.innerHTML = d.rejection_reason
+                ? `<strong>Manager Feedback to Address:</strong> "${d.rejection_reason}" — Update the fields below and click <strong>Update & Resubmit Application</strong>.`
+                : 'Update any of your registration fields below and submit to refresh your application.';
+
+            document.getElementById('submitAppBtnText').textContent = 'Update & Resubmit Driver Application';
+            switchTab('register');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>

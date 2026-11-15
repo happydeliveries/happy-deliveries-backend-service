@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Restaurants - Restaurant Manager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4a6fa5;
+            --secondary-color: #166088;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 250px;
+            background: linear-gradient(180deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            position: fixed;
+            height: 100vh;
+            padding-top: 20px;
+            left: 0;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 0 20px 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 15px 20px;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: white;
+            background: rgba(255,255,255,0.1);
+            border-left-color: white;
+        }
+
+        .main-content {
+            margin-left: 250px;
+            padding: 30px;
+        }
+
+        .page-header {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .restaurant-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .restaurant-card {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .restaurant-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+        }
+
+        .restaurant-card-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 20px;
+            position: relative;
+            height: 120px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+        }
+
+        .restaurant-card-header h5 {
+            margin: 0;
+            font-size: 1.3rem;
+        }
+
+        .restaurant-status-badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .restaurant-card-body {
+            padding: 20px;
+        }
+
+        .restaurant-info {
+            margin-bottom: 15px;
+        }
+
+        .restaurant-info-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #666;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .restaurant-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            display: block;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .stat-label {
+            display: block;
+            font-size: 0.8rem;
+            color: #999;
+            margin-top: 3px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+
+        .action-buttons button, .action-buttons a {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: none;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+
+        .btn-manage {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-manage:hover {
+            background: var(--secondary-color);
+        }
+
+        .btn-edit {
+            background: #f0f0f0;
+            color: var(--primary-color);
+        }
+
+        .btn-edit:hover {
+            background: #e0e0e0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 30px;
+            background: white;
+            border-radius: 15px;
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            color: #ddd;
+            margin-bottom: 20px;
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background: var(--secondary-color);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 60px;
+            }
+
+            .main-content {
+                margin-left: 60px;
+            }
+
+            .page-header {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .restaurant-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-utensils"></i> Manager</h3>
+        </div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" href="/manager/dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" href="/manager/restaurants">
+                    <i class="fas fa-store"></i> Restaurants
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/manager/orders">
+                    <i class="fas fa-receipt"></i> Orders
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/manager/menus">
+                    <i class="fas fa-utensils"></i> Menus
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/manager/analytics">
+                    <i class="fas fa-chart-line"></i> Analytics
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/manager/settings">
+                    <i class="fas fa-cog"></i> Settings
+                </a>
+            </li>
+            <li class="nav-item" style="position: absolute; bottom: 20px; width: 100%;">
+                <a class="nav-link text-danger" href="/manager/logout">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="page-header">
+            <div>
+                <h2>My Restaurants</h2>
+                <p class="text-muted mb-0">Manage all your restaurants in one place</p>
+            </div>
+            <div>
+                <a href="/manager/restaurants/add" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i> Add Restaurant
+                </a>
+            </div>
+        </div>
+
+        <!-- Restaurants Grid -->
+        <div id="restaurantsContainer" class="restaurant-grid">
+            <!-- Restaurants will be loaded here -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="empty-state-icon">
+                <i class="fas fa-store"></i>
+            </div>
+            <h3>No Restaurants Yet</h3>
+            <p class="text-muted">Create your first restaurant to get started managing deliveries and orders.</p>
+            <a href="/manager/restaurants/add" class="btn btn-primary mt-3">
+                <i class="fas fa-plus me-2"></i> Create Restaurant
+            </a>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = '/api/manager';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadRestaurants();
+        });
+
+        async function loadRestaurants() {
+            try {
+                const response = await fetch(`${API_BASE}/restaurants/my`, {
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success && data.restaurants.length > 0) {
+                    displayRestaurants(data.restaurants);
+                    document.getElementById('emptyState').style.display = 'none';
+                } else {
+                    document.getElementById('restaurantsContainer').innerHTML = '';
+                    document.getElementById('emptyState').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error loading restaurants:', error);
+                showError('Failed to load restaurants');
+            }
+        }
+
+        function displayRestaurants(restaurants) {
+            const container = document.getElementById('restaurantsContainer');
+            container.innerHTML = '';
+
+            restaurants.forEach(restaurant => {
+                const card = document.createElement('div');
+                card.className = 'restaurant-card';
+
+                const statusBadge = restaurant.is_active 
+                    ? '<span class="restaurant-status-badge" style="background: rgba(255,255,255,0.3);">✓ Active</span>'
+                    : '<span class="restaurant-status-badge" style="background: rgba(255,255,255,0.3);">○ Inactive</span>';
+
+                card.innerHTML = `
+                    <div class="restaurant-card-header">
+                        <div>
+                            <h5>${restaurant.name}</h5>
+                            <small style="opacity: 0.9">${restaurant.cuisine_type || 'Multi-cuisine'}</small>
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    <div class="restaurant-card-body">
+                        <div class="restaurant-info">
+                            <div class="restaurant-info-item">
+                                <i class="fas fa-map-marker-alt" style="color: var(--danger-color);"></i>
+                                <span>${truncateText(restaurant.address, 50)}</span>
+                            </div>
+                            <div class="restaurant-info-item">
+                                <i class="fas fa-phone" style="color: var(--primary-color);"></i>
+                                <span>${restaurant.phone_number || 'N/A'}</span>
+                            </div>
+                            <div class="restaurant-info-item">
+                                <i class="fas fa-envelope" style="color: var(--warning-color);"></i>
+                                <span>${restaurant.email || 'N/A'}</span>
+                            </div>
+                        </div>
+
+                        <div class="restaurant-stats">
+                            <div class="stat">
+                                <span class="stat-value">${restaurant.total_orders || 0}</span>
+                                <span class="stat-label">Orders</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value">₹${formatNumber(restaurant.total_revenue || 0)}</span>
+                                <span class="stat-label">Revenue</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value">${restaurant.average_rating || '0.0'}</span>
+                                <span class="stat-label">Rating</span>
+                            </div>
+                        </div>
+
+                        <div class="action-buttons">
+                            <a href="/manager/restaurants/edit/${restaurant.id}" class="btn-edit">
+                                <i class="fas fa-edit"></i> Edit
+                            </a>
+                            <button onclick="manageRestaurant('${restaurant.id}')" class="btn-manage">
+                                <i class="fas fa-cog"></i> Manage
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+        }
+
+        function manageRestaurant(restaurantId) {
+            window.location.href = `/manager/restaurants/${restaurantId}`;
+        }
+
+        function truncateText(text, length) {
+            if (!text) return 'N/A';
+            return text.length > length ? text.substring(0, length) + '...' : text;
+        }
+
+        function formatNumber(num) {
+            return new Intl.NumberFormat('en-IN').format(num);
+        }
+
+        function showError(message) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-danger alert-dismissible fade show position-fixed';
+            alert.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+            alert.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alert);
+        }
+    </script>
+</body>
+</html>

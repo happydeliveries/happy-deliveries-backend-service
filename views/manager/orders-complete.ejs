@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orders - Restaurant Manager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4a6fa5;
+            --secondary-color: #166088;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 250px;
+            background: linear-gradient(180deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            position: fixed;
+            height: 100vh;
+            padding-top: 20px;
+            left: 0;
+            top: 0;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 0 20px 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 15px 20px;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: white;
+            background: rgba(255,255,255,0.1);
+            border-left-color: white;
+        }
+
+        .main-content {
+            margin-left: 250px;
+            padding: 30px;
+        }
+
+        .page-header {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
+        }
+
+        .page-header h2 {
+            margin: 0 0 10px 0;
+            color: var(--primary-color);
+        }
+
+        .filters-section {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .filter-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .filter-group label {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .form-control, .form-select {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px 12px;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(74, 111, 165, 0.15);
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .stat-card h6 {
+            color: #666;
+            margin: 0 0 10px 0;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin: 0;
+        }
+
+        .orders-table-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+
+        .table-responsive {
+            margin: 0;
+        }
+
+        .table {
+            margin: 0;
+        }
+
+        .table thead th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+            border-bottom: 2px solid #dee2e6;
+            padding: 15px;
+        }
+
+        .table tbody td {
+            padding: 15px;
+            vertical-align: middle;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-accepted { background: #cce5ff; color: #004085; }
+        .status-preparing { background: #cff4fc; color: #055160; }
+        .status-ready { background: #d4edda; color: #155724; }
+        .status-on_the_way { background: #e2e3e5; color: #383d41; }
+        .status-delivered { background: #d1ecf1; color: #0c5460; }
+        .status-cancelled { background: #f8d7da; color: #721c24; }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-sm {
+            padding: 6px 10px;
+            font-size: 0.8rem;
+        }
+
+        .btn-outline-primary {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+
+        .pagination {
+            margin-top: 20px;
+            gap: 5px;
+        }
+
+        .page-link {
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+            border-radius: 5px;
+        }
+
+        .page-link:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .page-link.active {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .modal-content {
+            border-radius: 15px;
+            border: none;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: none;
+        }
+
+        .modal-header .btn-close {
+            filter: invert(1);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 30px;
+            color: #999;
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            color: #ddd;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { width: 60px; }
+            .main-content { margin-left: 60px; }
+            .filters-section { flex-direction: column; }
+            .filter-group { width: 100%; }
+            .stats-row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-utensils"></i> Manager</h3>
+        </div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" href="/manager/dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/manager/restaurants">
+                    <i class="fas fa-store"></i> Restaurants
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" href="/manager/orders">
+                    <i class="fas fa-receipt"></i> Orders
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/manager/menus">
+                    <i class="fas fa-utensils"></i> Menus
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/manager/analytics">
+                    <i class="fas fa-chart-line"></i> Analytics
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/manager/settings">
+                    <i class="fas fa-cog"></i> Settings
+                </a>
+            </li>
+            <li class="nav-item" style="position: absolute; bottom: 20px; width: 100%;">
+                <a class="nav-link text-danger" href="/manager/logout">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="page-header">
+            <h2><i class="fas fa-receipt me-2"></i>Order Management</h2>
+            <p class="text-muted mb-0">Monitor and manage all incoming orders</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters-section">
+            <div class="filter-group">
+                <label>Restaurant</label>
+                <select class="form-select" id="restaurantFilter">
+                    <option value="all">All Restaurants</option>
+                    <% restaurants.forEach(restaurant => { %>
+                        <option value="<%= restaurant.id %>"><%= restaurant.name %></option>
+                    <% }) %>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="all">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="accepted_by_driver">Accepted</option>
+                    <option value="ordering_at_restaurant">Ordering</option>
+                    <option value="order_ready">Ready</option>
+                    <option value="on_the_way">On the Way</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Date</label>
+                <input type="date" class="form-control" id="dateFilter">
+            </div>
+            <button class="btn btn-primary" onclick="applyFilters()">
+                <i class="fas fa-filter me-2"></i>Apply Filters
+            </button>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <h6>Active Orders</h6>
+                <p class="stat-value" id="activeOrdersCount">0</p>
+            </div>
+            <div class="stat-card">
+                <h6>Today's Revenue</h6>
+                <p class="stat-value">₹<span id="todayRevenue">0</span></p>
+            </div>
+            <div class="stat-card">
+                <h6>Total Orders Today</h6>
+                <p class="stat-value" id="totalOrdersToday">0</p>
+            </div>
+        </div>
+
+        <!-- Orders Table -->
+        <div class="orders-table-container">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Order #</th>
+                            <th>Customer</th>
+                            <th>Restaurant</th>
+                            <th>Items</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Time</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersList">
+                        <tr><td colspan="8" class="text-center py-4">Loading orders...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div style="padding: 20px; text-align: center;">
+                <nav>
+                    <ul class="pagination justify-content-center" id="pagination">
+                        <!-- Filled by JavaScript -->
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Details Modal -->
+    <div class="modal fade" id="orderDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Order Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="orderDetailsContent">
+                    <!-- Filled by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = '/api/manager';
+        let currentPage = 1;
+        const pageSize = 15;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadOrders();
+            setInterval(loadOrders, 10000); // Auto-refresh every 10 seconds
+        });
+
+        async function loadOrders(page = 1) {
+            try {
+                currentPage = page;
+                const restaurantId = document.getElementById('restaurantFilter')?.value || 'all';
+                const status = document.getElementById('statusFilter')?.value || 'all';
+                const date = document.getElementById('dateFilter')?.value || '';
+
+                let url = `${API_BASE}/dashboard/recent-orders?limit=50`;
+                if (date) url += `&date=${date}`;
+
+                const response = await fetch(url, {
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayOrders(data.orders);
+                    updateStats(data.orders);
+                } else {
+                    showError(data.error || 'Failed to load orders');
+                }
+            } catch (error) {
+                console.error('Error loading orders:', error);
+                showError('Failed to load orders');
+            }
+        }
+
+        function displayOrders(orders) {
+            const tbody = document.getElementById('ordersList');
+            tbody.innerHTML = '';
+
+            if (orders.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted">No orders found</td></tr>`;
+                return;
+            }
+
+            orders.forEach(order => {
+                const row = document.createElement('tr');
+                const orderTime = new Date(order.placed_at);
+                const timeString = orderTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+                let statusClass = `status-${order.status}`;
+                let statusText = order.status.replace(/_/g, ' ').toUpperCase();
+
+                row.innerHTML = `
+                    <td><strong>#${order.order_number || order.id.substring(0, 8)}</strong></td>
+                    <td>${order.customer_name || 'Unknown'}</td>
+                    <td>${order.restaurant_name || 'Unknown'}</td>
+                    <td><small>-</small></td>
+                    <td>₹${(order.total_amount || 0).toFixed(2)}</td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    <td><small>${timeString}</small></td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewOrderDetails('${order.id}')">
+                                <i class="fas fa-eye"></i> View
+                            </button>
+                        </div>
+                    </td>
+                `;
+
+                tbody.appendChild(row);
+            });
+        }
+
+        function updateStats(orders) {
+            const activeCount = orders.filter(o => !['delivered', 'cancelled'].includes(o.status)).length;
+            document.getElementById('activeOrdersCount').textContent = activeCount;
+
+            const revenue = orders
+                .filter(o => o.status === 'delivered')
+                .reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0);
+            document.getElementById('todayRevenue').textContent = revenue.toFixed(0);
+            document.getElementById('totalOrdersToday').textContent = orders.length;
+        }
+
+        function viewOrderDetails(orderId) {
+            const modal = new bootstrap.Modal(document.getElementById('orderDetailsModal'));
+            modal.show();
+
+            document.getElementById('orderDetailsContent').innerHTML = `
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary"></div>
+                </div>
+            `;
+        }
+
+        function applyFilters() {
+            loadOrders(1);
+        }
+
+        function showError(message) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-danger alert-dismissible fade show position-fixed';
+            alert.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+            alert.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alert);
+        }
+    </script>
+</body>
+</html>

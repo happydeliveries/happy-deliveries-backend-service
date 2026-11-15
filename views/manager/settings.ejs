@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - Restaurant Manager</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.5rem; border-bottom: 1px solid hsl(var(--border));
+      background: hsl(var(--background)); position: sticky; top: 0; z-index: 40;
+    }
+    .topbar-search { flex: 1; max-width: 28rem; }
+    .search-input-wrapper { position: relative; }
+    .search-input-wrapper svg {
+      position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%);
+      width: 1rem; height: 1rem; color: hsl(var(--muted-foreground));
+    }
+    .search-input {
+      width: 100%; padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+      border: 1px solid hsl(var(--input)); border-radius: var(--radius);
+      font-size: 0.875rem; background: hsl(var(--background));
+      color: hsl(var(--foreground)); outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .search-input:focus {
+      border-color: hsl(var(--ring)); box-shadow: 0 0 0 2px hsla(var(--ring), 0.2);
+    }
+    .search-input::placeholder { color: hsl(var(--muted-foreground)); }
+    .topbar-actions { display: flex; align-items: center; gap: 1rem; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.875rem;
+      font-weight: 500; cursor: pointer; transition: all 0.15s;
+      border: none; text-decoration: none; line-height: 1;
+    }
+    .btn svg { width: 1rem; height: 1rem; }
+    .btn-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
+    .btn-secondary:hover { background: hsl(var(--accent)); }
+    .btn-outline {
+      background: transparent; border: 1px solid hsl(var(--input));
+      color: hsl(var(--foreground));
+    }
+    .btn-outline:hover { background: hsl(var(--accent)); }
+    .btn-ghost { background: transparent; color: hsl(var(--foreground)); }
+    .btn-ghost:hover { background: hsl(var(--accent)); }
+    .btn-icon { padding: 0.5rem; width: 2rem; height: 2rem; }
+    .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; }
+    .btn-danger { background: hsl(var(--destructive)); color: hsl(var(--destructive-foreground)); }
+    .btn-danger:hover { opacity: 0.9; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.375rem;
+      padding: 0.25rem 0.625rem; border-radius: 9999px;
+      font-size: 0.75rem; font-weight: 600;
+    }
+    .badge-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+    .badge-secondary { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-yellow { background: #fef3c7; color: #92400e; }
+    .badge-red { background: #fee2e2; color: #991b1b; }
+
+    .notification-btn { position: relative; }
+    .notification-badge {
+      position: absolute; top: -0.25rem; right: -0.25rem;
+      width: 1.25rem; height: 1.25rem; background: hsl(var(--primary));
+      color: hsl(var(--primary-foreground)); border-radius: 50%;
+      font-size: 0.625rem; display: flex; align-items: center; justify-content: center;
+      font-weight: 500;
+    }
+
+    .avatar {
+      width: 2rem; height: 2rem; border-radius: 50%; overflow: hidden;
+      background: hsl(var(--muted)); display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 600; color: hsl(var(--muted-foreground));
+    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .avatar-xl { width: 5rem; height: 5rem; font-size: 1.5rem; }
+
+    .card {
+      background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .card-header {
+      padding: 1.5rem; display: flex; flex-direction: column; gap: 0.375rem;
+    }
+    .card-header-row {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-title { font-size: 1rem; font-weight: 600; line-height: 1.5; }
+    .card-title-lg { font-size: 1.125rem; }
+    .card-description { font-size: 0.875rem; color: hsl(var(--muted-foreground)); }
+    .card-content { padding: 0 1.5rem 1.5rem; }
+    .card-content-full { padding: 0; }
+
+    .page-container {
+      padding: 1.5rem 2rem; display: flex; flex-direction: column; gap: 1.5rem;
+    }
+    .page-title { font-size: 1.875rem; font-weight: 700; letter-spacing: -0.025em; }
+
+    .settings-tabs {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.125rem;
+      padding: 0.25rem; background: hsl(var(--muted)); border-radius: var(--radius);
+    }
+    .settings-tab {
+      display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+      padding: 0.5rem 0.75rem; border-radius: calc(var(--radius) - 0.125rem);
+      font-size: 0.875rem; font-weight: 500; cursor: pointer;
+      background: transparent; border: none; color: hsl(var(--muted-foreground));
+      transition: background-color 0.15s, color 0.15s;
+    }
+    .settings-tab:hover { color: hsl(var(--foreground)); }
+    .settings-tab.active {
+      background: hsl(var(--background)); color: hsl(var(--foreground));
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .settings-tab svg { width: 1rem; height: 1rem; }
+    .settings-section { display: none; }
+    .settings-section.active { display: block; }
+
+    .grid { display: grid; gap: 1rem; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+
+    .form-group {
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .form-label { font-size: 0.875rem; font-weight: 500; }
+    .form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+
+    input[type="text"], input[type="email"], input[type="password"], textarea {
+      width: 100%; padding: 0.5rem 0.75rem;
+      border: 1px solid hsl(var(--input)); border-radius: var(--radius);
+      font-size: 0.875rem; background: hsl(var(--background));
+      color: hsl(var(--foreground)); outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s; font-family: inherit;
+    }
+    input:focus, textarea:focus {
+      border-color: hsl(var(--ring)); box-shadow: 0 0 0 2px hsla(var(--ring), 0.2);
+    }
+    textarea { resize: vertical; min-height: 5rem; }
+
+    .switch {
+      position: relative; width: 2.75rem; height: 1.5rem;
+      background: hsl(var(--input)); border-radius: 9999px;
+      cursor: pointer; transition: background-color 0.2s;
+    }
+    .switch.active { background: hsl(var(--primary)); }
+    .switch-thumb {
+      position: absolute; top: 0.125rem; left: 0.125rem;
+      width: 1.25rem; height: 1.25rem; background: white;
+      border-radius: 50%; transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .switch.active .switch-thumb { transform: translateX(1.25rem); }
+    .switch-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.75rem 0;
+    }
+    .switch-info { display: flex; flex-direction: column; gap: 0.25rem; }
+    .switch-label { font-weight: 500; }
+    .switch-description { font-size: 0.875rem; color: hsl(var(--muted-foreground)); }
+
+    .dropdown { position: relative; }
+    .dropdown-content {
+      position: absolute; top: 100%; right: 0; background: hsl(var(--background));
+      border: 1px solid hsl(var(--border)); border-radius: var(--radius);
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      min-width: 12rem; z-index: 50; display: none; padding: 0.25rem;
+    }
+    .dropdown.active .dropdown-content { display: block; }
+    .dropdown-label { padding: 0.5rem 0.75rem; font-size: 0.875rem; font-weight: 500; }
+    .dropdown-item {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.5rem 0.75rem; font-size: 0.875rem; cursor: pointer;
+      border-radius: 0.25rem; transition: background-color 0.15s;
+      color: inherit; text-decoration: none;
+    }
+    .dropdown-item:hover { background: hsl(var(--accent)); }
+    .dropdown-item.danger { color: hsl(var(--destructive)); }
+    .dropdown-separator { height: 1px; background: hsl(var(--border)); margin: 0.25rem 0; }
+
+    .toast-container {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 200;
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .toast {
+      background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+      border-radius: var(--radius); padding: 1rem 1.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      min-width: 20rem; transform: translateX(100%); opacity: 0;
+      transition: transform 0.3s, opacity 0.3s;
+    }
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast-title { font-weight: 500; margin-bottom: 0.25rem; }
+    .toast-description { font-size: 0.875rem; color: hsl(var(--muted-foreground)); }
+
+    .hidden { display: none !important; }
+    .text-muted { color: hsl(var(--muted-foreground)); }
+    .font-medium { font-weight: 500; }
+    .font-semibold { font-weight: 600; }
+
+    /* Loading / saving states */
+    .btn-loading { opacity: 0.7; pointer-events: none; }
+    .btn-loading::after {
+      content: ''; display: inline-block; width: 0.875rem; height: 0.875rem;
+      border: 2px solid currentColor; border-top-color: transparent;
+      border-radius: 50%; animation: spin 0.6s linear infinite; margin-left: 0.5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+      .main-content { margin-left: 0; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .settings-tabs { grid-template-columns: repeat(2, 1fr); }
+      .topbar { padding: 1rem; }
+      .topbar-search { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  <!-- ═════════════════════════ SIDEBAR ═════════════════════════ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo"></div>
+      <span class="sidebar-title">Happy Deliveries</span>
+    </div>
+    <nav class="sidebar-content">
+      <ul class="sidebar-menu">
+        <li>
+          <a href="/manager/dashboard" class="sidebar-menu-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard-icon lucide-layout-dashboard"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a href="/manager/restaurants" class="sidebar-menu-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-store-icon lucide-store"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg>
+            <span>Restaurants</span>
+          </a>
+        </li>
+        <li>
+          <a href="/manager/menus" class="sidebar-menu-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-utensils-crossed-icon lucide-utensils-crossed"><path d="m16 2-2.3 2.3a3 3 0 0 0 0 4.2l1.8 1.8a3 3 0 0 0 4.2 0L22 8"/><path d="M15 15 3.3 3.3a4.2 4.2 0 0 0 0 6l7.3 7.3c.7.7 2 .7 2.8 0L15 15Zm0 0 7 7"/><path d="m2.1 21.8 6.4-6.3"/><path d="m19 5-7 7"/></svg>
+            <span>Menus</span>
+          </a>
+        </li>
+        <li>
+          <a href="/manager/orders" class="sidebar-menu-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-receipt-text-icon lucide-receipt-text"><path d="M13 16H8"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg>
+            <span>Orders</span></a></li><li><a href="/manager/drivers" class="sidebar-menu-item"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg><span>Manage Drivers</span>
+          </a>
+        </li>
+        <li>
+          <a href="/manager/analytics" class="sidebar-menu-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+            <span>Analytics</span>
+          </a>
+        </li>
+        <li>
+          <a href="/manager/settings" class="sidebar-menu-item active">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>Settings</span>
+          </a>
+        </li>
+        <!-- <li style="margin-top:auto;">
+          <a href="/manager/logout" class="sidebar-menu-item" style="color:hsl(var(--destructive));">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+            <span>Logout</span>
+          </a>
+        </li> -->
+      </ul>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="avatar"><%= manager.first_name ? manager.first_name[0] : 'M' %><%= manager.last_name ? manager.last_name[0] : '' %></div>
+        <div class="sidebar-user-info">
+          <span class="sidebar-user-name"><%= manager.first_name || 'Manager' %> <%= manager.last_name || '' %></span>
+          <span class="sidebar-user-role">Restaurant Manager</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════ MAIN CONTENT ═══════════════════════ -->
+  <main class="main-content">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="topbar-search">
+        <div class="search-input-wrapper">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" class="search-input" placeholder="Search...">
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="dropdown">
+          <button class="btn btn-ghost btn-icon" onclick="toggleDropdown(this)" style="border-radius:50%;">
+            <div class="avatar"><%= manager.first_name ? manager.first_name[0] : 'M' %></div>
+          </button>
+          <div class="dropdown-content">
+            <div class="dropdown-label">My Account</div>
+            <div class="dropdown-separator"></div>
+            <a href="/manager/settings" class="dropdown-item">Settings</a>
+            <div class="dropdown-separator"></div>
+            <a href="/manager/logout" class="dropdown-item danger">Log out</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Content -->
+    <div class="page-container">
+      <div style="margin-bottom: 1.5rem;">
+        <h1 class="page-title">Settings</h1>
+        <p class="text-muted">Manage your account settings and preferences</p>
+      </div>
+
+      <!-- Settings Tabs -->
+      <div class="settings-tabs" style="margin-bottom: 1.5rem;">
+        <button class="settings-tab active" data-settings="profile">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Profile
+        </button>
+        <button class="settings-tab" data-settings="security">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Security
+        </button>
+        <button class="settings-tab" data-settings="notifications">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          Notifications
+        </button>
+        <button class="settings-tab" data-settings="danger">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>
+          Danger Zone
+        </button>
+      </div>
+
+      <!-- Profile Section -->
+      <div class="settings-section active" id="settings-profile">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Profile Information</h3>
+            <p class="card-description">Update your personal information and profile settings</p>
+          </div>
+          <div class="card-content">
+            <div style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.5rem;">
+              <div class="avatar avatar-xl"><%= manager.first_name ? manager.first_name[0] : 'M' %><%= manager.last_name ? manager.last_name[0] : '' %></div>
+              <div>
+                <button class="btn btn-outline" onclick="showToast('Coming soon', 'Avatar upload will be available soon.')">Change Photo</button>
+                <p class="text-muted" style="font-size: 0.875rem; margin-top: 0.5rem;">JPG, GIF or PNG. 1MB max.</p>
+              </div>
+            </div>
+            <form id="profileForm" onsubmit="saveProfile(event)">
+              <div class="form-row" style="margin-bottom: 1rem;">
+                <div class="form-group">
+                  <label class="form-label">First Name</label>
+                  <input type="text" id="firstName" value="<%= manager.first_name || '' %>" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Last Name</label>
+                  <input type="text" id="lastName" value="<%= manager.last_name || '' %>" required>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 1rem;">
+                <label class="form-label">Email</label>
+                <input type="email" id="email" value="<%= manager.email || '' %>" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label class="form-label">Role</label>
+                <input type="text" value="Restaurant Manager" disabled style="opacity:0.6; cursor:not-allowed;">
+              </div>
+              <button type="submit" class="btn btn-primary" id="profileBtn">Save Changes</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Security Section -->
+      <div class="settings-section" id="settings-security">
+        <div class="card" style="margin-bottom: 1.5rem;">
+          <div class="card-header">
+            <h3 class="card-title">Change Password</h3>
+            <p class="card-description">Update your password to keep your account secure</p>
+          </div>
+          <div class="card-content">
+            <form id="passwordForm" onsubmit="changePassword(event)">
+              <div class="form-group" style="margin-bottom: 1rem;">
+                <label class="form-label">Current Password</label>
+                <input type="password" id="currentPassword" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 1rem;">
+                <label class="form-label">New Password</label>
+                <input type="password" id="newPassword" required minlength="8">
+              </div>
+              <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label class="form-label">Confirm New Password</label>
+                <input type="password" id="confirmPassword" required minlength="8">
+              </div>
+              <button type="submit" class="btn btn-primary" id="passwordBtn">Update Password</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Active Sessions</h3>
+            <p class="card-description">Manage your active sessions</p>
+          </div>
+          <div class="card-content">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; border: 1px solid hsl(var(--border)); border-radius: var(--radius); margin-bottom: 1rem;">
+              <div>
+                <div class="font-medium">Current Session</div>
+                <div class="text-muted" style="font-size: 0.875rem;">This device</div>
+              </div>
+              <span class="badge badge-green">Active</span>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="showToast('Coming soon', 'Session management will be available soon.')">View All Sessions</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notifications Section -->
+      <div class="settings-section" id="settings-notifications">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Notification Preferences</h3>
+            <p class="card-description">Choose how you want to be notified about updates</p>
+          </div>
+          <div class="card-content">
+            <h4 style="font-size: 0.875rem; font-weight: 500; margin-bottom: 1rem;">Order Updates</h4>
+            <div class="switch-row">
+              <div class="switch-info">
+                <span class="switch-label">New Orders</span>
+                <span class="switch-description">Receive notifications when new orders arrive</span>
+              </div>
+              <div class="switch active" onclick="toggleSwitch(this)" data-pref="new_orders"><div class="switch-thumb"></div></div>
+            </div>
+            <div class="switch-row">
+              <div class="switch-info">
+                <span class="switch-label">Order Status Changes</span>
+                <span class="switch-description">Notifications when order status updates</span>
+              </div>
+              <div class="switch active" onclick="toggleSwitch(this)" data-pref="status_changes"><div class="switch-thumb"></div></div>
+            </div>
+            <div class="switch-row">
+              <div class="switch-info">
+                <span class="switch-label">Order Cancellations</span>
+                <span class="switch-description">Alerts when orders are cancelled</span>
+              </div>
+              <div class="switch active" onclick="toggleSwitch(this)" data-pref="cancellations"><div class="switch-thumb"></div></div>
+            </div>
+
+            <h4 style="font-size: 0.875rem; font-weight: 500; margin: 1.5rem 0 1rem;">System</h4>
+            <div class="switch-row">
+              <div class="switch-info">
+                <span class="switch-label">Email Notifications</span>
+                <span class="switch-description">Receive summary emails</span>
+              </div>
+              <div class="switch" onclick="toggleSwitch(this)" data-pref="email_summary"><div class="switch-thumb"></div></div>
+            </div>
+            <div class="switch-row">
+              <div class="switch-info">
+                <span class="switch-label">Daily Reports</span>
+                <span class="switch-description">End-of-day sales summary</span>
+              </div>
+              <div class="switch" onclick="toggleSwitch(this)" data-pref="daily_reports"><div class="switch-thumb"></div></div>
+            </div>
+
+            <button class="btn btn-primary" style="margin-top: 1rem;" onclick="saveNotificationPrefs()">Save Preferences</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Danger Zone Section -->
+      <div class="settings-section" id="settings-danger">
+        <div class="card" style="border-color: hsla(var(--destructive), 0.3);">
+          <div class="card-header">
+            <h3 class="card-title" style="color: hsl(var(--destructive));">Danger Zone</h3>
+            <p class="card-description">Irreversible and destructive actions</p>
+          </div>
+          <div class="card-content">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem; border: 1px solid hsla(var(--destructive), 0.2); border-radius: var(--radius); margin-bottom: 1rem;">
+              <div>
+                <div class="font-medium">Log Out All Devices</div>
+                <div class="text-muted" style="font-size: 0.875rem;">Sign out from all other active sessions</div>
+              </div>
+              <button class="btn btn-outline" onclick="showToast('Coming soon', 'Session management will be available soon.')">Log Out All</button>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem; border: 1px solid hsla(var(--destructive), 0.2); border-radius: var(--radius);">
+              <div>
+                <div class="font-medium" style="color: hsl(var(--destructive));">Delete Account</div>
+                <div class="text-muted" style="font-size: 0.875rem;">Permanently delete your account and all data</div>
+              </div>
+              <button class="btn btn-danger" onclick="showToast('Coming soon', 'Account deletion will be available soon.')">Delete Account</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/manager.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   Happy Delivery — Settings Page (Dashboard-styled)
+   API routes served by managerWeb.js:
+     PUT /api/manager/settings/profile
+     PUT /api/manager/settings/password
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const API = '/manager/api';
+
+// ── Tab switching ───────────────────────────────────────────────────────
+document.querySelectorAll('.settings-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const settingsId = tab.dataset.settings;
+    document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+    document.getElementById('settings-' + settingsId).classList.add('active');
+  });
+});
+
+// ── Dropdown ──────────────────────────────────────────────────────────
+function toggleDropdown(btn) {
+  const dropdown = btn.closest('.dropdown');
+  document.querySelectorAll('.dropdown').forEach(d => {
+    if (d !== dropdown) d.classList.remove('active');
+  });
+  dropdown.classList.toggle('active');
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.dropdown')) {
+    document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('active'));
+  }
+});
+
+// ── Toast ─────────────────────────────────────────────────────────────
+function showToast(title, description, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  const borderColors = {
+    info: 'hsl(var(--primary))',
+    success: 'hsl(142.1 76.2% 36.3%)',
+    danger: 'hsl(var(--destructive))',
+    warning: '#b45309'
+  };
+  toast.style.borderLeft = `4px solid ${borderColors[type] || borderColors.info}`;
+  toast.innerHTML = `
+    <div class="toast-title">${escHtml(title)}</div>
+    <div class="toast-description">${escHtml(description)}</div>
+  `;
+  container.appendChild(toast);
+  setTimeout(() => toast.classList.add('show'), 10);
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
+// ── Switch toggle ─────────────────────────────────────────────────────
+function toggleSwitch(el) {
+  el.classList.toggle('active');
+}
+
+// ── Save Profile ──────────────────────────────────────────────────────
+async function saveProfile(e) {
+  e.preventDefault();
+  const btn = document.getElementById('profileBtn');
+  btn.classList.add('btn-loading');
+
+  const payload = {
+    first_name: document.getElementById('firstName').value.trim(),
+    last_name:  document.getElementById('lastName').value.trim(),
+    email:      document.getElementById('email').value.trim().toLowerCase(),
+  };
+
+  try {
+    const res = await fetch(`${API}/settings/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to update profile');
+    }
+
+    // Update sidebar initials
+    const initials = (payload.first_name[0] || 'M') + (payload.last_name[0] || '');
+    document.querySelectorAll('.avatar').forEach(av => {
+      if (!av.querySelector('img')) av.textContent = initials;
+    });
+    document.querySelectorAll('.sidebar-user-name').forEach(el => {
+      el.textContent = `${payload.first_name} ${payload.last_name}`;
+    });
+
+    showToast('Profile updated', 'Your profile has been saved successfully.', 'success');
+  } catch (err) {
+    console.error('[saveProfile]', err);
+    showToast('Error', err.message, 'danger');
+  } finally {
+    btn.classList.remove('btn-loading');
+  }
+}
+
+// ── Change Password ─────────────────────────────────────────────────────
+async function changePassword(e) {
+  e.preventDefault();
+  const btn = document.getElementById('passwordBtn');
+  btn.classList.add('btn-loading');
+
+  const current = document.getElementById('currentPassword').value;
+  const newPass = document.getElementById('newPassword').value;
+  const confirm = document.getElementById('confirmPassword').value;
+
+  if (newPass !== confirm) {
+    showToast('Error', 'New passwords do not match.', 'danger');
+    btn.classList.remove('btn-loading');
+    return;
+  }
+  if (newPass.length < 8) {
+    showToast('Error', 'Password must be at least 8 characters.', 'danger');
+    btn.classList.remove('btn-loading');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/settings/password`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ current_password: current, new_password: newPass }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to update password');
+    }
+
+    document.getElementById('passwordForm').reset();
+    showToast('Password updated', 'Your password has been changed successfully.', 'success');
+  } catch (err) {
+    console.error('[changePassword]', err);
+    showToast('Error', err.message, 'danger');
+  } finally {
+    btn.classList.remove('btn-loading');
+  }
+}
+
+// ── Save Notification Preferences ───────────────────────────────────────
+function saveNotificationPrefs() {
+  const prefs = {};
+  document.querySelectorAll('.switch[data-pref]').forEach(sw => {
+    prefs[sw.dataset.pref] = sw.classList.contains('active');
+  });
+  // Store locally for now; backend endpoint can be added later
+  localStorage.setItem('hd_notification_prefs', JSON.stringify(prefs));
+  showToast('Preferences saved', 'Your notification settings have been updated.', 'success');
+}
+
+// ── Load saved notification prefs ───────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('hd_notification_prefs') || '{}');
+    Object.entries(saved).forEach(([key, val]) => {
+      const sw = document.querySelector(`.switch[data-pref="${key}"]`);
+      if (sw) sw.classList.toggle('active', val);
+    });
+  } catch (e) { /* ignore */ }
+});
+
+// ── Helpers ─────────────────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+
+</body>
+</html>
