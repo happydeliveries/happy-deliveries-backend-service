@@ -700,7 +700,7 @@ class Driver {
         AND o.payment_status = 'completed'
         AND o.driver_id IS NULL
         AND d.is_available = true
-        AND d.is_approved = true
+        AND (d.approval_status = 'approved' OR d.approval_status IS NULL)
         AND (
           d.current_location IS NULL
           OR r.location IS NULL

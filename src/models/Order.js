@@ -1052,7 +1052,7 @@ class Order {
 
       // Lock and validate driver status to prevent accepting multiple simultaneous orders
       const driverCheck = await client.query(
-        `SELECT d.id, d.is_approved, d.current_status, u.is_active
+        `SELECT d.id, d.approval_status, d.current_status, u.is_active
          FROM drivers d
          JOIN users u ON d.user_id = u.id
          WHERE d.id = $1
@@ -1064,7 +1064,8 @@ class Order {
         throw new Error('Driver profile not found');
       }
       const driverRow = driverCheck.rows[0];
-      if (!driverRow.is_approved || !driverRow.is_active) {
+      const isApproved = !driverRow.approval_status || driverRow.approval_status === 'approved';
+      if (!isApproved || !driverRow.is_active) {
         throw new Error('Driver account is not active or approved');
       }
       
@@ -1184,7 +1185,7 @@ class Order {
           `SELECT COUNT(*)::int AS available_count
            FROM drivers d
            JOIN users u ON d.user_id = u.id
-           WHERE d.is_approved = true
+           WHERE (d.approval_status = 'approved' OR d.approval_status IS NULL)
              AND u.is_active = true
              AND d.is_available = true
              AND NOT (d.id = ANY(COALESCE($1::uuid[], '{}'::uuid[])))`,
