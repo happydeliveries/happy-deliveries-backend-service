@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const Payment = require('../models/Payment');
 const Order = require('../models/Order');
 const Customer = require('../models/Customer');
+const { sanitizeOrderForDriver } = require('../utils/driverOrderSanitizer');
 
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 
@@ -101,12 +102,14 @@ async function finalizeOrderPayment({
 
   const io = app?.get('io');
   if (io) {
+    const sanitizedForDriver = sanitizeOrderForDriver(updatedOrder);
     io.to('drivers').emit('new_order', {
       orderId: updatedOrder.id,
       restaurantName: order.restaurant_name || 'Restaurant',
-      total: updatedOrder.total_amount,
+      total: null,
+      pricing_hidden: true,
       order_number: updatedOrder.order_number,
-      order: updatedOrder,
+      order: sanitizedForDriver,
     });
 
     io.to('restaurant_managers').emit('order_updated', {

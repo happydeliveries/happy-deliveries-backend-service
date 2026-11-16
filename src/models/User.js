@@ -36,14 +36,31 @@ class User {
     return result.rows[0];
   }
 
-  // Update user
+  // Update user (never return password_hash)
   static async update(id, updateData) {
-    const fields = Object.keys(updateData);
-    const values = Object.values(updateData);
-    
-    const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ');
-    const query = `UPDATE users SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`;
-    
+    const allowedFields = ['first_name', 'last_name', 'phone_number', 'profile_image_url'];
+    const entries = Object.entries(updateData || {}).filter(
+      ([field, val]) => allowedFields.includes(field) && val !== undefined
+    );
+
+    if (entries.length === 0) {
+      const existing = await db.query(
+        `SELECT id, email, phone_number, role, first_name, last_name, profile_image_url, is_active, created_at, updated_at
+         FROM users WHERE id = $1`,
+        [id]
+      );
+      return existing.rows[0];
+    }
+
+    const setClause = entries.map(([field], index) => `${field} = $${index + 2}`).join(', ');
+    const values = entries.map(([, val]) => val);
+    const query = `
+      UPDATE users
+      SET ${setClause}, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING id, email, phone_number, role, first_name, last_name, profile_image_url, is_active, created_at, updated_at
+    `;
+
     const result = await db.query(query, [id, ...values]);
     return result.rows[0];
   }

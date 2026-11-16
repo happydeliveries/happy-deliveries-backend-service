@@ -81,16 +81,35 @@ class Restaurant {
 
   static async search(lat, lng, filters = {}) {
   try {
-    const { cuisine, minRating, maxDistance = 90 } = filters;
-    
+    const {
+      cuisine,
+      category,
+      query: searchText,
+      minRating,
+      isOpen,
+      maxDistance = 90
+    } = filters;
+
     // Standardize radius to meters (90km = 90000 meters)
-    const radiusMeters = maxDistance * 1000; 
-    
+    const radiusMeters = (Number(maxDistance) || 90) * 1000;
+
     let query = `
       SELECT 
         r.id, r.name, r.description, r.cuisine_type, r.address, 
-        r.total_ratings, r.logo_url, r.cover_image_url, r.opening_hours, r.preparation_time_minutes,
+        r.average_rating, r.total_ratings, r.is_accepting_orders,
+        r.logo_url, r.cover_image_url, r.opening_hours, r.preparation_time_minutes,
         r.delivery_radius_km,
+        COALESCE(
+          (
+            SELECT ARRAY_AGG(DISTINCT TRIM(mi.category))
+            FROM menu_items mi
+            WHERE mi.restaurant_id = r.id
+              AND mi.is_available = true
+              AND mi.category IS NOT NULL
+              AND TRIM(mi.category) <> ''
+          ),
+          ARRAY[]::text[]
+        ) as food_categories,
         ST_X(r.location::geometry) as longitude, -- Extract as float
         ST_Y(r.location::geometry) as latitude,  -- Extract as float
         ST_Distance(
@@ -105,15 +124,79 @@ class Restaurant {
       ) <= LEAST($3::numeric, COALESCE(r.delivery_radius_km * 1000, $3)::numeric)
     `;
 
-    const values = [lng, lat, radiusMeters]; // Always [Longitude, Latitude] for PostGIS
+    const values = [Number(lng), Number(lat), radiusMeters]; // Always [Longitude, Latitude] for PostGIS
 
-    // Optional: Add cuisine filter if provided
-    if (cuisine) {
-      query += ` AND $4 = ANY(r.cuisine_type)`;
-      values.push(cuisine);
+    const addParam = (val) => {
+      values.push(val);
+      return `$${values.length}`;
+    };
+
+    if (category && String(category).trim()) {
+      const catExact = String(category).trim();
+      const pExact = addParam(catExact);
+      const pLike = addParam(`%${catExact}%`);
+      query += `
+        AND (
+          EXISTS (
+            SELECT 1 FROM menu_items mi
+            WHERE mi.restaurant_id = r.id
+              AND mi.is_available = true
+              AND (LOWER(TRIM(mi.category)) = LOWER(TRIM(${pExact})) OR mi.category ILIKE ${pLike})
+          )
+          OR COALESCE(r.cuisine_type::text, '') ILIKE ${pLike}
+        )
+      `;
     }
 
-    query += ` ORDER BY distance_meters ASC`;
+    const cuisineList = Array.isArray(cuisine)
+      ? cuisine.map(c => String(c).trim()).filter(Boolean)
+      : typeof cuisine === 'string' && cuisine.trim()
+        ? cuisine.split(',').map(c => c.trim()).filter(Boolean)
+        : [];
+
+    if (cuisineList.length > 0) {
+      const cuisineClauses = cuisineList.map((c) => {
+        const pLike = addParam(`%${c}%`);
+        return `(
+          COALESCE(r.cuisine_type::text, '') ILIKE ${pLike}
+          OR EXISTS (
+            SELECT 1 FROM menu_items mi
+            WHERE mi.restaurant_id = r.id
+              AND mi.is_available = true
+              AND mi.category ILIKE ${pLike}
+          )
+        )`;
+      });
+      query += ` AND (${cuisineClauses.join(' OR ')})`;
+    }
+
+    if (searchText && String(searchText).trim()) {
+      const pSearch = addParam(`%${String(searchText).trim()}%`);
+      query += `
+        AND (
+          r.name ILIKE ${pSearch}
+          OR COALESCE(r.description, '') ILIKE ${pSearch}
+          OR COALESCE(r.cuisine_type::text, '') ILIKE ${pSearch}
+          OR EXISTS (
+            SELECT 1 FROM menu_items mi
+            WHERE mi.restaurant_id = r.id
+              AND mi.is_available = true
+              AND (mi.name ILIKE ${pSearch} OR COALESCE(mi.category, '') ILIKE ${pSearch})
+          )
+        )
+      `;
+    }
+
+    if (minRating !== null && minRating !== undefined && Number.isFinite(Number(minRating))) {
+      const pRating = addParam(Number(minRating));
+      query += ` AND COALESCE(r.average_rating, 0) >= ${pRating}`;
+    }
+
+    if (isOpen === true) {
+      query += ` AND r.is_accepting_orders = true`;
+    }
+
+    query += ` ORDER BY COALESCE(r.is_accepting_orders, true) DESC, distance_meters ASC`;
 
     const result = await db.query(query, values);
     return result.rows;

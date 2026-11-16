@@ -5,7 +5,7 @@ const db = require('../config/database');
 
 exports.getPopularItems = async (req, res) => {
   try {
-    const { lat, lng, radius = 10 } = req.query;
+    const { lat, lng, radius = 90, limit = 20 } = req.query;
     
     if (!lat || !lng) {
       return res.status(400).json({
@@ -14,10 +14,10 @@ exports.getPopularItems = async (req, res) => {
       });
     }
 
-    // Get popular items (you might want to implement popularity logic)
-    const items = await Menu.searchItems('', parseFloat(lat), parseFloat(lng), {
-      minRating: 4.0,
-      limit: 20
+    // Strictly fetch items marked is_popular = true
+    const items = await Menu.getPopularItems(parseFloat(lat), parseFloat(lng), {
+      radiusKm: parseFloat(radius) || 90,
+      limit: parseInt(limit, 10) || 20
     });
 
     res.json({
@@ -35,7 +35,7 @@ exports.getPopularItems = async (req, res) => {
 
 exports.searchItems = async (req, res) => {
   try {
-    const { q, lat, lng, radius = 10 } = req.query;
+    const { q, lat, lng, radius = 90 } = req.query;
     
     if (!lat || !lng) {
       return res.status(400).json({
@@ -48,7 +48,7 @@ exports.searchItems = async (req, res) => {
       q || '',
       parseFloat(lat),
       parseFloat(lng),
-      { radiusKm: radius }
+      { radiusKm: parseFloat(radius) || 90 }
     );
 
     res.json({

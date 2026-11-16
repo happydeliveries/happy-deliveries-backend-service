@@ -2,6 +2,7 @@ const db = require('../config/database');
 const crypto = require('crypto');
 const Payment = require('./Payment');
 const { emitOrderUpdate, emitUserEvent, emitDriverLocation, emitManagerEvent } = require('../socket');
+const { sanitizeOrderForDriver } = require('../utils/driverOrderSanitizer');
 
 function normalizePointCoords(pt) {
   if (!pt) return null;
@@ -283,7 +284,8 @@ class Order {
         d.last_location_update as driver_last_location_update,
         o.verification_code,
         o.code_expires_at,
-        o.code_used_at
+        o.code_used_at,
+        (SELECT e.net_amount FROM earnings e WHERE e.order_id = o.id LIMIT 1) as driver_earnings
       FROM orders o
       LEFT JOIN restaurants r ON o.restaurant_id = r.id
       LEFT JOIN customers cust ON o.customer_id = cust.id
@@ -583,6 +585,8 @@ class Order {
 
       await client.query('COMMIT');
 
+      updatedOrder.driver_earnings = driverEarnings;
+
       if (emitOrderUpdate) {
         emitOrderUpdate(updatedOrder.id, {
           type: 'delivery_code_verified',
@@ -798,7 +802,7 @@ class Order {
     }
   }
 
-  // Customer cancels order (allowed while pending or ordering_at_restaurant before driver pickup)
+  // Customer cancels order (allowed before driver pickup: pending, ordering_at_restaurant, order_ready, accepted_by_driver)
   static async cancelByCustomer(orderId, userId, reason = 'Cancelled by customer') {
     const client = await db.pool.connect();
 
@@ -822,8 +826,8 @@ class Order {
       if (existingOrder.status === 'cancelled') {
         throw new Error('Order is already cancelled');
       }
-      if (!['pending', 'ordering_at_restaurant'].includes(existingOrder.status) || existingOrder.driver_id) {
-        throw new Error('Order cannot be cancelled after preparation is complete or a driver has been assigned');
+      if (!['pending', 'ordering_at_restaurant', 'order_ready', 'accepted_by_driver'].includes(existingOrder.status)) {
+        throw new Error('Order cannot be cancelled once the driver has picked it up');
       }
 
       const updateRes = await client.query(
@@ -845,6 +849,20 @@ class Order {
         [orderId]
       );
 
+      let assignedDriverUserId = null;
+      if (existingOrder.driver_id) {
+        const driverRes = await client.query(
+          `SELECT user_id FROM drivers WHERE id = $1`,
+          [existingOrder.driver_id]
+        );
+        assignedDriverUserId = driverRes.rows[0]?.user_id || null;
+
+        await client.query(
+          `UPDATE drivers SET current_status = 'available', is_available = true WHERE id = $1`,
+          [existingOrder.driver_id]
+        );
+      }
+
       await client.query('COMMIT');
 
       if (existingOrder.payment_status === 'completed') {
@@ -858,6 +876,34 @@ class Order {
           order: updatedOrder,
           new_status: 'cancelled',
         });
+      }
+
+      if (emitManagerEvent && existingOrder.restaurant_id) {
+        emitManagerEvent(existingOrder.restaurant_id, 'order_updated', {
+          order_id: orderId,
+          order_number: existingOrder.order_number,
+          status: 'cancelled',
+          reason,
+        });
+      }
+
+      if (assignedDriverUserId) {
+        if (emitUserEvent) {
+          emitUserEvent(assignedDriverUserId, 'order_cancelled_by_customer', {
+            order_id: orderId,
+            order_number: existingOrder.order_number,
+            status: 'cancelled',
+            message: 'The customer cancelled this order before pickup.',
+          });
+        }
+        await this.createNotification(
+          assignedDriverUserId,
+          'driver',
+          'Order Cancelled',
+          `Order #${existingOrder.order_number || orderId.slice(0, 8)} was cancelled by the customer before pickup.`,
+          'order_cancelled',
+          { order_id: orderId, status: 'cancelled' }
+        ).catch(() => {});
       }
 
       return updatedOrder;
@@ -1427,11 +1473,12 @@ class Order {
         break;
       case 'driver':
         baseQuery = `
-          SELECT o.*, r.name as restaurant_name, c.first_name as customer_first_name
+          SELECT o.*, r.name as restaurant_name, c.first_name as customer_first_name, e.net_amount as driver_earnings
           FROM orders o
           JOIN restaurants r ON o.restaurant_id = r.id
           JOIN customers cust ON o.customer_id = cust.id
           JOIN users c ON cust.user_id = c.id
+          LEFT JOIN earnings e ON e.order_id = o.id
           WHERE o.driver_id = (SELECT id FROM drivers WHERE user_id = $1)
         `;
         params.push(userId);

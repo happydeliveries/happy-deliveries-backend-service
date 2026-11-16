@@ -2,6 +2,7 @@ const Order = require('../models/Order');
 const Customer = require('../models/Customer');
 const Driver = require('../models/Driver');
 const db = require('../config/database');
+const { sanitizeOrderForDriver, sanitizeOrderItemsForDriver } = require('../utils/driverOrderSanitizer');
 
 // Create order
 exports.createOrder = async (req, res) => {
@@ -56,17 +57,23 @@ exports.getOrder = async (req, res) => {
     
     const items = await Order.getOrderItems(req.params.id);
 
-    if (req.user.role !== 'customer') {
-      delete order.verification_code;
-      delete order.code_expires_at;
-      delete order.code_used_at;
+    let responseOrder = order;
+    let responseItems = items;
+
+    if (req.user.role === 'driver') {
+      responseOrder = sanitizeOrderForDriver(order);
+      responseItems = sanitizeOrderItemsForDriver(items, order.status);
+    } else if (req.user.role !== 'customer') {
+      delete responseOrder.verification_code;
+      delete responseOrder.code_expires_at;
+      delete responseOrder.code_used_at;
     }
     
     res.json({
       success: true,
       data: {
-        ...order,
-        items
+        ...responseOrder,
+        items: responseItems
       }
     });
   } catch (error) {
@@ -97,7 +104,9 @@ exports.getMyOrders = async (req, res) => {
       filters
     );
 
-    if (req.user.role !== 'customer') {
+    if (req.user.role === 'driver') {
+      orders = orders.map(sanitizeOrderForDriver);
+    } else if (req.user.role !== 'customer') {
       orders = orders.map((order) => {
         const filteredOrder = { ...order };
         delete filteredOrder.verification_code;
@@ -135,7 +144,7 @@ exports.verifyDeliveryCode = async (req, res) => {
 
     res.json({
       success: true,
-      data: order
+      data: sanitizeOrderForDriver(order)
     });
   } catch (error) {
     console.error('Verify delivery code error:', error);
@@ -157,7 +166,7 @@ exports.acceptOrder = async (req, res) => {
     
     res.json({
       success: true,
-      data: order
+      data: sanitizeOrderForDriver(order)
     });
   } catch (error) {
     console.error('Accept order error:', error);
@@ -310,7 +319,7 @@ exports.updateOrderStatus = async (req, res) => {
     
     res.json({
       success: true,
-      data: updatedOrder
+      data: userRole === 'driver' ? sanitizeOrderForDriver(updatedOrder) : updatedOrder
     });
   } catch (error) {
     console.error('Update order status error:', error);

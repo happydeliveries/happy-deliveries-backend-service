@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { sanitizeOrderForDriver } = require('../utils/driverOrderSanitizer');
 
 let schemaChecked = false;
 
@@ -650,21 +651,17 @@ class Driver {
       SELECT 
         o.*, 
         r.name as restaurant_name,
-        r.address as restaurant_address
+        r.address as restaurant_address,
+        e.net_amount as driver_earnings
       FROM orders o
       JOIN restaurants r ON o.restaurant_id = r.id
+      LEFT JOIN earnings e ON e.order_id = o.id AND e.driver_id = $1
       WHERE o.driver_id = $1
       ORDER BY o.placed_at DESC
     `;
     
     const result = await db.query(query, [driverId]);
-    return result.rows.map(row => {
-      const copy = { ...row };
-      delete copy.verification_code;
-      delete copy.code_expires_at;
-      delete copy.code_used_at;
-      return copy;
-    });
+    return result.rows.map(sanitizeOrderForDriver);
   }
 
   // Get available orders for driver (only paid orders that have been accepted by manager and not yet taken)
@@ -716,13 +713,7 @@ class Driver {
       LIMIT 10
     `;
     const result = await db.query(query, [driverId]);
-    return result.rows.map(row => {
-      const copy = { ...row };
-      delete copy.verification_code;
-      delete copy.code_expires_at;
-      delete copy.code_used_at;
-      return copy;
-    });
+    return result.rows.map(sanitizeOrderForDriver);
   }
 }
 

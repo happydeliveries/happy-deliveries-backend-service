@@ -70,7 +70,7 @@ exports.updateRestaurant = async (req, res) => {
 // Search restaurants
 exports.searchRestaurants = async (req, res) => {
   try {
-    const { lat, lng, cuisine, minRating, maxDistance, isOpen } = req.query;
+    const { lat, lng, cuisine, category, query, q, minRating, maxDistance, isOpen } = req.query;
     
     if (!lat || !lng) {
       return res.status(400).json({
@@ -81,8 +81,10 @@ exports.searchRestaurants = async (req, res) => {
     
     const filters = {
       cuisine: cuisine ? cuisine.split(',') : null,
+      category: category || null,
+      query: query || q || null,
       minRating: minRating ? parseFloat(minRating) : null,
-      maxDistance: maxDistance ? parseFloat(maxDistance) : 10,
+      maxDistance: maxDistance ? parseFloat(maxDistance) : 90,
       isOpen: isOpen === 'true'
     };
     
@@ -308,19 +310,27 @@ exports.updateMenuItem = async (req, res) => {
 
 exports.getHomeFeed = async (req, res) => {
   try {
-    const [menus, items] = await Promise.all([
+    const { lat, lng, maxDistance } = req.query;
+    const parsedLat = lat !== undefined ? parseFloat(lat) : null;
+    const parsedLng = lng !== undefined ? parseFloat(lng) : null;
+    const radiusKm = maxDistance ? parseFloat(maxDistance) : 90;
+
+    const [categories, items, menus] = await Promise.all([
+      Menu.getFoodCategories(parsedLat, parsedLng, radiusKm),
+      Menu.getAllDiscoveryItems(24, parsedLat, parsedLng, radiusKm), // Strictly is_popular = true items
       Menu.getDiscoveryMenus(8),
-      Menu.getAllDiscoveryItems(10) // Fetches all items, no discount needed
     ]);
 
     // Log the counts on the server side for debugging
-    console.log(`Feed generated: ${menus.length} menus, ${items.length} items.`);
+    console.log(`Feed generated: ${categories.length} categories, ${items.length} popular items.`);
 
     res.json({
       success: true,
       data: { 
-        menus, 
-        discounts: items // Keeping key as 'discounts' to avoid breaking frontend state
+        categories,
+        popularItems: items,
+        discounts: items, // Backward-compatible alias populated strictly with popular items
+        menus
       }
     });
   } catch (error) {
@@ -331,19 +341,16 @@ exports.getHomeFeed = async (req, res) => {
 
 exports.searchFood = async (req, res) => {
   try {
-    const { query, lat, lng } = req.query;
-    
-    if (!query || query.length < 2) {
-      return res.json({ success: true, data: [] });
-    }
+    const { query, q, lat, lng, radius = 90 } = req.query;
+    const searchTerm = (query ?? q ?? '').toString().trim();
+    const parsedLat = lat !== undefined ? parseFloat(lat) : null;
+    const parsedLng = lng !== undefined ? parseFloat(lng) : null;
+    const parsedRadius = parseFloat(radius) || 90;
 
-    // Call the static method from your Menu model
-    const items = await Menu.searchItems(
-      query, 
-      parseFloat(lat), 
-      parseFloat(lng), 
-      20 // Default 20km radius for food search
-    );
+    // Return popular nearby dishes when search input is empty so Dishes tab stays populated
+    const items = searchTerm.length < 1
+      ? await Menu.getPopularItems(parsedLat, parsedLng, { radiusKm: parsedRadius, limit: 30 })
+      : await Menu.searchItems(searchTerm, parsedLat, parsedLng, { radiusKm: parsedRadius, limit: 50 });
 
     res.json({
       success: true,

@@ -212,31 +212,86 @@ class Menu {
   }
 
   // Search menu items (PostGIS distance enabled)
-  static async searchItems(searchTerm, lat, lng, radiusKm = 5) {
+  static async searchItems(searchTerm, lat, lng, optionsOrRadius = 20) {
+    const opts = typeof optionsOrRadius === 'object' && optionsOrRadius !== null
+      ? optionsOrRadius
+      : { radiusKm: optionsOrRadius };
+    const radiusKm = Number.isFinite(Number(opts.radiusKm)) ? Number(opts.radiusKm) : 20;
+    const limit = Number.isFinite(Number(opts.limit)) ? Number(opts.limit) : 50;
+    const minRating = Number.isFinite(Number(opts.minRating)) ? Number(opts.minRating) : null;
+    const popularOnly = opts.popularOnly === true;
+    const hasCoords = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+    const term = typeof searchTerm === 'string' ? searchTerm.trim() : '';
+
+    const values = [];
+    let paramIdx = 1;
+
+    let distanceSelect = 'NULL::double precision as distance_meters';
+    let distanceWhere = '';
+    if (hasCoords) {
+      values.push(Number(lng), Number(lat), radiusKm);
+      distanceSelect = `
+        ST_Distance(
+          r.location::geography,
+          ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+        ) as distance_meters
+      `;
+      distanceWhere = `
+        AND ST_DWithin(
+          r.location::geography,
+          ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+          $3 * 1000
+        )
+      `;
+      paramIdx = 4;
+    }
+
+    let termWhere = '';
+    if (term) {
+      values.push(`%${term}%`);
+      termWhere = `
+        AND (
+          mi.name ILIKE $${paramIdx}
+          OR COALESCE(mi.description, '') ILIKE $${paramIdx}
+          OR COALESCE(mi.category, '') ILIKE $${paramIdx}
+          OR r.name ILIKE $${paramIdx}
+        )
+      `;
+      paramIdx += 1;
+    }
+
+    let ratingWhere = '';
+    if (minRating !== null) {
+      values.push(minRating);
+      ratingWhere = ` AND COALESCE(r.average_rating, 0) >= $${paramIdx}`;
+      paramIdx += 1;
+    }
+
+    const popularWhere = popularOnly ? ' AND mi.is_popular = true' : '';
+    values.push(limit);
+
     const query = `
       SELECT 
         mi.*,
+        r.id as restaurant_id,
         r.name as restaurant_name,
+        r.logo_url as restaurant_logo,
         r.average_rating as restaurant_rating,
-        ST_Distance(
-          r.location::geography,
-          ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography
-        ) as distance_meters
+        r.is_accepting_orders,
+        ${distanceSelect}
       FROM menu_items mi
       JOIN restaurants r ON mi.restaurant_id = r.id
-      WHERE (mi.name ILIKE $1 OR mi.description ILIKE $1)
-        AND mi.is_available = true
+      WHERE mi.is_available = true
         AND r.is_active = true
-        AND ST_DWithin(
-          r.location::geography,
-          ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
-          $4 * 1000
-        )
-      ORDER BY distance_meters ASC
-      LIMIT 50
+        ${distanceWhere}
+        ${termWhere}
+        ${ratingWhere}
+        ${popularWhere}
+      ORDER BY ${hasCoords ? 'distance_meters ASC,' : ''} mi.is_popular DESC, mi.created_at DESC
+      LIMIT $${paramIdx}
     `;
-    
-    const result = await db.query(query, [`%${searchTerm}%`, lng, lat, radiusKm]);
+
+    const result = await db.query(query, values);
     return result.rows;
   }
 
@@ -302,39 +357,61 @@ class Menu {
     return result.rows;
   }
 
-  // Get popular items (high rated, frequently ordered)
+  // Get popular items (strictly items marked popular)
   static async getPopularItems(lat, lng, filters = {}) {
-    const { radiusKm = 10, limit = 20 } = filters;
+    const { radiusKm = 20, limit = 20 } = filters;
+    const hasCoords = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+    const values = hasCoords ? [Number(lng), Number(lat), Number(radiusKm) || 20, limit] : [limit];
 
-    const query = `
-      SELECT
-        mi.*,
-        r.name as restaurant_name,
-        r.logo_url as restaurant_logo,
-        r.average_rating as restaurant_rating,
-        ST_Distance(
-          r.location::geography,
-          ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
-        ) as distance_meters
-      FROM menu_items mi
-      JOIN restaurants r ON mi.restaurant_id = r.id
-      WHERE mi.is_available = true
-        AND r.is_active = true
-        AND r.is_accepting_orders = true
-        AND ST_DWithin(
-          r.location::geography,
-          ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
-          $3 * 1000
-        )
-      ORDER BY
-        -- Add your popularity logic here (ratings, order count, etc.)
-        mi.is_popular DESC,
-        restaurant_rating DESC,
-        distance_meters ASC
-      LIMIT $4
-    `;
+    const query = hasCoords
+      ? `
+        SELECT
+          mi.*,
+          r.id as restaurant_id,
+          r.name as restaurant_name,
+          r.logo_url as restaurant_logo,
+          r.average_rating as restaurant_rating,
+          r.is_accepting_orders,
+          ST_Distance(
+            r.location::geography,
+            ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+          ) as distance_meters
+        FROM menu_items mi
+        JOIN restaurants r ON mi.restaurant_id = r.id
+        WHERE mi.is_available = true
+          AND mi.is_popular = true
+          AND r.is_active = true
+          AND ST_DWithin(
+            r.location::geography,
+            ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+            $3 * 1000
+          )
+        ORDER BY
+          COALESCE(r.average_rating, 0) DESC,
+          distance_meters ASC,
+          mi.created_at DESC
+        LIMIT $4
+      `
+      : `
+        SELECT
+          mi.*,
+          r.id as restaurant_id,
+          r.name as restaurant_name,
+          r.logo_url as restaurant_logo,
+          r.average_rating as restaurant_rating,
+          r.is_accepting_orders
+        FROM menu_items mi
+        JOIN restaurants r ON mi.restaurant_id = r.id
+        WHERE mi.is_available = true
+          AND mi.is_popular = true
+          AND r.is_active = true
+        ORDER BY
+          COALESCE(r.average_rating, 0) DESC,
+          mi.created_at DESC
+        LIMIT $1
+      `;
 
-    const result = await db.query(query, [lng, lat, radiusKm, limit]);
+    const result = await db.query(query, values);
     return result.rows;
   }
 
@@ -419,20 +496,98 @@ class Menu {
     return result.rows;
   }
 
-  static async getAllDiscoveryItems(limit = 10) {
+  static async getFoodCategories(lat = null, lng = null, maxDistance = 90) {
+    const hasCoords = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+    const radiusMeters = (Number(maxDistance) || 90) * 1000;
+    const values = hasCoords ? [Number(lng), Number(lat), radiusMeters] : [];
+
+    const distanceCondition = hasCoords
+      ? `
+        AND ST_Distance(
+          r.location::geography,
+          ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+        ) <= LEAST($3::numeric, COALESCE(r.delivery_radius_km * 1000, $3)::numeric)
+      `
+      : '';
+
+    const query = `
+      WITH normalized AS (
+        SELECT
+          LOWER(TRIM(mi.category)) AS slug,
+          TRIM(mi.category) AS display_name,
+          r.id AS restaurant_id,
+          NULLIF(TRIM(mi.image_url), '') AS item_image,
+          NULLIF(TRIM(r.cover_image_url), '') AS restaurant_cover
+        FROM menu_items mi
+        JOIN restaurants r ON mi.restaurant_id = r.id
+        WHERE mi.is_available = true
+          AND r.is_active = true
+          AND mi.category IS NOT NULL
+          AND TRIM(mi.category) <> ''
+          ${distanceCondition}
+      )
+      SELECT
+        MAX(display_name) AS name,
+        slug,
+        COUNT(*)::int AS item_count,
+        COUNT(DISTINCT restaurant_id)::int AS restaurant_count,
+        ARRAY_AGG(DISTINCT restaurant_id) AS restaurant_ids,
+        COALESCE(MAX(item_image), MAX(restaurant_cover)) AS image_url
+      FROM normalized
+      GROUP BY slug
+      ORDER BY restaurant_count DESC, item_count DESC, name ASC
+    `;
+
+    const result = await db.query(query, values);
+    return result.rows;
+  }
+
+  static async getAllDiscoveryItems(limit = 20, lat = null, lng = null, maxDistance = 90) {
+    const hasCoords = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+    const radiusMeters = (Number(maxDistance) || 90) * 1000;
+    const values = hasCoords ? [Number(lng), Number(lat), radiusMeters, limit] : [limit];
+
+    const distanceSelect = hasCoords
+      ? `
+        ST_Distance(
+          r.location::geography,
+          ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+        ) as distance_meters,
+      `
+      : '';
+
+    const distanceCondition = hasCoords
+      ? `
+        AND ST_Distance(
+          r.location::geography,
+          ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+        ) <= LEAST($3::numeric, COALESCE(r.delivery_radius_km * 1000, $3)::numeric)
+      `
+      : '';
+
+    const limitParam = hasCoords ? '$4' : '$1';
+
     const query = `
       SELECT 
         mi.id, mi.menu_id, mi.name, mi.description, mi.price, mi.discounted_price, mi.image_url,
         mi.category, mi.is_veg, mi.is_popular, mi.calories, mi.preparation_time_minutes,
         mi.ingredients, mi.customizations, mi.tags,
-        r.id as restaurant_id, r.name as restaurant_name
+        ${distanceSelect}
+        r.id as restaurant_id,
+        r.name as restaurant_name,
+        r.logo_url as restaurant_logo,
+        r.average_rating as restaurant_rating,
+        r.is_accepting_orders
       FROM menu_items mi
       JOIN restaurants r ON mi.restaurant_id = r.id
-      WHERE mi.is_available = true AND r.is_active = true
-      ORDER BY CASE WHEN mi.is_popular = true THEN 0 ELSE 1 END, mi.created_at DESC
-      LIMIT $1
+      WHERE mi.is_available = true
+        AND mi.is_popular = true
+        AND r.is_active = true
+        ${distanceCondition}
+      ORDER BY ${hasCoords ? 'distance_meters ASC,' : ''} COALESCE(r.average_rating, 0) DESC, mi.created_at DESC
+      LIMIT ${limitParam}
     `;
-    const result = await db.query(query, [limit]);
+    const result = await db.query(query, values);
     return result.rows;
   }
 }

@@ -27,23 +27,93 @@ class Customer {
     return result.rows[0];
   }
 
+  // Ensure customer row exists for a user ID
+  static async getOrCreateByUserId(userId) {
+    let customer = await this.findByUserId(userId);
+    if (!customer) {
+      await this.create(userId);
+      customer = await this.findByUserId(userId);
+    }
+    return customer;
+  }
+
   // Add delivery address
   static async addDeliveryAddress(customerId, address) {
-    const query = `
-      UPDATE customers 
-      SET delivery_addresses = delivery_addresses || $2::jsonb,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = $1
-      RETURNING delivery_addresses
-    `;
-    
-    const result = await db.query(query, [customerId, JSON.stringify([address])]);
+    const normalizedAddress = {
+      id: address.id || `addr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      label: address.label || 'Home',
+      street: address.street || address.address || '',
+      city: address.city || '',
+      postal_code: address.postal_code || '',
+      instructions: address.instructions || '',
+      latitude: Number.isFinite(Number(address.latitude)) ? Number(address.latitude) : undefined,
+      longitude: Number.isFinite(Number(address.longitude)) ? Number(address.longitude) : undefined,
+      is_default: Boolean(address.is_default),
+    };
+
+    const existingRes = await db.query(
+      'SELECT COALESCE(delivery_addresses, \'[]\'::jsonb) AS delivery_addresses FROM customers WHERE id = $1',
+      [customerId]
+    );
+    const current = Array.isArray(existingRes.rows[0]?.delivery_addresses)
+      ? existingRes.rows[0].delivery_addresses
+      : [];
+
+    const baseList = normalizedAddress.is_default || current.length === 0
+      ? current.map((a) => ({ ...a, is_default: false }))
+      : [...current];
+
+    if (current.length === 0) {
+      normalizedAddress.is_default = true;
+    }
+
+    const updated = [...baseList, normalizedAddress];
+
+    const result = await db.query(
+      `UPDATE customers
+       SET delivery_addresses = $2::jsonb,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING delivery_addresses`,
+      [customerId, JSON.stringify(updated)]
+    );
+    return result.rows[0];
+  }
+
+  // Remove delivery address by id or array index
+  static async removeDeliveryAddress(customerId, identifier) {
+    const existingRes = await db.query(
+      'SELECT COALESCE(delivery_addresses, \'[]\'::jsonb) AS delivery_addresses FROM customers WHERE id = $1',
+      [customerId]
+    );
+    const current = Array.isArray(existingRes.rows[0]?.delivery_addresses)
+      ? existingRes.rows[0].delivery_addresses
+      : [];
+
+    const filtered = current.filter((addr, idx) => {
+      if (addr && addr.id && String(addr.id) === String(identifier)) return false;
+      if (/^\d+$/.test(String(identifier)) && idx === parseInt(identifier, 10)) return false;
+      return true;
+    });
+
+    if (filtered.length > 0 && !filtered.some((a) => a && a.is_default)) {
+      filtered[0] = { ...filtered[0], is_default: true };
+    }
+
+    const result = await db.query(
+      `UPDATE customers
+       SET delivery_addresses = $2::jsonb,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING delivery_addresses`,
+      [customerId, JSON.stringify(filtered)]
+    );
     return result.rows[0];
   }
 
   // Update customer preferences
   static async updatePreferences(customerId, preferences) {
-    const { dietary_preferences, default_payment_method } = preferences;
+    const { dietary_preferences, default_payment_method } = preferences || {};
     const query = `
       UPDATE customers 
       SET 
@@ -54,7 +124,7 @@ class Customer {
       RETURNING *
     `;
     
-    const result = await db.query(query, [customerId, dietary_preferences, default_payment_method]);
+    const result = await db.query(query, [customerId, dietary_preferences ?? null, default_payment_method ?? null]);
     return result.rows[0];
   }
 
