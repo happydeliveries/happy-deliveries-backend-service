@@ -792,8 +792,12 @@
 
   // Real-time updates when a new driver registers
   try {
-    const socket = io();
-    socket.emit('join_manager_room');
+    const socket = io({ transports: ['websocket', 'polling'] });
+    const joinApplications = () => {
+      socket.emit('join_driver_applications');
+    };
+    joinApplications();
+    socket.on('connect', joinApplications);
     socket.on('new_driver_application', (payload) => {
       showToast(
         payload?.resubmitted ? 'Driver Application Resubmitted!' : 'New Driver Application Received!',

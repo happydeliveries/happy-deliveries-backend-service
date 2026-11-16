@@ -3,6 +3,7 @@ const Customer = require('../models/Customer');
 const Driver = require('../models/Driver');
 const db = require('../config/database');
 const { sanitizeOrderForDriver, sanitizeOrderItemsForDriver } = require('../utils/driverOrderSanitizer');
+const { emitManagerEvent, emitUserEvent } = require('../socket');
 
 // Create order
 exports.createOrder = async (req, res) => {
@@ -12,23 +13,20 @@ exports.createOrder = async (req, res) => {
       customer = await Customer.create(req.user.id);
     }
     const newOrder = await Order.create(customer.id, req.body);
-    const io = req.app.get('io');
     // Notify only managers about the new order; drivers will see it only after manager accepts AND customer completes payment.
-    if (io) {
-      const restaurantResult = await db.query('SELECT name FROM restaurants WHERE id = $1', [req.body.restaurant_id]);
-      const restaurantName = restaurantResult.rows[0]?.name || 'New order';
-      console.log("🔔 Emitting new order notification to managers only...");
-      io.to('restaurant_managers').emit('new_order', {
-        orderId: newOrder.id,
-        restaurantName,
-        total: newOrder.total_amount,
-        order_number: newOrder.order_number,
-        order: {
-          ...newOrder,
-          restaurant_name: restaurantName
-        }
-      });
-    }
+    const restaurantResult = await db.query('SELECT name FROM restaurants WHERE id = $1', [req.body.restaurant_id]);
+    const restaurantName = restaurantResult.rows[0]?.name || 'New order';
+    console.log("🔔 Emitting new order notification to managers only...");
+    emitManagerEvent(req.body.restaurant_id, 'new_order', {
+      orderId: newOrder.id,
+      restaurantName,
+      total: newOrder.total_amount,
+      order_number: newOrder.order_number,
+      order: {
+        ...newOrder,
+        restaurant_name: restaurantName
+      }
+    });
     res.status(201).json({ success: true, data: newOrder });
   } catch (error) {
     console.error('Create order error:', error);
@@ -186,7 +184,12 @@ exports.declineOrder = async (req, res) => {
       req.params.id,
       driver.id
     );
-    
+
+    emitUserEvent(req.user.id, 'order_unavailable', {
+      orderId: req.params.id,
+      reason: 'declined'
+    });
+
     res.json({
       success: true,
       data: result

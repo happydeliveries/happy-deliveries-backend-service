@@ -4,6 +4,7 @@ const Payment = require('../models/Payment');
 const Order = require('../models/Order');
 const Customer = require('../models/Customer');
 const { sanitizeOrderForDriver } = require('../utils/driverOrderSanitizer');
+const { emitDriversEvent, emitManagerEvent } = require('../socket');
 
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 
@@ -100,33 +101,32 @@ async function finalizeOrderPayment({
 
   const updatedOrder = await Order.completePaymentAndPublishToDrivers(order.id, dbMethod);
 
-  const io = app?.get('io');
-  if (io) {
-    const sanitizedForDriver = sanitizeOrderForDriver(updatedOrder);
-    io.to('drivers').emit('new_order', {
-      orderId: updatedOrder.id,
-      restaurantName: order.restaurant_name || 'Restaurant',
-      total: null,
-      pricing_hidden: true,
-      order_number: updatedOrder.order_number,
-      order: sanitizedForDriver,
-    });
+  const sanitizedForDriver = sanitizeOrderForDriver({
+    ...updatedOrder,
+    restaurant_name: order.restaurant_name || updatedOrder.restaurant_name || 'Restaurant',
+    restaurant_address: order.restaurant_address || updatedOrder.restaurant_address || '',
+    time_left_seconds: 600,
+  });
 
-    io.to('restaurant_managers').emit('order_updated', {
-      orderId: updatedOrder.id,
-      status: updatedOrder.status,
-      payment_status: 'completed',
-      order: updatedOrder,
-    });
+  emitDriversEvent('new_order', {
+    orderId: updatedOrder.id,
+    restaurantName: sanitizedForDriver.restaurant_name || 'Restaurant',
+    restaurantAddress: sanitizedForDriver.restaurant_address || '',
+    deliveryAddress: sanitizedForDriver.delivery_address || null,
+    total: null,
+    pricing_hidden: true,
+    order_number: updatedOrder.order_number,
+    time_left_seconds: 600,
+    driver_acceptance_deadline: updatedOrder.driver_acceptance_deadline,
+    order: sanitizedForDriver,
+  });
 
-    io.to(`order_${updatedOrder.id}`).emit('order_update', {
-      type: 'payment_completed',
-      orderId: updatedOrder.id,
-      status: updatedOrder.status,
-      payment_status: 'completed',
-      order: updatedOrder,
-    });
-  }
+  emitManagerEvent(updatedOrder.restaurant_id, 'order_updated', {
+    orderId: updatedOrder.id,
+    status: updatedOrder.status,
+    payment_status: 'completed',
+    order: updatedOrder,
+  });
 
   return { payment, updatedOrder };
 }

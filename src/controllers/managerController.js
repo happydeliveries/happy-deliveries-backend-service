@@ -89,73 +89,67 @@ exports.getDashboardStats = async (req, res) => {
       return res.json({ success: true, stats: buildEmptyStats() });
     }
 
-    // ── Today ──
-    const todayQ = `
+    // Single consolidated query for today's KPIs, active orders, WoW comparison, and ratings
+    const statsQ = `
       SELECT
-        COUNT(*)::int                                    AS total_orders,
-        COALESCE(SUM(CASE WHEN status = $2 THEN total_amount ELSE 0 END), 0) AS total_revenue,
-        COALESCE(AVG(CASE WHEN status = $2 THEN total_amount END), 0)        AS average_order_value
-      FROM orders
-      WHERE restaurant_id = ANY($1)
-        AND DATE(placed_at) = CURRENT_DATE
-    `;
-    const todayRes = await db.query(todayQ, [restaurantIds, COMPLETED_STATUS]);
-    const today = todayRes.rows[0];
-
-    // ── Active orders ──
-    const activeQ = `
-      SELECT COUNT(*)::int AS active_orders
-      FROM orders
-      WHERE restaurant_id = ANY($1)
-        AND status = ANY($2)
-    `;
-    const activeRes = await db.query(activeQ, [restaurantIds, ACTIVE_ORDER_STATUSES]);
-
-    // ── Week-over-week (last 7 days vs previous 7 days) ──
-    const wowQ = `
-      SELECT
-        COALESCE(SUM(CASE WHEN placed_at >= CURRENT_DATE - INTERVAL '7 days'  AND status = $2 THEN total_amount ELSE 0 END), 0) AS current_revenue,
-        COALESCE(SUM(CASE WHEN placed_at >= CURRENT_DATE - INTERVAL '14 days' AND placed_at < CURRENT_DATE - INTERVAL '7 days' AND status = $2 THEN total_amount ELSE 0 END), 0) AS previous_revenue,
-        COUNT(CASE WHEN placed_at >= CURRENT_DATE - INTERVAL '7 days'  THEN 1 END)::int AS current_orders,
-        COUNT(CASE WHEN placed_at >= CURRENT_DATE - INTERVAL '14 days' AND placed_at < CURRENT_DATE - INTERVAL '7 days' THEN 1 END)::int AS previous_orders
-      FROM orders
-      WHERE restaurant_id = ANY($1)
-        AND placed_at >= CURRENT_DATE - INTERVAL '14 days'
-    `;
-    const wowRes = await db.query(wowQ, [restaurantIds, COMPLETED_STATUS]);
-    const wow = wowRes.rows[0];
-
-    const revenueChange = wow.previous_revenue > 0
-      ? ((wow.current_revenue - wow.previous_revenue) / wow.previous_revenue) * 100
-      : (wow.current_revenue > 0 ? 100 : 0);
-
-    const ordersChange = wow.previous_orders > 0
-      ? ((wow.current_orders - wow.previous_orders) / wow.previous_orders) * 100
-      : (wow.current_orders > 0 ? 100 : 0);
-
-    // ── Ratings & reviews (from orders.restaurant_rating) ──
-    const ratingQ = `
-      SELECT
+        COUNT(*) FILTER (
+          WHERE placed_at >= CURRENT_DATE
+            AND placed_at < CURRENT_DATE + INTERVAL '1 day'
+        )::int AS total_orders,
+        COALESCE(SUM(total_amount) FILTER (
+          WHERE placed_at >= CURRENT_DATE
+            AND placed_at < CURRENT_DATE + INTERVAL '1 day'
+            AND status = $2
+        ), 0) AS total_revenue,
+        COALESCE(AVG(total_amount) FILTER (
+          WHERE placed_at >= CURRENT_DATE
+            AND placed_at < CURRENT_DATE + INTERVAL '1 day'
+            AND status = $2
+        ), 0) AS average_order_value,
+        COUNT(*) FILTER (WHERE status = ANY($3))::int AS active_orders,
+        COALESCE(SUM(total_amount) FILTER (
+          WHERE placed_at >= CURRENT_DATE - INTERVAL '7 days' AND status = $2
+        ), 0) AS current_revenue,
+        COALESCE(SUM(total_amount) FILTER (
+          WHERE placed_at >= CURRENT_DATE - INTERVAL '14 days'
+            AND placed_at < CURRENT_DATE - INTERVAL '7 days'
+            AND status = $2
+        ), 0) AS previous_revenue,
+        COUNT(*) FILTER (WHERE placed_at >= CURRENT_DATE - INTERVAL '7 days')::int AS current_orders,
+        COUNT(*) FILTER (
+          WHERE placed_at >= CURRENT_DATE - INTERVAL '14 days'
+            AND placed_at < CURRENT_DATE - INTERVAL '7 days'
+        )::int AS previous_orders,
         COALESCE(AVG(restaurant_rating), 0) AS avg_rating,
-        COUNT(CASE WHEN restaurant_rating IS NOT NULL THEN 1 END)::int AS total_reviews
+        COUNT(restaurant_rating)::int AS total_reviews
       FROM orders
       WHERE restaurant_id = ANY($1)
     `;
-    const ratingRes = await db.query(ratingQ, [restaurantIds]);
-    const rating = ratingRes.rows[0];
+    const statsRes = await db.query(statsQ, [restaurantIds, COMPLETED_STATUS, ACTIVE_ORDER_STATUSES]);
+    const row = statsRes.rows[0];
+
+    const currentRevenue = parseFloat(row.current_revenue || 0);
+    const previousRevenue = parseFloat(row.previous_revenue || 0);
+    const revenueChange = previousRevenue > 0
+      ? ((currentRevenue - previousRevenue) / previousRevenue) * 100
+      : (currentRevenue > 0 ? 100 : 0);
+
+    const ordersChange = row.previous_orders > 0
+      ? ((row.current_orders - row.previous_orders) / row.previous_orders) * 100
+      : (row.current_orders > 0 ? 100 : 0);
 
     res.json({
       success: true,
       stats: {
-        total_revenue:       parseFloat(today.total_revenue).toFixed(2),
-        total_orders:        today.total_orders,
-        avg_rating:          parseFloat(rating.avg_rating).toFixed(2),
-        active_orders:       activeRes.rows[0].active_orders,
+        total_revenue:       parseFloat(row.total_revenue).toFixed(2),
+        total_orders:        row.total_orders,
+        avg_rating:          parseFloat(row.avg_rating).toFixed(2),
+        active_orders:       row.active_orders,
         total_restaurants:   restaurantIds.length,
         revenue_change:      parseFloat(revenueChange.toFixed(1)),
         orders_change:       parseFloat(ordersChange.toFixed(1)),
-        total_reviews:       rating.total_reviews,
-        average_order_value: parseFloat(today.average_order_value).toFixed(2)
+        total_reviews:       row.total_reviews,
+        average_order_value: parseFloat(row.average_order_value).toFixed(2)
       }
     });
   } catch (error) {

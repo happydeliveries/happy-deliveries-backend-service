@@ -350,7 +350,10 @@
       </div>
     </aside>
 
-    <script>window.managerId = "<%= manager.id || '' %>" || null;</script>
+    <script>
+      window.managerId = "<%= manager.id || '' %>" || null;
+      window.restaurantIds = <%- JSON.stringify((restaurants || []).map(r => r.id)) %>;
+    </script>
 
     <!-- Main Content -->
     <main class="main-content">
@@ -798,8 +801,21 @@
     document.addEventListener('DOMContentLoaded', function() {
       loadDashboardData();
       setupEventListeners();
-      startAutoRefresh();
     });
+
+    // Silent live refresh called by Socket.IO events in manager.js (no blocking spinner)
+    async function refreshDashboardLive() {
+      try {
+        await Promise.all([
+          loadDashboardStats(),
+          loadRecentOrders(),
+          loadOrdersTab(),
+          typeof loadPendingOrders === 'function' ? loadPendingOrders() : Promise.resolve()
+        ]);
+      } catch (error) {
+        console.error('Live dashboard refresh error:', error);
+      }
+    }
 
     function setupEventListeners() {
       // Tab switching
@@ -891,6 +907,13 @@
           const ordChange = document.getElementById('ordersChange');
           ordChange.textContent = `${stats.orders_change >= 0 ? '+' : ''}${stats.orders_change || 0}% from last week`;
           ordChange.style.color = stats.orders_change >= 0 ? 'hsl(142.1 76.2% 36.3%)' : 'hsl(0 84.2% 60.2%)';
+
+          // Update notification counters cleanly (eliminates separate /active-orders-count polling)
+          const activeCount = stats.active_orders || 0;
+          const notifBadge = document.getElementById('notificationBadge');
+          const notifActive = document.getElementById('notifActiveCount');
+          if (notifBadge) notifBadge.textContent = activeCount;
+          if (notifActive) notifActive.textContent = activeCount;
 
           // Update analytics tab mirrors
           document.getElementById('analyticsRevenue').textContent = `R ${stats.total_revenue || '0.00'}`;
@@ -1216,39 +1239,6 @@
     // View order details
     function viewOrder(orderId) {
       window.location.href = `/manager/orders`;
-    }
-
-    // Auto-refresh dashboard
-    function startAutoRefresh() {
-      // Refresh stats and recent orders every 30 seconds
-      setInterval(async () => {
-        try {
-          await loadDashboardStats();
-          await loadRecentOrders();
-          await loadOrdersTab();
-        } catch (error) {
-          console.error('Auto-refresh error:', error);
-        }
-      }, 30000);
-
-      // Refresh active orders count every 15 seconds
-      setInterval(async () => {
-        try {
-          const response = await fetch(`${API_BASE}/dashboard/active-orders-count`, { credentials: 'same-origin' });
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success) {
-              const count = data.count || 0;
-              document.getElementById('notificationBadge').textContent = count;
-              document.getElementById('notifActiveCount').textContent = count;
-              document.getElementById('activeOrders').textContent = count;
-              document.getElementById('analyticsActive').textContent = count;
-            }
-          }
-        } catch (error) {
-          console.error('Error updating active count:', error);
-        }
-      }, 15000);
     }
   </script>
 </body>

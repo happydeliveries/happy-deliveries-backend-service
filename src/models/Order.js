@@ -1,7 +1,13 @@
 const db = require('../config/database');
 const crypto = require('crypto');
 const Payment = require('./Payment');
-const { emitOrderUpdate, emitUserEvent, emitDriverLocation, emitManagerEvent } = require('../socket');
+const {
+  emitOrderUpdate,
+  emitUserEvent,
+  emitDriverLocation,
+  emitManagerEvent,
+  emitDriversEvent
+} = require('../socket');
 const { sanitizeOrderForDriver } = require('../utils/driverOrderSanitizer');
 
 function normalizePointCoords(pt) {
@@ -587,16 +593,27 @@ class Order {
 
       updatedOrder.driver_earnings = driverEarnings;
 
+      const customerRes = await db.query('SELECT user_id FROM customers WHERE id = $1', [order.customer_id]);
+      const customerUserId = customerRes.rows[0]?.user_id;
+
       if (emitOrderUpdate) {
         emitOrderUpdate(updatedOrder.id, {
           type: 'delivery_code_verified',
+          customerUserId,
           order: updatedOrder,
           new_status: 'delivered'
         });
       }
 
-      const customerRes = await db.query('SELECT user_id FROM customers WHERE id = $1', [order.customer_id]);
-      const customerUserId = customerRes.rows[0]?.user_id;
+      if (emitManagerEvent && updatedOrder.restaurant_id) {
+        emitManagerEvent(updatedOrder.restaurant_id, 'order_updated', {
+          orderId: updatedOrder.id,
+          order_number: updatedOrder.order_number,
+          status: 'delivered',
+          order: updatedOrder
+        });
+      }
+
       if (customerUserId) {
         await this.createNotification(
           customerUserId,
@@ -688,8 +705,18 @@ class Order {
       if (emitOrderUpdate) {
         emitOrderUpdate(orderId, {
           type: 'order_accepted_by_manager',
+          customerUserId,
           order: updatedOrder,
           new_status: 'ordering_at_restaurant'
+        });
+      }
+
+      if (emitManagerEvent && updatedOrder.restaurant_id) {
+        emitManagerEvent(updatedOrder.restaurant_id, 'order_updated', {
+          orderId: updatedOrder.id,
+          order_number: updatedOrder.order_number,
+          status: updatedOrder.status,
+          order: updatedOrder
         });
       }
 
@@ -775,8 +802,26 @@ class Order {
       if (emitOrderUpdate) {
         emitOrderUpdate(orderId, {
           type: 'order_rejected_by_manager',
+          customerUserId,
           order: updatedOrder,
           new_status: 'cancelled'
+        });
+      }
+
+      if (emitManagerEvent && updatedOrder.restaurant_id) {
+        emitManagerEvent(updatedOrder.restaurant_id, 'order_updated', {
+          orderId: updatedOrder.id,
+          order_number: updatedOrder.order_number,
+          status: 'cancelled',
+          order: updatedOrder
+        });
+      }
+
+      if (emitDriversEvent) {
+        emitDriversEvent('order_unavailable', {
+          orderId: updatedOrder.id,
+          order_number: updatedOrder.order_number,
+          reason: 'cancelled'
         });
       }
 
@@ -873,6 +918,7 @@ class Order {
       if (emitOrderUpdate) {
         emitOrderUpdate(orderId, {
           type: 'order_cancelled_by_customer',
+          customerUserId: userId,
           order: updatedOrder,
           new_status: 'cancelled',
         });
@@ -880,10 +926,19 @@ class Order {
 
       if (emitManagerEvent && existingOrder.restaurant_id) {
         emitManagerEvent(existingOrder.restaurant_id, 'order_updated', {
+          orderId,
           order_id: orderId,
           order_number: existingOrder.order_number,
           status: 'cancelled',
           reason,
+        });
+      }
+
+      if (emitDriversEvent) {
+        emitDriversEvent('order_unavailable', {
+          orderId,
+          order_number: existingOrder.order_number,
+          reason: 'cancelled',
         });
       }
 
@@ -1058,6 +1113,7 @@ class Order {
       if (emitOrderUpdate) {
         emitOrderUpdate(orderId, {
           type: 'payment_completed',
+          customerUserId,
           order: updatedOrder,
           payment_status: 'completed',
           available_drivers: driverIds.length
@@ -1174,6 +1230,7 @@ class Order {
       if (emitOrderUpdate) {
         emitOrderUpdate(order.id, {
           type: 'order_accepted',
+          customerUserId,
           order,
           driver_id: driverId
         });
@@ -1185,6 +1242,22 @@ class Order {
           order_number: order.order_number,
           driver_id: driverId,
           status: order.status
+        });
+        emitManagerEvent(order.restaurant_id, 'order_updated', {
+          orderId: order.id,
+          order_number: order.order_number,
+          driver_id: driverId,
+          status: order.status,
+          order
+        });
+      }
+
+      if (emitDriversEvent) {
+        emitDriversEvent('order_unavailable', {
+          orderId: order.id,
+          order_number: order.order_number,
+          reason: 'accepted',
+          acceptedByDriverId: driverId
         });
       }
       
@@ -1371,9 +1444,17 @@ class Order {
         }
       }
 
+      // Get User ID for notification & socket sync
+      const userRes = await db.query(
+        'SELECT user_id FROM customers WHERE id = $1',
+        [order.customer_id]
+      );
+      const customerUserId = userRes.rows[0]?.user_id;
+
       if (emitOrderUpdate) {
         emitOrderUpdate(order.id, {
           type: 'status_update',
+          customerUserId,
           order: {
             ...order,
             ...(driverCoords ? { driver_location: driverCoords } : {})
@@ -1381,6 +1462,23 @@ class Order {
           status,
           new_status: status,
           driver_location: driverCoords
+        });
+      }
+
+      if (emitManagerEvent && order.restaurant_id) {
+        emitManagerEvent(order.restaurant_id, 'order_updated', {
+          orderId: order.id,
+          order_number: order.order_number,
+          status,
+          order
+        });
+      }
+
+      if (emitDriversEvent && (status === 'cancelled' || status === 'no_drivers_available')) {
+        emitDriversEvent('order_unavailable', {
+          orderId: order.id,
+          order_number: order.order_number,
+          reason: status
         });
       }
 
@@ -1427,13 +1525,6 @@ class Order {
           );
         }
       }
-      
-      // Get User ID for notification
-      const userRes = await db.query(
-        'SELECT user_id FROM customers WHERE id = $1', 
-        [order.customer_id]
-      );
-      const customerUserId = userRes.rows[0]?.user_id;
 
       if (customerUserId) {
         const statusTitle = status === 'picked_up'
@@ -1561,9 +1652,13 @@ class Order {
             console.error(`Auto-refund failed for expired order ${order.id}:`, refundErr.message);
           }
         }
+        const userRes = await db.query('SELECT user_id FROM customers WHERE id = $1', [order.customer_id]);
+        const customerUserId = userRes.rows[0]?.user_id || null;
+
         if (emitOrderUpdate) {
           emitOrderUpdate(order.id, {
             type: 'status_update',
+            customerUserId,
             order,
             status: 'no_drivers_available',
             new_status: 'no_drivers_available'
@@ -1575,11 +1670,23 @@ class Order {
             order_number: order.order_number,
             status: 'no_drivers_available'
           });
+          emitManagerEvent(order.restaurant_id, 'order_updated', {
+            orderId: order.id,
+            order_number: order.order_number,
+            status: 'no_drivers_available',
+            order
+          });
         }
-        const userRes = await db.query('SELECT user_id FROM customers WHERE id = $1', [order.customer_id]);
-        if (userRes.rows[0]) {
+        if (emitDriversEvent) {
+          emitDriversEvent('order_unavailable', {
+            orderId: order.id,
+            order_number: order.order_number,
+            reason: 'expired'
+          });
+        }
+        if (customerUserId) {
           await this.createNotification(
-            userRes.rows[0].user_id,
+            customerUserId,
             'customer',
             'No Drivers Available',
             order.payment_status === 'refunded'
@@ -1593,7 +1700,7 @@ class Order {
     }
 
     // Also cancel abandoned unpaid orders older than 30 minutes
-    await db.query(
+    const staleRes = await db.query(
       `UPDATE orders
        SET status = 'cancelled',
            cancelled_at = CURRENT_TIMESTAMP,
@@ -1601,8 +1708,33 @@ class Order {
        WHERE status IN ('pending', 'ordering_at_restaurant')
          AND payment_status = 'pending'
          AND driver_id IS NULL
-         AND created_at <= NOW() - INTERVAL '30 minutes'`
-    ).catch(err => console.warn('Stale unpaid order cleanup warning:', err.message));
+         AND created_at <= NOW() - INTERVAL '30 minutes'
+       RETURNING id, order_number, restaurant_id, status`
+    ).catch(err => {
+      console.warn('Stale unpaid order cleanup warning:', err.message);
+      return { rows: [] };
+    });
+
+    if (staleRes.rows?.length) {
+      for (const stale of staleRes.rows) {
+        if (emitOrderUpdate) {
+          emitOrderUpdate(stale.id, {
+            type: 'status_update',
+            order: stale,
+            status: 'cancelled',
+            new_status: 'cancelled'
+          });
+        }
+        if (emitManagerEvent && stale.restaurant_id) {
+          emitManagerEvent(stale.restaurant_id, 'order_updated', {
+            orderId: stale.id,
+            order_number: stale.order_number,
+            status: 'cancelled',
+            order: stale
+          });
+        }
+      }
+    }
 
     return result.rows;
   }

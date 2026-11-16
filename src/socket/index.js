@@ -2,6 +2,11 @@ const db = require('../config/database');
 const jwt = require('jsonwebtoken');
 
 let ioInstance;
+const LOCATION_PERSIST_INTERVAL_MS = 12000;
+const ACTIVE_ORDERS_CACHE_MS = 10000;
+const lastDriverDbPersist = new Map();
+const driverActiveOrdersCache = new Map();
+const orderCustomerUserCache = new Map();
 
 function extractLngLat(data = {}) {
   const loc = data.location;
@@ -47,21 +52,76 @@ module.exports = (io) => {
       socket.join(`user_${socket.user.id}`);
     }
 
-    // Drivers join the shared "drivers" room to receive newly published (paid) orders
+    // Drivers join the shared "drivers" room when online to receive available orders
     socket.on('join_driver_room', () => {
       if (socket.user && socket.user.role !== 'driver') return;
       socket.join('drivers');
       console.log(`Socket ${socket.id} joined drivers room`);
     });
 
-    // Restaurant managers join this room to receive pending order notifications
-    const joinManagerRoom = () => {
+    socket.on('leave_driver_room', () => {
+      socket.leave('drivers');
+      console.log(`Socket ${socket.id} left drivers room`);
+    });
+
+    // Restaurant managers join scoped restaurant rooms (plus global room when unscoped)
+    const joinManagerRoom = async (payload) => {
       if (socket.user && socket.user.role !== 'restaurant_manager') return;
-      socket.join('restaurant_managers');
-      console.log(`Socket ${socket.id} joined restaurant managers room`);
+
+      let restaurantIds = [];
+      let managerId = null;
+
+      if (typeof payload === 'string') {
+        managerId = payload;
+      } else if (payload && typeof payload === 'object') {
+        managerId = payload.managerId || null;
+        if (Array.isArray(payload.restaurantIds)) {
+          restaurantIds = payload.restaurantIds.filter(Boolean).map(String);
+        }
+      }
+
+      if (socket.user?.id && socket.user.role === 'restaurant_manager') {
+        socket.join(`manager_${socket.user.id}`);
+        if (restaurantIds.length === 0) {
+          try {
+            const resRows = await db.query(
+              `SELECT r.id
+               FROM restaurants r
+               JOIN restaurant_managers rm ON r.manager_id = rm.id
+               WHERE rm.user_id = $1`,
+              [socket.user.id]
+            );
+            restaurantIds = resRows.rows.map((r) => String(r.id));
+          } catch {
+            // Fallback to global room if query fails
+          }
+        }
+      }
+
+      if (managerId) {
+        socket.join(`manager_${managerId}`);
+      }
+
+      const hasExplicitScope =
+        Boolean(payload && typeof payload === 'object' && Array.isArray(payload.restaurantIds)) ||
+        (socket.user?.role === 'restaurant_manager' && restaurantIds.length > 0);
+
+      if (hasExplicitScope) {
+        restaurantIds.forEach((rid) => socket.join(`restaurant_${rid}`));
+        // Avoid noisy broadcasts from unrelated restaurants when scoped rooms are used
+        socket.leave('restaurant_managers');
+        console.log(`Socket ${socket.id} joined ${restaurantIds.length} scoped restaurant room(s)`);
+      } else {
+        socket.join('restaurant_managers');
+        console.log(`Socket ${socket.id} joined restaurant managers room`);
+      }
     };
     socket.on('join_manager_room', joinManagerRoom);
     socket.on('join_manager', joinManagerRoom);
+    socket.on('join_driver_applications', () => {
+      if (socket.user && socket.user.role !== 'restaurant_manager') return;
+      socket.join('restaurant_managers');
+    });
 
     // Join user to their room based on user ID
     socket.on('join', (userId) => {
@@ -111,7 +171,7 @@ module.exports = (io) => {
       console.log(`Client joined order room: ${orderId}`);
     });
     
-    // Handle location updates from drivers
+    // Handle location updates from drivers (broadcast instantaneously, throttle DB writes)
     socket.on('driver_location_update', async (data = {}) => {
       if (socket.user && socket.user.role !== 'driver') return;
       const { driverId, orderId } = data;
@@ -131,7 +191,47 @@ module.exports = (io) => {
         timestamp: new Date().toISOString()
       };
 
-      // Persist driver location in DB so REST fetches / refreshes also get the latest live location
+      // 1. Broadcast immediately over Socket.IO (zero DB latency)
+      let targetOrderIds = orderId ? [orderId] : [];
+      if (!orderId && effectiveDriverRef) {
+        const cached = driverActiveOrdersCache.get(String(effectiveDriverRef));
+        if (cached && Date.now() - cached.cachedAt < ACTIVE_ORDERS_CACHE_MS) {
+          targetOrderIds = cached.orderIds;
+        } else {
+          try {
+            const activeOrders = await db.query(
+              `SELECT id FROM orders
+               WHERE (driver_id = $1 OR driver_id = (SELECT id FROM drivers WHERE user_id = $1 LIMIT 1))
+                 AND status IN ('accepted_by_driver', 'order_ready', 'picked_up', 'on_the_way', 'arrived')`,
+              [effectiveDriverRef]
+            );
+            targetOrderIds = activeOrders.rows.map((row) => row.id);
+            driverActiveOrdersCache.set(String(effectiveDriverRef), {
+              orderIds: targetOrderIds,
+              cachedAt: Date.now(),
+            });
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      targetOrderIds.forEach((targetId) => {
+        io.to(`order_${targetId}`).emit('driver_location', {
+          ...payload,
+          orderId: targetId,
+        });
+      });
+
+      // 2. Persist driver location checkpoint to Neon at most every 12s per driver
+      const persistKey = String(effectiveDriverRef || orderId || socket.id);
+      const now = Date.now();
+      const lastPersistedAt = lastDriverDbPersist.get(persistKey) || 0;
+      if (now - lastPersistedAt < LOCATION_PERSIST_INTERVAL_MS) {
+        return;
+      }
+      lastDriverDbPersist.set(persistKey, now);
+
       try {
         let resolvedDriverId = effectiveDriverRef;
         if (!resolvedDriverId && orderId) {
@@ -147,41 +247,17 @@ module.exports = (io) => {
             [lng, lat, resolvedDriverId]
           );
         }
-        if (orderId && resolvedDriverId) {
+        const persistOrderId = orderId || targetOrderIds[0] || null;
+        if (persistOrderId && resolvedDriverId) {
           await db.query(
             `INSERT INTO delivery_tracking (order_id, driver_id, location)
              VALUES ($1, (SELECT id FROM drivers WHERE id = $2 OR user_id = $2 LIMIT 1), point($3, $4))`,
-            [orderId, resolvedDriverId, lng, lat]
+            [persistOrderId, resolvedDriverId, lng, lat]
           ).catch(() => {});
         }
       } catch (err) {
         console.warn('Failed to persist socket driver location:', err.message);
       }
-
-      // Broadcast to order room
-      if (orderId) {
-        io.to(`order_${orderId}`).emit('driver_location', payload);
-      } else if (effectiveDriverRef) {
-        // Broadcast to all active orders for this driver
-        try {
-          const activeOrders = await db.query(
-            `SELECT id FROM orders
-             WHERE (driver_id = $1 OR driver_id = (SELECT id FROM drivers WHERE user_id = $1 LIMIT 1))
-               AND status IN ('accepted_by_driver', 'picked_up', 'on_the_way', 'arrived')`,
-            [effectiveDriverRef]
-          );
-          for (const row of activeOrders.rows) {
-            io.to(`order_${row.id}`).emit('driver_location', {
-              ...payload,
-              orderId: row.id
-            });
-          }
-        } catch (err) {
-          // ignore
-        }
-      }
-      
-      console.log(`Driver ${effectiveDriverRef} location updated for order ${orderId}: [${lng}, ${lat}]`);
     });
     
     // Handle disconnect
@@ -192,23 +268,70 @@ module.exports = (io) => {
 
 };
 
-function emitOrderUpdate(orderId, data) {
-  if (ioInstance && orderId) {
-    const status = data?.status || data?.new_status || data?.order?.status;
-    // Never broadcast customer delivery verification_code to the shared order room
-    let safeData = { ...data };
-    if (safeData.order && typeof safeData.order === 'object') {
-      const { verification_code, code_expires_at, code_used_at, ...restOrder } = safeData.order;
-      safeData.order = restOrder;
-    }
-    delete safeData.verification_code;
-
-    ioInstance.to(`order_${orderId}`).emit('order_update', {
-      ...safeData,
-      orderId,
-      status
-    });
+function rememberOrderCustomerUser(orderId, customerUserId) {
+  if (!orderId || !customerUserId) return;
+  const key = String(orderId);
+  if (orderCustomerUserCache.size > 2000) {
+    const oldestKey = orderCustomerUserCache.keys().next().value;
+    if (oldestKey) orderCustomerUserCache.delete(oldestKey);
   }
+  orderCustomerUserCache.set(key, String(customerUserId));
+}
+
+function emitOrderUpdate(orderId, data) {
+  if (!ioInstance || !orderId) return;
+
+  const status = data?.status || data?.new_status || data?.order?.status;
+  // Never broadcast customer delivery verification_code to the shared order room
+  let safeData = { ...data };
+  if (safeData.order && typeof safeData.order === 'object') {
+    const { verification_code, code_expires_at, code_used_at, ...restOrder } = safeData.order;
+    safeData.order = restOrder;
+  }
+  delete safeData.verification_code;
+
+  const payload = {
+    ...safeData,
+    orderId,
+    status
+  };
+
+  if (safeData.order?.driver_id) {
+    driverActiveOrdersCache.delete(String(safeData.order.driver_id));
+  }
+
+  const directUserId =
+    safeData.customerUserId ||
+    safeData.order?.customer_user_id ||
+    orderCustomerUserCache.get(String(orderId)) ||
+    null;
+
+  if (directUserId) {
+    rememberOrderCustomerUser(orderId, directUserId);
+    ioInstance.to(`order_${orderId}`).to(`user_${directUserId}`).emit('order_update', payload);
+    return;
+  }
+
+  db.query(
+    `SELECT c.user_id
+     FROM orders o
+     JOIN customers c ON o.customer_id = c.id
+     WHERE o.id = $1
+     LIMIT 1`,
+    [orderId]
+  )
+    .then((res) => {
+      const resolvedUserId = res.rows[0]?.user_id || null;
+      if (resolvedUserId) {
+        rememberOrderCustomerUser(orderId, resolvedUserId);
+        ioInstance.to(`order_${orderId}`).to(`user_${resolvedUserId}`).emit('order_update', payload);
+      } else {
+        ioInstance.to(`order_${orderId}`).emit('order_update', payload);
+      }
+    })
+    .catch(() => {
+      ioInstance.to(`order_${orderId}`).emit('order_update', payload);
+    });
 }
 
 function emitUserEvent(userId, eventName, data) {
@@ -226,9 +349,16 @@ function emitDriverLocation(orderId, payload) {
 function emitManagerEvent(restaurantId, eventName, data) {
   if (ioInstance && eventName) {
     if (restaurantId) {
-      ioInstance.to(`restaurant_${restaurantId}`).emit(eventName, data);
+      ioInstance.to(`restaurant_${restaurantId}`).to('restaurant_managers').emit(eventName, data);
+      return;
     }
     ioInstance.to('restaurant_managers').emit(eventName, data);
+  }
+}
+
+function emitDriversEvent(eventName, data) {
+  if (ioInstance && eventName) {
+    ioInstance.to('drivers').emit(eventName, data);
   }
 }
 
@@ -236,3 +366,4 @@ module.exports.emitOrderUpdate = emitOrderUpdate;
 module.exports.emitUserEvent = emitUserEvent;
 module.exports.emitDriverLocation = emitDriverLocation;
 module.exports.emitManagerEvent = emitManagerEvent;
+module.exports.emitDriversEvent = emitDriversEvent;

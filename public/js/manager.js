@@ -4,14 +4,36 @@ class ManagerDashboard {
     constructor() {
         this.socket = null;
         this.liveOrderCount = 0;
+        this.isSocketConnected = false;
+        this.lastLiveRefreshAt = 0;
+        this.refreshTimer = null;
+        this.debouncedLiveRefresh = this.debounce(() => {
+            this.triggerPageLiveRefresh();
+        }, 350);
         this.initialize();
     }
 
     initialize() {
         this.setupEventListeners();
         this.setupWebSocket();
-        // REMOVE: this.updateLiveStats();
         this.startAutoRefresh();
+    }
+
+    triggerPageLiveRefresh() {
+        this.lastLiveRefreshAt = Date.now();
+        if (typeof refreshDashboardLive === 'function') {
+            refreshDashboardLive();
+        } else {
+            if (typeof loadPendingOrders === 'function') loadPendingOrders();
+            if (typeof loadRecentOrders === 'function') loadRecentOrders();
+            if (typeof loadOrdersTab === 'function') loadOrdersTab();
+            if (typeof loadDashboardStats === 'function') loadDashboardStats();
+        }
+        if (typeof loadOrders === 'function') {
+            const activePage = typeof currentPage !== 'undefined' ? currentPage : (window.currentPage || 1);
+            loadOrders(activePage, true);
+        }
+        if (typeof loadStats === 'function') loadStats();
     }
 
     setupEventListeners() {
@@ -44,15 +66,37 @@ class ManagerDashboard {
             return;
         }
 
-        this.socket = io();
+        this.socket = io({
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 10000,
+        });
+
+        let hasConnectedOnce = false;
 
         this.socket.on('connect', () => {
             console.log('Socket.IO connected');
-            this.socket.emit('join_manager_room');
+            this.isSocketConnected = true;
+            if (typeof updateLiveBadgeStatus === 'function') updateLiveBadgeStatus(true);
+
             const managerId = window.managerId || null;
-            if (managerId) {
-                this.socket.emit('join_manager', managerId);
+            const restaurantIds = Array.isArray(window.restaurantIds) ? window.restaurantIds : null;
+
+            if (restaurantIds) {
+                this.socket.emit('join_manager', { managerId, restaurantIds });
+            } else {
+                this.socket.emit('join_manager_room');
+                if (managerId) {
+                    this.socket.emit('join_manager', managerId);
+                }
             }
+
+            // Re-sync once if socket reconnected after a drop
+            if (hasConnectedOnce) {
+                this.debouncedLiveRefresh();
+            }
+            hasConnectedOnce = true;
         });
 
         this.socket.on('new_order', (payload) => {
@@ -60,13 +104,7 @@ class ManagerDashboard {
             this.liveOrderCount++;
             this.updateOrderCounter();
             this.showNotification(`New order #${order.order_number || order.orderId || order.id || ''} received! Awaiting your approval.`, 'success');
-
-            if (typeof loadPendingOrders === 'function') loadPendingOrders();
-            if (typeof loadRecentOrders === 'function') loadRecentOrders();
-            if (typeof loadOrdersTab === 'function') loadOrdersTab();
-            if (typeof loadOrders === 'function') loadOrders(window.currentPage || 1, true);
-            if (typeof loadStats === 'function') loadStats();
-            if (typeof loadDashboardData === 'function') loadDashboardData();
+            this.debouncedLiveRefresh();
         });
 
         this.socket.on('order_updated', (payload) => {
@@ -74,14 +112,18 @@ class ManagerDashboard {
             const statusLabel = payload?.payment_status === 'completed'
                 ? 'paid (finding driver)'
                 : (order.status || payload?.status || 'updated');
-            this.showNotification(`Order #${order.order_number || order.orderId || order.id || ''} is now ${statusLabel}`, 'info');
+            this.showNotification(`Order #${order.order_number || order.orderId || order.id || ''} is now ${String(statusLabel).replace(/_/g, ' ')}`, 'info');
+            this.debouncedLiveRefresh();
+        });
 
-            if (typeof loadPendingOrders === 'function') loadPendingOrders();
-            if (typeof loadRecentOrders === 'function') loadRecentOrders();
-            if (typeof loadOrdersTab === 'function') loadOrdersTab();
-            if (typeof loadOrders === 'function') loadOrders(window.currentPage || 1, true);
-            if (typeof loadStats === 'function') loadStats();
-            if (typeof loadDashboardData === 'function') loadDashboardData();
+        this.socket.on('driver_assigned', (payload) => {
+            this.showNotification(`Driver assigned to order #${payload?.order_number || payload?.order_id || ''}`, 'info');
+            this.debouncedLiveRefresh();
+        });
+
+        this.socket.on('order_expired', (payload) => {
+            this.showNotification(`Order #${payload?.order_number || payload?.order_id || ''} expired (no drivers available)`, 'warning');
+            this.debouncedLiveRefresh();
         });
 
         this.socket.on('live_stats', (payload) => {
@@ -92,10 +134,14 @@ class ManagerDashboard {
 
         this.socket.on('disconnect', () => {
             console.log('Socket.IO disconnected. Reconnecting...');
+            this.isSocketConnected = false;
+            if (typeof updateLiveBadgeStatus === 'function') updateLiveBadgeStatus(false);
         });
 
         this.socket.on('connect_error', (error) => {
             console.error('Socket.IO connect error:', error);
+            this.isSocketConnected = false;
+            if (typeof updateLiveBadgeStatus === 'function') updateLiveBadgeStatus(false);
         });
     }
 
@@ -136,12 +182,14 @@ class ManagerDashboard {
     }
 
     updateDashboardData(period = 'today') {
-        fetch(`/manager/api/dashboard/stats?period=${period}`)
+        fetch(`/manager/api/dashboard/stats?period=${period}`, { credentials: 'same-origin' })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
                     this.updateStatsCards(data.stats);
-                    this.updateCharts(data.charts);
+                    if (data.charts && typeof this.updateCharts === 'function') {
+                        this.updateCharts(data.charts);
+                    }
                 }
             })
             .catch(error => console.error('Error updating dashboard:', error));
@@ -157,19 +205,19 @@ class ManagerDashboard {
             ordersChange: document.getElementById('ordersChange')
         };
 
-        if (elements.totalRevenue) elements.totalRevenue.textContent = `₹${stats.total_revenue || '0'}`;
+        if (elements.totalRevenue) elements.totalRevenue.textContent = `R ${stats.total_revenue || '0.00'}`;
         if (elements.totalOrders) elements.totalOrders.textContent = stats.total_orders || '0';
-        if (elements.avgRating) elements.avgRating.textContent = `${stats.avg_rating || '0'} ⭐`;
+        if (elements.avgRating) elements.avgRating.textContent = `${stats.avg_rating || '0.0'}`;
         if (elements.activeOrders) elements.activeOrders.textContent = stats.active_orders || '0';
         
         if (elements.revenueChange) {
-            elements.revenueChange.textContent = `${stats.revenue_change || '0'}%`;
-            elements.revenueChange.className = stats.revenue_change > 0 ? 'text-success' : 'text-danger';
+            elements.revenueChange.textContent = `${stats.revenue_change >= 0 ? '+' : ''}${stats.revenue_change || '0'}% from last week`;
+            elements.revenueChange.style.color = stats.revenue_change >= 0 ? 'hsl(142.1 76.2% 36.3%)' : 'hsl(0 84.2% 60.2%)';
         }
         
         if (elements.ordersChange) {
-            elements.ordersChange.textContent = `${stats.orders_change || '0'}%`;
-            elements.ordersChange.className = stats.orders_change > 0 ? 'text-success' : 'text-danger';
+            elements.ordersChange.textContent = `${stats.orders_change >= 0 ? '+' : ''}${stats.orders_change || '0'}% from last week`;
+            elements.ordersChange.style.color = stats.orders_change >= 0 ? 'hsl(142.1 76.2% 36.3%)' : 'hsl(0 84.2% 60.2%)';
         }
     }
 
@@ -237,21 +285,31 @@ class ManagerDashboard {
     }
 
     startAutoRefresh() {
-        // Safety net only: refresh every 5 minutes in case a socket event was missed
-        setInterval(() => {
-            if (window.location.pathname.includes('dashboard')) {
-                this.updateDashboardData();
+        // Visibility-aware fallback only: poll every 45s while disconnected, or 5m safety sync when visible
+        if (this.refreshTimer) clearInterval(this.refreshTimer);
+        this.refreshTimer = setInterval(() => {
+            if (typeof document !== 'undefined' && document.hidden) return;
+            const elapsed = Date.now() - (this.lastLiveRefreshAt || 0);
+            if (!this.isSocketConnected && elapsed >= 40000) {
+                this.triggerPageLiveRefresh();
+            } else if (elapsed >= 300000) {
+                this.triggerPageLiveRefresh();
             }
-            if (window.location.pathname.includes('orders')) {
-                this.refreshOrders();
-            }
-        }, 300000); // 5 minutes
+        }, 45000);
+
+        if (typeof document !== 'undefined') {
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && Date.now() - (this.lastLiveRefreshAt || 0) >= 60000) {
+                    this.triggerPageLiveRefresh();
+                }
+            });
+        }
     }
 
     refreshOrders() {
-        const currentPage = window.currentPage || 1;
+        const activePage = typeof currentPage !== 'undefined' ? currentPage : (window.currentPage || 1);
         if (typeof loadOrders === 'function') {
-            loadOrders(currentPage);
+            loadOrders(activePage, true);
         }
     }
 }
@@ -421,7 +479,10 @@ async function acceptOrder(orderId, btnEl = null) {
                 closeModal('orderModal');
             }
             if (typeof loadPendingOrders === 'function') loadPendingOrders();
-            if (typeof loadOrders === 'function') loadOrders(window.currentPage || 1, true);
+            if (typeof loadOrders === 'function') {
+            const activePage = typeof currentPage !== 'undefined' ? currentPage : (window.currentPage || 1);
+            loadOrders(activePage, true);
+        }
             if (typeof loadStats === 'function') loadStats();
             if (typeof loadRecentOrders === 'function') loadRecentOrders();
             if (typeof loadOrdersTab === 'function') loadOrdersTab();
@@ -469,7 +530,10 @@ async function rejectOrder(orderId, btnEl = null) {
                 closeModal('orderModal');
             }
             if (typeof loadPendingOrders === 'function') loadPendingOrders();
-            if (typeof loadOrders === 'function') loadOrders(window.currentPage || 1, true);
+            if (typeof loadOrders === 'function') {
+            const activePage = typeof currentPage !== 'undefined' ? currentPage : (window.currentPage || 1);
+            loadOrders(activePage, true);
+        }
             if (typeof loadStats === 'function') loadStats();
             if (typeof loadOrdersTab === 'function') loadOrdersTab();
             if (typeof loadRecentOrders === 'function') loadRecentOrders();

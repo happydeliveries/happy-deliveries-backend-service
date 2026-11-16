@@ -129,12 +129,33 @@ async function fetchRestaurantIds(managerId) {
 }
 
 /**
- * Resolve managerId from a session.  Returns null when no manager record exists.
+ * Resolve manager from a session (with lightweight session caching of manager.id).
  */
 async function resolveManager(req) {
+    if (req.session?.user?.manager_id && req.session?.user?.id) {
+        return {
+            id: req.session.user.manager_id,
+            user_id: req.session.user.id,
+            email: req.session.user.email,
+            first_name: req.session.user.first_name,
+            last_name: req.session.user.last_name,
+        };
+    }
     const RM = getModel.RestaurantManager();
     const manager = await RM.findByUserId(req.session.user.id);
+    if (manager?.id && req.session?.user) {
+        req.session.user.manager_id = manager.id;
+    }
     return manager || null;
+}
+
+/** Fast restaurant UUID lookup without fetching full restaurant columns. */
+async function fetchRestaurantIdsFast(managerId) {
+    const { rows } = await db.query(
+        'SELECT id FROM restaurants WHERE manager_id = $1',
+        [managerId]
+    );
+    return rows.map((r) => r.id);
 }
 
 // ─── Dashboard stats ──────────────────────────────────────────────────────────
@@ -154,47 +175,41 @@ async function buildDashboardStats(managerId, restaurants) {
 
     const ids = restaurants.map(r => r.id);
 
-    const [tOrders, tRevenue, lwOrders, lwRevenue, active] = await Promise.all([
-        db.query(`
-            SELECT COUNT(*) AS c FROM orders
-            WHERE restaurant_id = ANY($1::uuid[])
-              AND placed_at >= CURRENT_DATE
-              AND placed_at  < CURRENT_DATE + INTERVAL '1 day'
-        `, [ids]),
-        db.query(`
-            SELECT COALESCE(SUM(total_amount), 0) AS s FROM orders
-            WHERE restaurant_id = ANY($1::uuid[])
-              AND placed_at >= CURRENT_DATE
-              AND placed_at  < CURRENT_DATE + INTERVAL '1 day'
-              AND status = 'delivered'
-        `, [ids]),
-        db.query(`
-            SELECT COUNT(*) AS c FROM orders
-            WHERE restaurant_id = ANY($1::uuid[])
-              AND placed_at >= CURRENT_DATE - INTERVAL '7 days'
-              AND placed_at  < CURRENT_DATE - INTERVAL '6 days'
-        `, [ids]),
-        db.query(`
-            SELECT COALESCE(SUM(total_amount), 0) AS s FROM orders
-            WHERE restaurant_id = ANY($1::uuid[])
-              AND placed_at >= CURRENT_DATE - INTERVAL '7 days'
-              AND placed_at  < CURRENT_DATE - INTERVAL '6 days'
-              AND status = 'delivered'
-        `, [ids]),
-        db.query(`
-            SELECT COUNT(*) AS c FROM orders
-            WHERE restaurant_id = ANY($1::uuid[])
-              AND status IN (
-                'pending','accepted_by_driver','ordering_at_restaurant',
-                'order_ready','picked_up','on_the_way'
-              )
-        `, [ids]),
-    ]);
+    const { rows } = await db.query(`
+        SELECT
+            COUNT(*) FILTER (
+                WHERE placed_at >= CURRENT_DATE
+                  AND placed_at < CURRENT_DATE + INTERVAL '1 day'
+            )::int AS t_orders,
+            COALESCE(SUM(total_amount) FILTER (
+                WHERE placed_at >= CURRENT_DATE
+                  AND placed_at < CURRENT_DATE + INTERVAL '1 day'
+                  AND status = 'delivered'
+            ), 0) AS t_revenue,
+            COUNT(*) FILTER (
+                WHERE placed_at >= CURRENT_DATE - INTERVAL '7 days'
+                  AND placed_at < CURRENT_DATE - INTERVAL '6 days'
+            )::int AS lw_orders,
+            COALESCE(SUM(total_amount) FILTER (
+                WHERE placed_at >= CURRENT_DATE - INTERVAL '7 days'
+                  AND placed_at < CURRENT_DATE - INTERVAL '6 days'
+                  AND status = 'delivered'
+            ), 0) AS lw_revenue,
+            COUNT(*) FILTER (
+                WHERE status IN (
+                    'pending','accepted_by_driver','ordering_at_restaurant',
+                    'order_ready','picked_up','on_the_way'
+                )
+            )::int AS active
+        FROM orders
+        WHERE restaurant_id = ANY($1::uuid[])
+    `, [ids]);
 
-    const totalOrders = parseInt(tOrders.rows[0].c, 10);
-    const totalRevenue = parseFloat(tRevenue.rows[0].s);
-    const lwOrdersCount = parseInt(lwOrders.rows[0].c, 10);
-    const lwRevenueTotal = parseFloat(lwRevenue.rows[0].s);
+    const row = rows[0] || {};
+    const totalOrders = parseInt(row.t_orders || 0, 10);
+    const totalRevenue = parseFloat(row.t_revenue || 0);
+    const lwOrdersCount = parseInt(row.lw_orders || 0, 10);
+    const lwRevenueTotal = parseFloat(row.lw_revenue || 0);
 
     const ordersChange = lwOrdersCount > 0
         ? Math.round(((totalOrders - lwOrdersCount) / lwOrdersCount) * 100)
@@ -213,7 +228,7 @@ async function buildDashboardStats(managerId, restaurants) {
         total_revenue: totalRevenue.toFixed(2),
         total_orders: totalOrders,
         avg_rating: avgRating,
-        active_orders: parseInt(active.rows[0].c, 10),
+        active_orders: parseInt(row.active || 0, 10),
         total_reviews: totalReviews,
         revenue_change: revenueChange,
         orders_change: ordersChange,
@@ -1636,14 +1651,6 @@ router.post(['/api/orders/:id/publish', '/api/orders/:id/accept'], isLoggedInApi
 
         const Order = getModel.Order();
         const order = await Order.acceptByManager(req.params.id, req.session.user.id);
-        const io = req.app.get('io');
-        if (io) {
-            io.to('restaurant_managers').emit('order_updated', {
-                orderId: order.id,
-                status: order.status,
-                order
-            });
-        }
         res.json({
             success: true,
             message: 'Order accepted! Waiting for customer payment before dispatching to drivers.',
@@ -1663,14 +1670,6 @@ router.post('/api/orders/:id/reject', isLoggedInApi, async (req, res) => {
 
         const Order = getModel.Order();
         const order = await Order.rejectByManager(req.params.id, req.session.user.id);
-        const io = req.app.get('io');
-        if (io) {
-            io.to('restaurant_managers').emit('order_updated', {
-                orderId: order.id,
-                status: 'cancelled',
-                order
-            });
-        }
         res.json({
             success: true,
             message: 'Order rejected and cancelled.',
@@ -1737,50 +1736,44 @@ router.patch('/api/orders/:id/status', isLoggedInApi, async (req, res) => {
     }
 });
 
-/** GET /api/manager/orders/stats — summary stats for the orders page */
+/** GET /api/manager/orders/stats — summary stats for the orders page (single consolidated query) */
 router.get('/api/orders/stats', isLoggedInApi, async (req, res) => {
     try {
         const manager = await resolveManager(req);
         if (!manager) return res.status(403).json({ success: false, error: 'Manager not found' });
 
-        const restaurants = await fetchRestaurants(manager.id);
-        if (!restaurants.length) {
+        const ids = await fetchRestaurantIdsFast(manager.id);
+        if (!ids.length) {
             return res.json({ success: true, stats: { active: 0, pending: 0, revenue: '0.00', total_today: 0 } });
         }
 
-        const ids = restaurants.map(r => r.id);
+        const { rows } = await db.query(`
+            SELECT
+                COUNT(*) FILTER (
+                    WHERE status IN ('pending','accepted_by_driver','ordering_at_restaurant','order_ready','picked_up','on_the_way')
+                )::int AS active,
+                COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
+                COALESCE(SUM(total_amount) FILTER (
+                    WHERE placed_at >= CURRENT_DATE
+                      AND placed_at < CURRENT_DATE + INTERVAL '1 day'
+                      AND status = 'delivered'
+                ), 0) AS revenue,
+                COUNT(*) FILTER (
+                    WHERE placed_at >= CURRENT_DATE
+                      AND placed_at < CURRENT_DATE + INTERVAL '1 day'
+                )::int AS total_today
+            FROM orders
+            WHERE restaurant_id = ANY($1::uuid[])
+        `, [ids]);
 
-        const [active, pending, revenue, total] = await Promise.all([
-            db.query(`
-                SELECT COUNT(*) AS c FROM orders
-                WHERE restaurant_id = ANY($1::uuid[])
-                  AND status IN ('pending','accepted_by_driver','ordering_at_restaurant','order_ready','picked_up','on_the_way')
-            `, [ids]),
-            db.query(`
-                SELECT COUNT(*) AS c FROM orders
-                WHERE restaurant_id = ANY($1::uuid[])
-                  AND status = 'pending'
-            `, [ids]),
-            db.query(`
-                SELECT COALESCE(SUM(total_amount), 0) AS s FROM orders
-                WHERE restaurant_id = ANY($1::uuid[])
-                  AND DATE(placed_at) = CURRENT_DATE
-                  AND status = 'delivered'
-            `, [ids]),
-            db.query(`
-                SELECT COUNT(*) AS c FROM orders
-                WHERE restaurant_id = ANY($1::uuid[])
-                  AND DATE(placed_at) = CURRENT_DATE
-            `, [ids]),
-        ]);
-
+        const row = rows[0] || {};
         res.json({
             success: true,
             stats: {
-                active: parseInt(active.rows[0].c, 10),
-                pending: parseInt(pending.rows[0].c, 10),
-                revenue: parseFloat(revenue.rows[0].s).toFixed(2),
-                total_today: parseInt(total.rows[0].c, 10),
+                active: parseInt(row.active || 0, 10),
+                pending: parseInt(row.pending || 0, 10),
+                revenue: parseFloat(row.revenue || 0).toFixed(2),
+                total_today: parseInt(row.total_today || 0, 10),
             },
         });
     } catch (err) {
