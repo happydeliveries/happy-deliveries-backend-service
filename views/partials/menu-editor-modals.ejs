@@ -1,0 +1,239 @@
+<!-- Menu Modal -->
+<div class="modal-overlay" id="menuModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title" id="menuModalTitle">Add New Menu</h3>
+        <p class="modal-description">Create a new menu for your restaurant.</p>
+      </div>
+      <button type="button" class="modal-close" onclick="closeModal('menuModal')">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form id="menuForm" onsubmit="event.preventDefault(); saveMenu();">
+        <input type="hidden" id="menuId">
+        <div class="form-group">
+          <label class="form-label">Menu Name *</label>
+          <input type="text" class="form-input" id="menuName" required placeholder="e.g., Main Menu, Lunch Specials">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-input" id="menuDescription" rows="2" placeholder="Brief description of this menu"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Display Order</label>
+            <input type="number" class="form-input" id="menuDisplayOrder" value="0" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <div style="display:flex;align-items:center;gap:0.75rem;height:2.25rem;">
+              <input type="checkbox" class="toggle-switch" id="menuIsActive" checked>
+              <label class="toggle-label" for="menuIsActive">Active</label>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" onclick="closeModal('menuModal')">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveMenu()">
+        <i class="fas fa-save"></i> Save Menu
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Menu Item Modal -->
+<div class="modal-overlay" id="itemModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title" id="itemModalTitle">Add Menu Item</h3>
+        <p class="modal-description">Add or edit a menu item and its customization options.</p>
+      </div>
+      <button type="button" class="modal-close" onclick="closeModal('itemModal')">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form id="itemForm" onsubmit="event.preventDefault(); saveItem();">
+        <input type="hidden" id="itemId">
+        <input type="hidden" id="itemMenuId">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Item Name *</label>
+            <input type="text" class="form-input" id="itemName" required placeholder="e.g., Double Cheese Burger">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Category *</label>
+            <input type="text" class="form-input" id="itemCategory" required list="categoryList" placeholder="e.g., Burgers, Starters, Drinks">
+            <datalist id="categoryList"></datalist>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-input" id="itemDescription" rows="2" placeholder="Describe ingredients, portion size, or preparation style..."></textarea>
+        </div>
+
+        <div class="form-row-3">
+          <div class="form-group">
+            <label class="form-label">Base Price *</label>
+            <div style="position:relative;">
+              <span style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);color:hsl(var(--muted-foreground));font-size:0.875rem;">R</span>
+              <input type="number" class="form-input" id="itemPrice" required step="0.01" min="0" style="padding-left:1.75rem;">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Discounted Price</label>
+            <div style="position:relative;">
+              <span style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);color:hsl(var(--muted-foreground));font-size:0.875rem;">R</span>
+              <input type="number" class="form-input" id="itemDiscountedPrice" step="0.01" min="0" style="padding-left:1.75rem;">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Prep Time (min)</label>
+            <input type="number" class="form-input" id="itemPrepTime" value="15" min="1">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Calories</label>
+            <input type="number" class="form-input" id="itemCalories" min="0" placeholder="kcal">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Image URL</label>
+            <input type="url" class="form-input" id="itemImageUrl" placeholder="https://...">
+            <div id="itemUploadWrap" style="margin-top:0.35rem;display:none;align-items:center;gap:0.5rem;">
+              <input type="file" id="itemImageFile" accept="image/*" style="font-size:0.78rem;" onchange="uploadMenuItemImage(this)">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Ingredients</label>
+          <div class="tag-input-container" id="ingredientsContainer">
+            <input type="text" class="tag-input" id="ingredientsInput" placeholder="Type ingredient and press Enter...">
+          </div>
+          <small style="font-size:0.75rem;color:hsl(var(--muted-foreground));">Press Enter or comma to add each ingredient</small>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Dietary &amp; Highlight Tags</label>
+          <div class="tag-input-container" id="tagsContainer">
+            <input type="text" class="tag-input" id="tagsInput" placeholder="Type tag and press Enter...">
+          </div>
+          <small style="font-size:0.75rem;color:hsl(var(--muted-foreground));">e.g., spicy, gluten-free, halaal, vegan, bestseller</small>
+        </div>
+
+        <!-- Customizations & Option Groups Builder -->
+        <div class="form-group" style="border:1px solid hsl(var(--border));border-radius:var(--radius);padding:1rem;background:hsl(var(--muted) / 0.35);">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">
+            <div>
+              <label class="form-label" style="margin-bottom:0;font-size:0.95rem;font-weight:600;">
+                <i class="fas fa-sliders-h" style="margin-right:0.4rem;color:hsl(var(--primary));"></i>
+                Customization &amp; Option Groups
+              </label>
+              <div style="font-size:0.78rem;color:hsl(var(--muted-foreground));">
+                Configure sizes, preparation styles, required side choices, or paid extras/add-ons.
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-primary" onclick="addCustomizationGroup()">
+              <i class="fas fa-plus"></i> Add Option Group
+            </button>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+            <span style="font-size:0.75rem;font-weight:500;color:hsl(var(--muted-foreground));">Quick Presets:</span>
+            <button type="button" class="btn btn-sm btn-outline" style="height:1.75rem;font-size:0.75rem;padding:0 0.6rem;" onclick="addPresetGroup('size')">+ Size (Reg/Med/Lrg)</button>
+            <button type="button" class="btn btn-sm btn-outline" style="height:1.75rem;font-size:0.75rem;padding:0 0.6rem;" onclick="addPresetGroup('spice')">+ Spice Level</button>
+            <button type="button" class="btn btn-sm btn-outline" style="height:1.75rem;font-size:0.75rem;padding:0 0.6rem;" onclick="addPresetGroup('side')">+ Choice of Side</button>
+            <button type="button" class="btn btn-sm btn-outline" style="height:1.75rem;font-size:0.75rem;padding:0 0.6rem;" onclick="addPresetGroup('extras')">+ Extra Toppings / Add-ons</button>
+          </div>
+
+          <div id="customizationsContainer" style="display:flex;flex-direction:column;gap:0.75rem;">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <div class="form-row-3">
+          <div style="display:flex;align-items:center;gap:0.75rem;">
+            <input type="checkbox" class="toggle-switch" id="itemIsAvailable" checked>
+            <label class="toggle-label" for="itemIsAvailable">Available</label>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.75rem;">
+            <input type="checkbox" class="toggle-switch" id="itemIsVeg">
+            <label class="toggle-label" for="itemIsVeg">Vegetarian</label>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.75rem;">
+            <input type="checkbox" class="toggle-switch" id="itemIsPopular">
+            <label class="toggle-label" for="itemIsPopular">Popular Item</label>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" onclick="closeModal('itemModal')">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveItem()">
+        <i class="fas fa-save"></i> Save Item
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Category Management Modal -->
+<div class="modal-overlay" id="categoryModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">Manage Categories</h3>
+        <p class="modal-description">Add or remove item categories.</p>
+      </div>
+      <button type="button" class="modal-close" onclick="closeModal('categoryModal')">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Add New Category</label>
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <input type="text" class="form-input" id="newCategoryName" placeholder="Category name" style="flex:1;">
+          <button type="button" class="btn btn-primary btn-icon" onclick="addCategory()">
+            <i class="fas fa-plus"></i>
+          </button>
+        </div>
+      </div>
+      <div id="categoriesList" class="list-group">
+        <!-- Categories populated dynamically -->
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" onclick="closeModal('categoryModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal modal-sm">
+    <div class="modal-header" style="border-bottom:none;text-align:center;padding-bottom:0;">
+      <div style="margin:0 auto;">
+        <i class="fas fa-exclamation-triangle" style="font-size:2.5rem;color:#f59e0b;margin-bottom:0.75rem;display:block;"></i>
+        <h3 class="modal-title">Confirm Delete</h3>
+      </div>
+    </div>
+    <div class="modal-body" style="text-align:center;">
+      <p id="deleteMessage" style="color:hsl(var(--muted-foreground));font-size:0.9rem;">Are you sure you want to delete this?</p>
+    </div>
+    <div class="modal-footer" style="justify-content:center;">
+      <button type="button" class="btn btn-outline" onclick="closeModal('deleteModal')">Cancel</button>
+      <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+        <i class="fas fa-trash"></i> Delete
+      </button>
+    </div>
+  </div>
+</div>

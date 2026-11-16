@@ -80,6 +80,7 @@ const {
     parseBool,
 } = require('../src/utils/restaurantAccess');
 const { attachManageRestaurantRoutes } = require('./manageRestaurantsWeb');
+const { handleSingleImageUpload } = require('../src/utils/imageUpload');
 
 // ─── Models (lazy-loaded to survive missing optional deps) ──
 const getModel = {
@@ -1321,8 +1322,10 @@ router.delete('/api/menus/:id', isLoggedInApi, async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  MENU ITEMS API
+//  MENU ITEMS API & SHARED IMAGE UPLOAD
 // ═══════════════════════════════════════════════════════════════════════════════
+
+router.post('/api/upload', isLoggedInApi, handleSingleImageUpload);
 
 /** GET /api/manager/menu-items/:id */
 router.get('/api/menu-items/:id', isLoggedInApi, async (req, res) => {

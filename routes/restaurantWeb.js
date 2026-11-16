@@ -19,15 +19,7 @@ const {
   fetchOrderDetail,
   parseBool,
 } = require('../src/utils/restaurantAccess');
-
-let uploadMiddleware = null;
-try {
-  const multer = require('multer');
-  const { storage } = require('../src/config/cloudinary');
-  uploadMiddleware = multer({ storage }).single('image');
-} catch (err) {
-  console.warn('[restaurantWeb] Cloudinary upload unavailable, URL inputs remain active:', err.message);
-}
+const { handleSingleImageUpload } = require('../src/utils/imageUpload');
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  PARTNER AUTH HELPERS (Session-isolated via req.session.restaurantUser)
@@ -462,20 +454,7 @@ router.get('/api/portal/summary', isPartnerApiLoggedIn, async (req, res) => {
   }
 });
 
-router.post('/api/upload', isPartnerApiLoggedIn, (req, res) => {
-  if (!uploadMiddleware) {
-    return res.status(503).json({ success: false, error: 'Image upload service unavailable; please paste an image URL.' });
-  }
-  uploadMiddleware(req, res, (err) => {
-    if (err) {
-      return res.status(400).json({ success: false, error: err.message || 'Image upload failed' });
-    }
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: 'No image file provided' });
-    }
-    res.json({ success: true, url: req.file.path });
-  });
-});
+router.post('/api/upload', isPartnerApiLoggedIn, handleSingleImageUpload);
 
 /** PUT /restaurant/api/restaurant — update partner's restaurant info & operational settings */
 router.put('/api/restaurant', isPartnerApiLoggedIn, async (req, res) => {
@@ -702,7 +681,9 @@ router.post('/api/menu-items', isPartnerApiLoggedIn, async (req, res) => {
       is_available: parseBool(req.body.is_available, true),
       is_veg: parseBool(req.body.is_veg, false),
       is_popular: parseBool(req.body.is_popular, false),
-      calories: parseInt(req.body.calories, 10) || 0,
+      calories: req.body.calories !== undefined && req.body.calories !== null && req.body.calories !== ''
+        ? (parseInt(req.body.calories, 10) || 0)
+        : null,
       preparation_time_minutes: parseInt(req.body.preparation_time_minutes, 10) || 15,
     });
     res.status(201).json({ success: true, item });
@@ -755,6 +736,17 @@ router.put('/api/menu-items/:id', isPartnerApiLoggedIn, async (req, res) => {
         ? null
         : parseFloat(updates.discounted_price);
     }
+    if (updates.calories !== undefined) {
+      updates.calories = updates.calories === '' || updates.calories === null
+        ? null
+        : (parseInt(updates.calories, 10) || 0);
+    }
+    if (updates.preparation_time_minutes !== undefined) {
+      updates.preparation_time_minutes = parseInt(updates.preparation_time_minutes, 10) || 15;
+    }
+    if (updates.is_available !== undefined) updates.is_available = parseBool(updates.is_available, true);
+    if (updates.is_veg !== undefined) updates.is_veg = parseBool(updates.is_veg, false);
+    if (updates.is_popular !== undefined) updates.is_popular = parseBool(updates.is_popular, false);
 
     const item = await Menu.updateMenuItem(req.params.id, updates);
     res.json({ success: true, item });
