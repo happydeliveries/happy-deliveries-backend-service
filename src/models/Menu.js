@@ -283,6 +283,7 @@ class Menu {
       JOIN restaurants r ON mi.restaurant_id = r.id
       WHERE mi.is_available = true
         AND r.is_active = true
+        AND COALESCE(r.approval_status, 'approved') = 'approved'
         ${distanceWhere}
         ${termWhere}
         ${ratingWhere}
@@ -381,6 +382,7 @@ class Menu {
         WHERE mi.is_available = true
           AND mi.is_popular = true
           AND r.is_active = true
+          AND COALESCE(r.approval_status, 'approved') = 'approved'
           AND ST_DWithin(
             r.location::geography,
             ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
@@ -405,6 +407,7 @@ class Menu {
         WHERE mi.is_available = true
           AND mi.is_popular = true
           AND r.is_active = true
+          AND COALESCE(r.approval_status, 'approved') = 'approved'
         ORDER BY
           COALESCE(r.average_rating, 0) DESC,
           mi.created_at DESC
@@ -463,6 +466,7 @@ class Menu {
       JOIN restaurants r ON mi.restaurant_id = r.id
       WHERE mi.is_available = true
         AND r.is_active = true
+        AND COALESCE(r.approval_status, 'approved') = 'approved'
         AND r.is_accepting_orders = true
         AND mi.category ILIKE $4
         AND ST_DWithin(
@@ -488,7 +492,9 @@ class Menu {
         r.name as restaurant_name
       FROM menus m
       JOIN restaurants r ON m.restaurant_id = r.id
-      WHERE m.is_active = true AND r.is_active = true
+      WHERE m.is_active = true
+        AND r.is_active = true
+        AND COALESCE(r.approval_status, 'approved') = 'approved'
       ORDER BY m.name, m.display_order
       LIMIT $1
     `;
@@ -522,6 +528,7 @@ class Menu {
         JOIN restaurants r ON mi.restaurant_id = r.id
         WHERE mi.is_available = true
           AND r.is_active = true
+          AND COALESCE(r.approval_status, 'approved') = 'approved'
           AND mi.category IS NOT NULL
           AND TRIM(mi.category) <> ''
           ${distanceCondition}
@@ -583,6 +590,7 @@ class Menu {
       WHERE mi.is_available = true
         AND mi.is_popular = true
         AND r.is_active = true
+        AND COALESCE(r.approval_status, 'approved') = 'approved'
         ${distanceCondition}
       ORDER BY ${hasCoords ? 'distance_meters ASC,' : ''} COALESCE(r.average_rating, 0) DESC, mi.created_at DESC
       LIMIT ${limitParam}

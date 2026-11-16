@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0a">
+  <title><%= title || 'Restaurant Registration Portal · Happy Delivery' %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --black: #0a0a0a;
+      --ink: #171717;
+      --slate: #404040;
+      --muted: #737373;
+      --border: #e5e5e5;
+      --border-strong: #d4d4d4;
+      --bg: #f5f5f5;
+      --surface: #ffffff;
+      --soft: #fafafa;
+      --chip: #efefef;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    .topbar {
+      background: #635700ff;
+      color: #fff;
+      padding: 14px clamp(14px, 4vw, 28px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: #fff;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: url("https://res.cloudinary.com/dpdira4rd/image/upload/v1794689123/logo-square_pzavip.png") center/cover no-repeat;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-sub {
+      font-size: 12px;
+      color: #a3a3a3;
+    }
+
+    .topbar-links {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .topbar-links a {
+      color: #e5e5e5;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .topbar-links a:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #262626 0%, #0a0a0a 100%);
+      color: #fff;
+      padding: clamp(28px, 5vw, 42px) clamp(16px, 4vw, 24px) clamp(56px, 8vw, 72px);
+      text-align: center;
+    }
+
+    .hero h1 {
+      font-size: clamp(22px, 5vw, 30px);
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .hero p {
+      color: #d4d4d4;
+      max-width: 660px;
+      margin: 0 auto;
+      font-size: 14.5px;
+    }
+
+    .steps-banner {
+      display: flex;
+      justify-content: center;
+      gap: 10px 14px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .step-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      padding: 7px 14px;
+      font-size: 12.5px;
+      color: #e5e5e5;
+    }
+
+    .step-pill .num {
+      background: #fff;
+      color: var(--black);
+      width: 20px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 11px;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: -36px auto 60px;
+      padding: 0 clamp(12px, 3vw, 20px);
+    }
+
+    .tab-bar {
+      display: flex;
+      background: var(--surface);
+      padding: 6px;
+      gap: 4px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      flex: 1;
+      min-height: 46px;
+      padding: 11px 14px;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .tab-btn.active {
+      background: var(--black);
+      color: #fff;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: clamp(18px, 4vw, 26px);
+      margin-bottom: 20px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 14px;
+      margin-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-icon {
+      width: 38px;
+      height: 38px;
+      background: var(--ink);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 15px;
+    }
+
+    .section-header h2 {
+      font-size: 16.5px;
+      font-weight: 800;
+    }
+
+    .section-header p {
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .full {
+      grid-column: 1 / -1;
+    }
+
+    @media (max-width: 720px) {
+
+      .grid-2,
+      .grid-3 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .form-group label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .req {
+      color: #dc2626;
+    }
+
+    .form-hint {
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border-strong);
+      font-size: 14px;
+      font-family: inherit;
+      background: #fff;
+      color: var(--ink);
+      outline: none;
+    }
+
+    .form-control:focus {
+      border-color: var(--black);
+      box-shadow: 0 0 0 2px rgba(23, 23, 23, 0.12);
+    }
+
+    textarea.form-control {
+      resize: vertical;
+      min-height: 82px;
+    }
+
+    .btn-primary {
+      background: var(--black);
+      color: #fff;
+      border: none;
+      padding: 13px 22px;
+      font-size: 14.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+
+    .btn-primary:hover {
+      background: #262626;
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-outline {
+      background: #fff;
+      color: var(--ink);
+      border: 1.5px solid var(--border-strong);
+      padding: 10px 16px;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+    }
+
+    .btn-outline:hover {
+      background: var(--chip);
+    }
+
+    .alert {
+      padding: 15px 18px;
+      margin-bottom: 20px;
+      display: none;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 14px;
+    }
+
+    .alert.show {
+      display: flex;
+    }
+
+    .alert-success {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      border-left: 4px solid #16a34a;
+      color: #14532d;
+    }
+
+    .alert-error {
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      border-left: 4px solid #dc2626;
+      color: #7f1d1d;
+    }
+
+    .alert-info {
+      background: #fafafa;
+      border: 1px solid #d4d4d4;
+      border-left: 4px solid #171717;
+      color: #171717;
+    }
+
+    .status-box {
+      padding: 20px;
+      margin-top: 20px;
+      border: 1.5px solid var(--border);
+      background: var(--soft);
+    }
+
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .badge-pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .badge-approved {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .badge-rejected {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .map-box {
+      width: 100%;
+      height: 220px;
+      border: 1px solid var(--border-strong);
+      background: var(--soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <a href="/restaurant/register" class="brand">
+      <div class="brand-icon"></div>
+      <div>
+        <div class="brand-title">Happy Deliveries</div>
+        <div class="brand-sub">Restaurant Onboarding & Partner Portal</div>
+      </div>
+    </a>
+    <nav class="topbar-links">
+      <a href="/restaurant/login"><i class="fas fa-store"></i> Partner Portal Login</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>Partner Your Restaurant with Happy Deliveries</h1>
+    <p>Submit your restaurant profile below. Once approved by our team, log in to build your menus, accept customer orders, and track assigned drivers live.</p>
+    <div class="steps-banner">
+      <div class="step-pill"><span class="num">1</span> Register Restaurant & Owner</div>
+      <div class="step-pill"><span class="num">2</span> Admin Review & Email Confirmation</div>
+      <div class="step-pill"><span class="num">3</span> Manage Menus & Accept Orders</div>
+    </div>
+  </section>
+
+  <main class="container">
+    <div class="tab-bar">
+      <button type="button" class="tab-btn active" id="tabRegisterBtn" onclick="switchTab('register')">
+        <i class="fas fa-store"></i> Register Your Restaurant
+      </button>
+      <button type="button" class="tab-btn" id="tabStatusBtn" onclick="switchTab('status')">
+        <i class="fas fa-clipboard-check"></i> Check Application Status
+      </button>
+    </div>
+
+    <div id="globalAlert" class="alert">
+      <i class="fas fa-info-circle" id="globalAlertIcon" style="margin-top:3px;font-size:18px;"></i>
+      <div id="globalAlertText" style="flex:1;"></div>
+    </div>
+
+    <!-- TAB 1: RESTAURANT APPLICATION -->
+    <div id="registerTabPane">
+      <div id="resubmitBanner" class="alert alert-info">
+        <i class="fas fa-pen-to-square" style="margin-top:3px;font-size:18px;"></i>
+        <div>
+          <strong>Editing & Resubmitting Your Restaurant Application</strong>
+          <div id="resubmitReasonText" style="margin-top:4px;font-size:13px;"></div>
+        </div>
+      </div>
+
+      <form id="restaurantAppForm" onsubmit="submitRestaurantApplication(event)">
+        <!-- 1. Restaurant Profile -->
+        <div class="card">
+          <div class="section-header">
+            <div class="section-icon"><i class="fas fa-utensils"></i></div>
+            <div>
+              <h2>1. Restaurant Profile & Operations</h2>
+              <p>Customer-facing details displayed on the Happy Deliveries mobile app.</p>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="form-group full">
+              <label for="f_restaurant_name">Restaurant Name <span class="req">*</span></label>
+              <input type="text" class="form-control" name="restaurant_name" id="f_restaurant_name" required placeholder="e.g. Jozi Flame Grill">
+            </div>
+            <div class="form-group">
+              <label for="f_cuisine_type">Cuisine Types <span class="req">*</span></label>
+              <input type="text" class="form-control" name="cuisine_type" id="f_cuisine_type" required placeholder="e.g. Burgers, Braai, South African, Beverages">
+              <span class="form-hint">Comma-separated cuisines shown in app filters.</span>
+            </div>
+            <div class="form-group">
+              <label for="f_opening_hours">Opening Hours <span class="req">*</span></label>
+              <input type="text" class="form-control" name="opening_hours" id="f_opening_hours" required value="08:00 - 21:00" placeholder="e.g. 08:00 - 22:00">
+            </div>
+            <div class="form-group full">
+              <label for="f_description">Short Description</label>
+              <textarea class="form-control" name="description" id="f_description" placeholder="Describe your signature dishes, kitchen style, and specialties..."></textarea>
+            </div>
+            <div class="form-group">
+              <label for="f_restaurant_phone">Store Contact Phone <span class="req">*</span></label>
+              <input type="tel" class="form-control" name="restaurant_phone" id="f_restaurant_phone" required placeholder="e.g. 0112345678">
+            </div>
+            <div class="form-group">
+              <label for="f_restaurant_email">Store Contact Email</label>
+              <input type="email" class="form-control" name="restaurant_email" id="f_restaurant_email" placeholder="orders@restaurant.co.za">
+            </div>
+            <div class="form-group">
+              <label for="f_prep_time">Avg Preparation Time (mins) <span class="req">*</span></label>
+              <input type="number" class="form-control" name="preparation_time_minutes" id="f_prep_time" required min="5" max="120" value="25">
+            </div>
+            <div class="form-group">
+              <label for="f_radius_km">Delivery Radius (km) <span class="req">*</span></label>
+              <input type="number" class="form-control" name="delivery_radius_km" id="f_radius_km" required min="1" max="50" value="8">
+            </div>
+            <div class="form-group">
+              <label for="f_logo_url">Logo Image URL (Optional)</label>
+              <input type="url" class="form-control" name="logo_url" id="f_logo_url" placeholder="https://...">
+            </div>
+            <div class="form-group">
+              <label for="f_cover_url">Cover Banner URL (Optional)</label>
+              <input type="url" class="form-control" name="cover_image_url" id="f_cover_url" placeholder="https://...">
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Location & Coordinates -->
+        <div class="card">
+          <div class="section-header">
+            <div class="section-icon"><i class="fas fa-location-dot"></i></div>
+            <div>
+              <h2>2. Restaurant Address & Map Pin</h2>
+              <p>Drivers use these exact coordinates to pick up prepared orders.</p>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="form-group full">
+              <label for="f_address">Full Street Address <span class="req">*</span></label>
+              <textarea class="form-control" name="address" id="f_address" rows="2" required placeholder="e.g. 42 Rivonia Rd, Sandhurst, Sandton, 2196"></textarea>
+            </div>
+            <div class="form-group">
+              <label for="f_city">City / Town <span class="req">*</span></label>
+              <input type="text" class="form-control" name="city" id="f_city" required placeholder="e.g. Johannesburg">
+            </div>
+            <div class="form-group">
+              <label for="f_postal_code">Postal Code <span class="req">*</span></label>
+              <input type="text" class="form-control" name="postal_code" id="f_postal_code" required placeholder="e.g. 2196">
+            </div>
+            <div class="form-group">
+              <label for="f_lat">Latitude</label>
+              <input type="number" step="any" class="form-control" name="latitude" id="f_lat" placeholder="-26.2041" oninput="updateMapPreview()">
+            </div>
+            <div class="form-group">
+              <label for="f_lng">Longitude</label>
+              <div style="display:flex;gap:8px;">
+                <input type="number" step="any" class="form-control" name="longitude" id="f_lng" placeholder="28.0473" oninput="updateMapPreview()">
+                <button type="button" class="btn-outline" onclick="detectLocation()" title="Use current location">
+                  <i class="fas fa-crosshairs"></i> Detect GPS
+                </button>
+              </div>
+            </div>
+            <div class="form-group full">
+              <div id="mapPreview" class="map-box">
+                Enter coordinates or click "Detect GPS" to preview pickup location
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Owner & Business Compliance -->
+        <div class="card">
+          <div class="section-header">
+            <div class="section-icon"><i class="fas fa-id-badge"></i></div>
+            <div>
+              <h2>3. Owner / Authorised Representative</h2>
+              <p>Contact and verification details for your Restaurant Partner Portal account.</p>
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="form-group">
+              <label for="f_first_name">Owner First Name <span class="req">*</span></label>
+              <input type="text" class="form-control" name="first_name" id="f_first_name" required placeholder="First name">
+            </div>
+            <div class="form-group">
+              <label for="f_last_name">Owner Last Name <span class="req">*</span></label>
+              <input type="text" class="form-control" name="last_name" id="f_last_name" required placeholder="Last name">
+            </div>
+            <div class="form-group">
+              <label for="f_phone_number">Owner Mobile Number <span class="req">*</span></label>
+              <input type="tel" class="form-control" name="phone_number" id="f_phone_number" required placeholder="+27 82 ...">
+            </div>
+            <div class="form-group">
+              <label for="f_email">Portal Login Email <span class="req">*</span></label>
+              <input type="email" class="form-control" name="email" id="f_email" required placeholder="owner@restaurant.co.za">
+              <span class="form-hint">Used for portal sign in & approval updates.</span>
+            </div>
+            <div class="form-group">
+              <label for="f_owner_id_number">ID / Passport Number</label>
+              <input type="text" class="form-control" name="owner_id_number" id="f_owner_id_number" placeholder="SA ID or Passport">
+            </div>
+            <div class="form-group">
+              <label for="f_business_reg">Company / CIPC Reg #</label>
+              <input type="text" class="form-control" name="business_registration_number" id="f_business_reg" placeholder="e.g. 2023/123456/07">
+            </div>
+            <div class="form-group">
+              <label for="f_vat_number">VAT Number (Optional)</label>
+              <input type="text" class="form-control" name="vat_number" id="f_vat_number" placeholder="Optional">
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Banking & Payout -->
+        <div class="card">
+          <div class="section-header">
+            <div class="section-icon"><i class="fas fa-building-columns"></i></div>
+            <div>
+              <h2>4. Settlement Banking Details</h2>
+              <p>Where order payouts are settled.</p>
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="form-group">
+              <label for="f_bank_name">Bank Name <span class="req">*</span></label>
+              <select class="form-control" name="bank_name" id="f_bank_name" required>
+                <option value="">Select bank...</option>
+                <option value="FNB (First National Bank)">FNB (First National Bank)</option>
+                <option value="Standard Bank">Standard Bank</option>
+                <option value="ABSA">ABSA</option>
+                <option value="Nedbank">Nedbank</option>
+                <option value="Capitec Business">Capitec Business</option>
+                <option value="TymeBank">TymeBank</option>
+                <option value="Discovery Bank">Discovery Bank</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="f_account_holder">Account Holder Name <span class="req">*</span></label>
+              <input type="text" class="form-control" name="account_holder_name" id="f_account_holder" required placeholder="Company or Owner Name">
+            </div>
+            <div class="form-group">
+              <label for="f_account_number">Account Number <span class="req">*</span></label>
+              <input type="text" class="form-control" name="account_number" id="f_account_number" required placeholder="Account number">
+            </div>
+            <div class="form-group">
+              <label for="f_branch_code">Branch Code <span class="req">*</span></label>
+              <input type="text" class="form-control" name="branch_code" id="f_branch_code" required placeholder="e.g. 250655">
+            </div>
+            <div class="form-group">
+              <label for="f_account_type">Account Type</label>
+              <select class="form-control" name="account_type" id="f_account_type">
+                <option value="Cheque / Business Current">Cheque / Business Current</option>
+                <option value="Savings / Transmission">Savings / Transmission</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="f_applicant_notes">Notes for Reviewer</label>
+              <input type="text" class="form-control" name="applicant_notes" id="f_applicant_notes" placeholder="Optional notes...">
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Portal Credentials -->
+        <div class="card">
+          <div class="section-header">
+            <div class="section-icon"><i class="fas fa-lock"></i></div>
+            <div>
+              <h2>5. Partner Portal Password</h2>
+              <p>Use your email and this password to check status and log in to your Restaurant Portal once approved.</p>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="form-group">
+              <label for="f_password">Password <span class="req">*</span></label>
+              <input type="password" class="form-control" name="password" id="f_password" required minlength="6" placeholder="At least 6 characters">
+            </div>
+            <div class="form-group">
+              <label for="f_confirm_password">Confirm Password <span class="req">*</span></label>
+              <input type="password" class="form-control" id="f_confirm_password" required minlength="6" placeholder="Confirm password">
+            </div>
+          </div>
+
+          <div style="margin-top:22px;">
+            <button type="submit" class="btn-primary" id="submitBtn">
+              <i class="fas fa-paper-plane"></i>
+              <span id="submitBtnText">Submit Restaurant Application</span>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- TAB 2: CHECK STATUS -->
+    <div id="statusTabPane" style="display:none;">
+      <div class="card">
+        <div class="section-header">
+          <div class="section-icon"><i class="fas fa-clipboard-check"></i></div>
+          <div>
+            <h2>Check Your Restaurant Application Status</h2>
+            <p>Enter the email address and password used when registering your restaurant.</p>
+          </div>
+        </div>
+
+        <form onsubmit="checkApplicationStatus(event)">
+          <div class="grid-2">
+            <div class="form-group">
+              <label for="status_email">Registered Login Email <span class="req">*</span></label>
+              <input type="email" class="form-control" id="status_email" required placeholder="owner@restaurant.co.za">
+            </div>
+            <div class="form-group">
+              <label for="status_password">Account Password <span class="req">*</span></label>
+              <input type="password" class="form-control" id="status_password" required placeholder="Your password">
+            </div>
+          </div>
+          <div style="margin-top:16px;">
+            <button type="submit" class="btn-primary" id="checkStatusBtn">
+              <i class="fas fa-magnifying-glass"></i> Check Status
+            </button>
+          </div>
+        </form>
+
+        <div id="statusResultContainer" style="display:none;"></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let lastCheckedApp = null;
+    let lastCheckedPass = '';
+
+    function esc(val) {
+      if (val === null || val === undefined) return '';
+      return String(val).replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      } [c]));
+    }
+
+    function switchTab(tab) {
+      const regPane = document.getElementById('registerTabPane');
+      const statusPane = document.getElementById('statusTabPane');
+      const regBtn = document.getElementById('tabRegisterBtn');
+      const statusBtn = document.getElementById('tabStatusBtn');
+      if (tab === 'status') {
+        regPane.style.display = 'none';
+        statusPane.style.display = 'block';
+        regBtn.classList.remove('active');
+        statusBtn.classList.add('active');
+      } else {
+        regPane.style.display = 'block';
+        statusPane.style.display = 'none';
+        regBtn.classList.add('active');
+        statusBtn.classList.remove('active');
+      }
+    }
+
+    function showAlert(type, htmlMessage) {
+      const el = document.getElementById('globalAlert');
+      const icon = document.getElementById('globalAlertIcon');
+      const text = document.getElementById('globalAlertText');
+      el.className = 'alert show ' + (type === 'success' ? 'alert-success' : type === 'error' ? 'alert-error' : 'alert-info');
+      icon.className = 'fas ' + (type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-info');
+      text.innerHTML = htmlMessage;
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+
+    function updateMapPreview() {
+      const lat = document.getElementById('f_lat').value.trim();
+      const lng = document.getElementById('f_lng').value.trim();
+      const box = document.getElementById('mapPreview');
+      if (lat && lng) {
+        box.innerHTML = `<iframe width="100%" height="100%" frameborder="0" style="border:0;" src="https://maps.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}&z=15&output=embed"></iframe>`;
+      }
+    }
+
+    function detectLocation() {
+      if (!navigator.geolocation) {
+        alert('Geolocation is not supported by your browser.');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          document.getElementById('f_lat').value = pos.coords.latitude.toFixed(6);
+          document.getElementById('f_lng').value = pos.coords.longitude.toFixed(6);
+          updateMapPreview();
+        },
+        () => alert('Could not access GPS location. Please enter coordinates manually.')
+      );
+    }
+
+    async function submitRestaurantApplication(e) {
+      e.preventDefault();
+      const form = document.getElementById('restaurantAppForm');
+      const fd = new FormData(form);
+      const payload = Object.fromEntries(fd.entries());
+      const confirmPass = document.getElementById('f_confirm_password').value;
+
+      if (payload.password !== confirmPass) {
+        showAlert('error', 'Passwords do not match. Please re-enter them carefully.');
+        return;
+      }
+
+      const btn = document.getElementById('submitBtn');
+      const btnText = document.getElementById('submitBtnText');
+      btn.disabled = true;
+      btnText.textContent = 'Submitting Application...';
+
+      try {
+        const res = await fetch('/restaurant/api/applications', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Submission failed');
+
+        showAlert('success', `
+          <strong>${esc(data.message)}</strong><br/>
+          <span style="font-size:13px;">You can track live review progress anytime on the <strong>Check Application Status</strong> tab. Once approved, sign in at <a href="/restaurant/login" style="color:inherit;font-weight:700;">/restaurant/login</a>.</span>
+        `);
+        document.getElementById('status_email').value = payload.email;
+        document.getElementById('resubmitBanner').classList.remove('show');
+        form.reset();
+        document.getElementById('f_opening_hours').value = '08:00 - 21:00';
+        document.getElementById('f_prep_time').value = '25';
+        document.getElementById('f_radius_km').value = '8';
+      } catch (err) {
+        showAlert('error', esc(err.message));
+      } finally {
+        btn.disabled = false;
+        btnText.textContent = 'Submit Restaurant Application';
+      }
+    }
+
+    async function checkApplicationStatus(e) {
+      e.preventDefault();
+      const email = document.getElementById('status_email').value.trim();
+      const password = document.getElementById('status_password').value;
+      const box = document.getElementById('statusResultContainer');
+      const btn = document.getElementById('checkStatusBtn');
+
+      btn.disabled = true;
+      try {
+        const res = await fetch('/restaurant/api/applications/status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email,
+            password
+          }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Lookup failed');
+
+        lastCheckedApp = data.restaurant;
+        lastCheckedPass = password;
+
+        const r = data.restaurant;
+        const st = r.approval_status || 'pending';
+        const badgeClass = st === 'approved' ? 'badge-approved' : st === 'rejected' ? 'badge-rejected' : 'badge-pending';
+        const badgeLabel = st === 'approved' ? 'Approved — Portal Ready' : st === 'rejected' ? 'Action Required — Not Approved' : 'Pending Review';
+
+        box.style.display = 'block';
+        box.innerHTML = `
+          <div class="status-box">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+              <div>
+                <div style="font-size:18px;font-weight:800;">${esc(r.name)}</div>
+                <div style="font-size:13px;color:var(--muted);">${esc(r.cuisine_type || 'Restaurant')} · ${esc(r.address)}</div>
+              </div>
+              <span class="badge-status ${badgeClass}">${badgeLabel}</span>
+            </div>
+
+            ${st === 'pending' ? `
+              <p style="margin-top:12px;font-size:14px;">Happy Deliveries management is reviewing your restaurant profile, address, and payout information. You will receive an email as soon as your account is approved.</p>
+              <div style="margin-top:14px;">
+                <button type="button" class="btn-outline" onclick="loadAppIntoEditForm()">
+                  <i class="fas fa-pen"></i> Edit Application Details
+                </button>
+              </div>
+            ` : st === 'approved' ? `
+              <p style="margin-top:12px;font-size:14px;color:#166534;"><strong>Congratulations!</strong> Your restaurant is approved and ready. Sign in to the Restaurant Partner Portal to add menus & items, manage store hours, and accept incoming orders.</p>
+              <div style="margin-top:14px;">
+                <a href="/restaurant/login" class="btn-primary">
+                  <i class="fas fa-right-to-bracket"></i> Sign In to Restaurant Partner Portal →
+                </a>
+              </div>
+            ` : `
+              <div style="margin-top:12px;padding:12px 14px;background:#fef2f2;border-left:4px solid #dc2626;color:#7f1d1d;">
+                <strong>Reviewer Feedback:</strong>
+                <div style="margin-top:4px;white-space:pre-line;font-size:13.5px;">${esc(r.rejection_reason || 'Please review your application details and resubmit.')}</div>
+              </div>
+              <div style="margin-top:14px;">
+                <button type="button" class="btn-primary" onclick="loadAppIntoEditForm()">
+                  <i class="fas fa-pen-to-square"></i> Edit & Resubmit Application
+                </button>
+              </div>
+            `}
+          </div>
+        `;
+      } catch (err) {
+        box.style.display = 'block';
+        box.innerHTML = `<div class="status-box" style="border-color:#dc2626;color:#991b1b;">${esc(err.message)}</div>`;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function loadAppIntoEditForm() {
+      if (!lastCheckedApp) return;
+      const r = lastCheckedApp;
+      const d = r.application_details || {};
+
+      document.getElementById('f_restaurant_name').value = r.name || '';
+      document.getElementById('f_cuisine_type').value = r.cuisine_type || '';
+      document.getElementById('f_opening_hours').value = r.opening_hours_display || '08:00 - 21:00';
+      document.getElementById('f_description').value = r.description || '';
+      document.getElementById('f_restaurant_phone').value = r.phone_number || '';
+      document.getElementById('f_restaurant_email').value = r.email || '';
+      document.getElementById('f_prep_time').value = r.preparation_time_minutes || 25;
+      document.getElementById('f_radius_km').value = r.delivery_radius_km || 8;
+      document.getElementById('f_logo_url').value = r.logo_url || '';
+      document.getElementById('f_cover_url').value = r.cover_image_url || '';
+
+      document.getElementById('f_address').value = r.address || '';
+      document.getElementById('f_city').value = d.city || '';
+      document.getElementById('f_postal_code').value = d.postal_code || '';
+      if (r.lat) document.getElementById('f_lat').value = r.lat;
+      if (r.lng) document.getElementById('f_lng').value = r.lng;
+      updateMapPreview();
+
+      document.getElementById('f_first_name').value = r.owner_first_name || d.owner_first_name || '';
+      document.getElementById('f_last_name').value = r.owner_last_name || d.owner_last_name || '';
+      document.getElementById('f_phone_number').value = r.owner_phone || d.owner_phone || '';
+      document.getElementById('f_email').value = r.owner_email || d.owner_email || '';
+      document.getElementById('f_owner_id_number').value = d.owner_id_number || '';
+      document.getElementById('f_business_reg').value = d.business_registration_number || '';
+      document.getElementById('f_vat_number').value = d.vat_number || '';
+
+      document.getElementById('f_bank_name').value = d.bank_name || '';
+      document.getElementById('f_account_holder').value = d.account_holder_name || '';
+      document.getElementById('f_account_number').value = d.account_number || '';
+      document.getElementById('f_branch_code').value = d.branch_code || '';
+      if (d.account_type) document.getElementById('f_account_type').value = d.account_type;
+      document.getElementById('f_applicant_notes').value = d.applicant_notes || '';
+
+      document.getElementById('f_password').value = lastCheckedPass;
+      document.getElementById('f_confirm_password').value = lastCheckedPass;
+
+      document.getElementById('resubmitReasonText').textContent = r.rejection_reason ?
+        `Reason from management: ${r.rejection_reason}` :
+        'Update any fields below and submit again for review.';
+      document.getElementById('resubmitBanner').classList.add('show');
+      document.getElementById('submitBtnText').textContent = 'Resubmit Updated Restaurant Application';
+
+      switchTab('register');
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const qTab = new URLSearchParams(window.location.search).get('tab');
+      if (qTab === 'status') switchTab('status');
+    });
+  </script>
+</body>
+
+</html>

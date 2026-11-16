@@ -376,6 +376,12 @@
             <span>Restaurants</span>
           </a>
         </li>
+        <li>
+          <a href="/manager/manage-restaurants" class="sidebar-menu-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Manage Restaurants</span>
+          </a>
+        </li>
         
         <li>
           <a href="/manager/menus" class="sidebar-menu-item">
@@ -595,6 +601,7 @@
                   <th>Order #</th>
                   <th>Customer</th>
                   <th>Restaurant</th>
+                  <th>Driver</th>
                   <th>Items</th>
                   <th>Total</th>
                   <th>Payment</th>
@@ -605,7 +612,7 @@
               </thead>
               <tbody id="ordersBody">
                 <tr class="spinner-row">
-                  <td colspan="9" class="text-center">
+                  <td colspan="10" class="text-center">
                     <div class="spinner"></div>
                     <div style="margin-top:0.5rem; color:hsl(var(--muted-foreground)); font-size:0.85rem;">Loading orders…</div>
                   </td>
@@ -733,7 +740,7 @@ async function loadOrders(page = 1, silent = false) {
   if (!silent) {
     document.getElementById('ordersBody').innerHTML = `
       <tr class="spinner-row">
-        <td colspan="9" class="text-center">
+        <td colspan="10" class="text-center">
           <div class="spinner"></div>
           <div style="margin-top:0.5rem; color:hsl(var(--muted-foreground)); font-size:0.85rem;">Loading orders…</div>
         </td>
@@ -779,7 +786,7 @@ async function loadOrders(page = 1, silent = false) {
     console.error('[loadOrders]', err);
     document.getElementById('ordersBody').innerHTML = `
       <tr>
-        <td colspan="9">
+        <td colspan="10">
           <div class="empty-state">
             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
             <h5>Could not load orders</h5>
@@ -803,7 +810,7 @@ function renderOrders(orders) {
   if (!orders.length) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="9">
+        <td colspan="10">
           <div class="empty-state">
             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
             <h5>No orders found</h5>
@@ -819,6 +826,7 @@ function renderOrders(orders) {
     const timeStr = fmtTime(o.placed_at);
     const statusClass = STATUS_BADGES[o.status] || 'badge-gray';
     const payClass    = PAY_BADGES[o.payment_status] || 'badge-yellow';
+    const driverVeh   = [o.driver_vehicle_color, o.driver_vehicle_model || o.driver_vehicle_type].filter(Boolean).join(' ');
 
     return `
     <tr>
@@ -830,6 +838,13 @@ function renderOrders(orders) {
       </td>
       <td>
         <div style="font-size:0.85rem;color:hsl(var(--muted-foreground))">${escHtml(o.restaurant_name || '—')}</div>
+      </td>
+      <td>
+        ${o.driver_name
+          ? `<div style="font-weight:600;font-size:0.84rem;color:#1e40af">${escHtml(o.driver_name)}</div>
+             <div style="font-size:0.74rem;color:hsl(var(--muted-foreground))">${escHtml(driverVeh)}${o.driver_vehicle_plate ? ` · ${escHtml(o.driver_vehicle_plate)}` : ''}</div>`
+          : `<span style="font-size:0.78rem;color:hsl(var(--muted-foreground))">Unassigned</span>`
+        }
       </td>
       <td>
         <span style="color:hsl(var(--muted-foreground));font-size:0.85rem">
@@ -1094,6 +1109,18 @@ function renderOrderModal(order, items) {
           : ''}
       </div>
     </div>
+
+    <!-- Assigned Driver -->
+    <div class="modal-section-title">Assigned Delivery Driver</div>
+    ${order.driver_name ? `
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;">
+        <div class="detail-row"><span class="detail-label">Driver Name</span><span class="detail-value">${escHtml(order.driver_name)}</span></div>
+        <div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${escHtml(order.driver_phone || '—')}</span></div>
+        <div class="detail-row"><span class="detail-label">Vehicle</span><span class="detail-value">${escHtml([order.driver_vehicle_color, order.driver_vehicle_model || order.driver_vehicle_type].filter(Boolean).join(' ') || '—')}</span></div>
+        <div class="detail-row"><span class="detail-label">Plate Registration</span><span class="detail-value">${escHtml(order.driver_vehicle_plate || '—')}</span></div>
+        ${order.accepted_at ? `<div class="detail-row"><span class="detail-label">Accepted At</span><span class="detail-value">${fmtDateTime(order.accepted_at)}</span></div>` : ''}
+      </div>
+    ` : `<div class="address-card" style="color:hsl(var(--muted-foreground));">No driver assigned yet.</div>`}
 
     <!-- Address -->
     <div class="modal-section-title">Delivery Address</div>

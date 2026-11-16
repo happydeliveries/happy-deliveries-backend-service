@@ -312,7 +312,10 @@ class Order {
         query += ` AND (o.driver_id = (SELECT id FROM drivers WHERE user_id = $2) OR (o.driver_id IS NULL AND o.status IN ('ordering_at_restaurant', 'order_ready') AND o.payment_status = 'completed'))`;
         params.push(userId);
         } else if (userRole === 'restaurant_manager') {
-        query += ` AND o.restaurant_id IN (SELECT id FROM restaurants WHERE manager_id = (SELECT id FROM restaurant_managers WHERE user_id = $2))`;
+        query += ` AND (
+          o.restaurant_id IN (SELECT id FROM restaurants WHERE manager_id = (SELECT id FROM restaurant_managers WHERE user_id = $2) OR owner_user_id = $2)
+          OR EXISTS (SELECT 1 FROM restaurant_managers rm WHERE rm.user_id = $2 AND COALESCE(rm.account_type, 'platform_admin') = 'platform_admin')
+        )`;
         params.push(userId);
         }
     }
@@ -656,9 +659,17 @@ class Order {
       const authQuery = `
         SELECT o.* FROM orders o
         WHERE o.id = $1
-          AND o.restaurant_id IN (
-            SELECT id FROM restaurants 
-            WHERE manager_id = (SELECT id FROM restaurant_managers WHERE user_id = $2)
+          AND (
+            o.restaurant_id IN (
+              SELECT id FROM restaurants 
+              WHERE manager_id = (SELECT id FROM restaurant_managers WHERE user_id = $2)
+                 OR owner_user_id = $2
+            )
+            OR EXISTS (
+              SELECT 1 FROM restaurant_managers rm
+              WHERE rm.user_id = $2
+                AND COALESCE(rm.account_type, 'platform_admin') = 'platform_admin'
+            )
           )
       `;
       const authResult = await client.query(authQuery, [orderId, managerId]);
@@ -750,9 +761,17 @@ class Order {
       const authQuery = `
         SELECT o.* FROM orders o
         WHERE o.id = $1
-          AND o.restaurant_id IN (
-            SELECT id FROM restaurants 
-            WHERE manager_id = (SELECT id FROM restaurant_managers WHERE user_id = $2)
+          AND (
+            o.restaurant_id IN (
+              SELECT id FROM restaurants 
+              WHERE manager_id = (SELECT id FROM restaurant_managers WHERE user_id = $2)
+                 OR owner_user_id = $2
+            )
+            OR EXISTS (
+              SELECT 1 FROM restaurant_managers rm
+              WHERE rm.user_id = $2
+                AND COALESCE(rm.account_type, 'platform_admin') = 'platform_admin'
+            )
           )
       `;
       const authResult = await client.query(authQuery, [orderId, managerId]);
@@ -1117,6 +1136,16 @@ class Order {
           order: updatedOrder,
           payment_status: 'completed',
           available_drivers: driverIds.length
+        });
+      }
+
+      if (emitManagerEvent && updatedOrder.restaurant_id) {
+        emitManagerEvent(updatedOrder.restaurant_id, 'order_updated', {
+          orderId: updatedOrder.id,
+          order_number: updatedOrder.order_number,
+          status: updatedOrder.status,
+          payment_status: 'completed',
+          order: updatedOrder
         });
       }
 

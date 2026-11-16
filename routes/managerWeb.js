@@ -69,6 +69,17 @@ const express = require('express');
 const router = express.Router();
 const db = require('../src/config/database');
 const bcrypt = require('bcryptjs');
+const {
+    resolveAccessibleRestaurants,
+    resolveAccessibleRestaurantIds,
+    verifyRestaurantAccess,
+    verifyMenuAccess,
+    verifyMenuItemAccess,
+    fetchPaginatedOrders,
+    fetchOrderDetail,
+    parseBool,
+} = require('../src/utils/restaurantAccess');
+const { attachManageRestaurantRoutes } = require('./manageRestaurantsWeb');
 
 // ─── Models (lazy-loaded to survive missing optional deps) ──
 const getModel = {
@@ -87,13 +98,17 @@ const getModel = {
 
 /** Redirect to login when the browser navigates to a protected page. */
 const isLoggedIn = (req, res, next) => {
-    if (req.session?.user?.role === 'restaurant_manager') return next();
+    if (req.session?.user?.role === 'restaurant_manager' && req.session?.user?.account_type !== 'restaurant_partner') {
+        return next();
+    }
     res.redirect('/manager/login');
 };
 
 /** Return 401 JSON for protected API calls. */
 const isLoggedInApi = (req, res, next) => {
-    if (req.session?.user?.role === 'restaurant_manager') return next();
+    if (req.session?.user?.role === 'restaurant_manager' && req.session?.user?.account_type !== 'restaurant_partner') {
+        return next();
+    }
     res.status(401).json({ success: false, error: 'Unauthorized. Please log in.' });
 };
 
@@ -101,61 +116,58 @@ const isLoggedInApi = (req, res, next) => {
 //  SHARED HELPERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * Fetch all restaurants belonging to managerId.
- * Falls back to a raw SQL query if the model method fails.
- */
-async function fetchRestaurants(managerId) {
-    try {
-        const Restaurant = getModel.Restaurant();
-        if (typeof Restaurant.findByManager === 'function') {
-            const rows = await Restaurant.findByManager(managerId);
-            if (Array.isArray(rows) && rows.length > 0) return rows;
-        }
-    } catch (e) {
-        console.warn('[managerWeb] Restaurant.findByManager failed, using SQL fallback:', e.message);
-    }
-    const { rows } = await db.query(
-        'SELECT * FROM restaurants WHERE manager_id = $1 ORDER BY created_at DESC',
-        [managerId]
-    );
-    return rows;
+async function resolveManagerObject(managerOrId) {
+    if (!managerOrId) return null;
+    if (typeof managerOrId === 'object' && managerOrId.id) return managerOrId;
+    await getModel.Restaurant().ensureApplicationColumns();
+    const { rows } = await db.query('SELECT * FROM restaurant_managers WHERE id = $1', [managerOrId]);
+    return rows[0] || null;
 }
 
-/** Return an array of UUID strings for the manager's restaurants. */
-async function fetchRestaurantIds(managerId) {
-    const restaurants = await fetchRestaurants(managerId);
+/**
+ * Fetch all accessible restaurants for manager / platform admin.
+ */
+async function fetchRestaurants(managerOrId) {
+    const manager = await resolveManagerObject(managerOrId);
+    if (!manager) return [];
+    return resolveAccessibleRestaurants(manager);
+}
+
+/** Return an array of UUID strings for the manager's accessible restaurants. */
+async function fetchRestaurantIds(managerOrId) {
+    const restaurants = await fetchRestaurants(managerOrId);
     return restaurants.map(r => r.id);
 }
 
 /**
- * Resolve manager from a session (with lightweight session caching of manager.id).
+ * Resolve manager from a session (with lightweight session caching of manager.id & account_type).
  */
 async function resolveManager(req) {
-    if (req.session?.user?.manager_id && req.session?.user?.id) {
+    if (req.session?.user?.manager_id && req.session?.user?.id && req.session?.user?.account_type) {
         return {
             id: req.session.user.manager_id,
             user_id: req.session.user.id,
             email: req.session.user.email,
             first_name: req.session.user.first_name,
             last_name: req.session.user.last_name,
+            account_type: req.session.user.account_type,
         };
     }
+    await getModel.Restaurant().ensureApplicationColumns();
     const RM = getModel.RestaurantManager();
     const manager = await RM.findByUserId(req.session.user.id);
     if (manager?.id && req.session?.user) {
         req.session.user.manager_id = manager.id;
+        req.session.user.account_type = manager.account_type || 'platform_admin';
     }
     return manager || null;
 }
 
 /** Fast restaurant UUID lookup without fetching full restaurant columns. */
-async function fetchRestaurantIdsFast(managerId) {
-    const { rows } = await db.query(
-        'SELECT id FROM restaurants WHERE manager_id = $1',
-        [managerId]
-    );
-    return rows.map((r) => r.id);
+async function fetchRestaurantIdsFast(managerOrId) {
+    const manager = await resolveManagerObject(managerOrId);
+    if (!manager) return [];
+    return resolveAccessibleRestaurantIds(manager);
 }
 
 // ─── Dashboard stats ──────────────────────────────────────────────────────────
@@ -323,8 +335,17 @@ router.post('/login', async (req, res) => {
             });
         }
 
+        await getModel.Restaurant().ensureApplicationColumns();
         const RM = getModel.RestaurantManager();
         const manager = await RM.findByUserId(user.id);
+
+        if (manager?.account_type === 'restaurant_partner') {
+            return res.render('manager/login', {
+                title: 'Manager Login',
+                error: 'Restaurant partner accounts sign in via the Restaurant Partner Portal (/restaurant/login).',
+                success: null,
+            });
+        }
 
         req.session.user = {
             id: user.id,
@@ -333,6 +354,7 @@ router.post('/login', async (req, res) => {
             first_name: user.first_name,
             last_name: user.last_name,
             manager_id: manager?.id ?? null,
+            account_type: manager?.account_type || 'platform_admin',
         };
 
         res.redirect('/manager/dashboard');
@@ -411,20 +433,15 @@ router.get('/restaurants/edit/:id', isLoggedIn, async (req, res) => {
         const manager = await resolveManager(req);
         if (!manager) { req.session.destroy(); return res.redirect('/manager/login'); }
 
-        const { rows } = await db.query(
-            `SELECT *, ST_X(location::geometry) AS lng, ST_Y(location::geometry) AS lat
-             FROM restaurants WHERE id = $1 AND manager_id = $2`,
-            [req.params.id, manager.id]
-        );
-
-        if (!rows.length) {
+        const row = await verifyRestaurantAccess(req.params.id, manager);
+        if (!row) {
             return res.redirect('/manager/restaurants');
         }
 
         res.render('manager/edit-restaurant', {
-            title: `Edit ${rows[0].name}`, currentPage: 'restaurants',
+            title: `Edit ${row.name}`, currentPage: 'restaurants',
             manager: req.session.user,
-            restaurant: rows[0],
+            restaurant: row,
         });
     } catch (err) {
         console.error('[GET /manager/restaurants/edit/:id]', err);
@@ -443,12 +460,9 @@ router.post('/restaurants/edit/:id', isLoggedIn, async (req, res) => {
         const manager = await resolveManager(req);
         if (!manager) { req.session.destroy(); return res.redirect('/manager/login'); }
 
-        // Ownership check
-        const { rows: ownerRows } = await db.query(
-            'SELECT id FROM restaurants WHERE id = $1 AND manager_id = $2',
-            [req.params.id, manager.id]
-        );
-        if (!ownerRows.length) return res.redirect('/manager/restaurants');
+        // Ownership / admin access check
+        const owns = await verifyRestaurantAccess(req.params.id, manager);
+        if (!owns) return res.redirect('/manager/restaurants');
 
         const b = req.body;
 
@@ -511,11 +525,8 @@ router.post('/restaurants/delete/:id', isLoggedIn, async (req, res) => {
         const manager = await resolveManager(req);
         if (!manager) return res.redirect('/manager/login');
 
-        const { rows } = await db.query(
-            'SELECT id FROM restaurants WHERE id = $1 AND manager_id = $2',
-            [req.params.id, manager.id]
-        );
-        if (!rows.length) return res.redirect('/manager/restaurants');
+        const owns = await verifyRestaurantAccess(req.params.id, manager);
+        if (!owns) return res.redirect('/manager/restaurants');
 
         await db.query('DELETE FROM restaurants WHERE id = $1', [req.params.id]);
         return res.redirect('/manager/restaurants');
@@ -591,12 +602,14 @@ router.post('/restaurants/:id/toggle-status', isLoggedIn, async (req, res) => {
         const manager = await resolveManager(req);
         if (!manager) return res.redirect('/manager/login');
 
-        const { rows } = await db.query(
+        const owns = await verifyRestaurantAccess(req.params.id, manager);
+        if (!owns) return res.redirect('/manager/restaurants');
+
+        await db.query(
             `UPDATE restaurants
              SET is_active = NOT is_active, updated_at = CURRENT_TIMESTAMP
-             WHERE id = $1 AND manager_id = $2
-             RETURNING id`,
-            [req.params.id, manager.id]
+             WHERE id = $1`,
+            [req.params.id]
         );
 
         return res.redirect('/manager/restaurants');
@@ -916,6 +929,9 @@ router.get('/api/restaurants/my', isLoggedInApi, async (req, res) => {
         const manager = await resolveManager(req);
         if (!manager) return res.status(403).json({ success: false, error: 'Manager not found' });
 
+        const accessibleIds = await fetchRestaurantIdsFast(manager);
+        if (!accessibleIds.length) return res.json({ success: true, restaurants: [] });
+
         const { rows } = await db.query(`
             SELECT
                 r.*,
@@ -932,9 +948,9 @@ router.get('/api/restaurants/my', isLoggedInApi, async (req, res) => {
                 WHERE status = 'delivered'
                 GROUP BY restaurant_id
             ) o ON r.id = o.restaurant_id
-            WHERE r.manager_id = $1
+            WHERE r.id = ANY($1::uuid[])
             ORDER BY r.created_at DESC
-        `, [manager.id]);
+        `, [accessibleIds]);
 
         res.json({ success: true, restaurants: rows });
     } catch (err) {
@@ -943,20 +959,15 @@ router.get('/api/restaurants/my', isLoggedInApi, async (req, res) => {
     }
 });
 
-/** GET single restaurant (ownership-checked). */
+/** GET single restaurant (ownership / platform admin checked). */
 router.get('/api/restaurants/:id', isLoggedInApi, async (req, res) => {
     try {
         const manager = await resolveManager(req);
         if (!manager) return res.status(403).json({ success: false, error: 'Manager not found' });
 
-        const { rows } = await db.query(
-            `SELECT *, ST_X(location::geometry) AS lng, ST_Y(location::geometry) AS lat
-             FROM restaurants WHERE id = $1 AND manager_id = $2`,
-            [req.params.id, manager.id]
-        );
-
-        if (!rows.length) return res.status(404).json({ success: false, error: 'Restaurant not found' });
-        res.json({ success: true, restaurant: rows[0] });
+        const restaurant = await verifyRestaurantAccess(req.params.id, manager);
+        if (!restaurant) return res.status(404).json({ success: false, error: 'Restaurant not found' });
+        res.json({ success: true, restaurant });
     } catch (err) {
         console.error('[API GET restaurants/:id]', err);
         res.status(500).json({ success: false, error: 'Failed to load restaurant' });
@@ -1034,11 +1045,8 @@ router.put('/api/restaurants/:id', isLoggedInApi, async (req, res) => {
         const manager = await resolveManager(req);
         if (!manager) return res.status(403).json({ success: false, error: 'Manager not found' });
 
-        const check = await db.query(
-            'SELECT id FROM restaurants WHERE id = $1 AND manager_id = $2',
-            [req.params.id, manager.id]
-        );
-        if (!check.rows.length) return res.status(404).json({ success: false, error: 'Restaurant not found or access denied' });
+        const owns = await verifyRestaurantAccess(req.params.id, manager);
+        if (!owns) return res.status(404).json({ success: false, error: 'Restaurant not found or access denied' });
 
         const {
             name, description, cuisine_type, phone_number, email,
@@ -1107,11 +1115,8 @@ router.delete('/api/restaurants/:id', isLoggedInApi, async (req, res) => {
         const manager = await resolveManager(req);
         if (!manager) return res.status(403).json({ success: false, error: 'Manager not found' });
 
-        const check = await db.query(
-            'SELECT id FROM restaurants WHERE id = $1 AND manager_id = $2',
-            [req.params.id, manager.id]
-        );
-        if (!check.rows.length) return res.status(404).json({ success: false, error: 'Restaurant not found or access denied' });
+        const owns = await verifyRestaurantAccess(req.params.id, manager);
+        if (!owns) return res.status(404).json({ success: false, error: 'Restaurant not found or access denied' });
 
         await db.query('DELETE FROM restaurants WHERE id = $1', [req.params.id]);
         res.json({ success: true, message: 'Restaurant deleted successfully' });
@@ -1127,10 +1132,13 @@ router.patch('/api/restaurants/:id/toggle-status', isLoggedInApi, async (req, re
         const manager = await resolveManager(req);
         if (!manager) return res.status(403).json({ success: false, error: 'Manager not found' });
 
+        const owns = await verifyRestaurantAccess(req.params.id, manager);
+        if (!owns) return res.status(404).json({ success: false, error: 'Restaurant not found' });
+
         const { rows } = await db.query(
             `UPDATE restaurants SET is_active = NOT is_active, updated_at = CURRENT_TIMESTAMP
-             WHERE id = $1 AND manager_id = $2 RETURNING *`,
-            [req.params.id, manager.id]
+             WHERE id = $1 RETURNING *`,
+            [req.params.id]
         );
         if (!rows.length) return res.status(404).json({ success: false, error: 'Restaurant not found' });
         res.json({ success: true, restaurant: rows[0] });
@@ -1146,11 +1154,14 @@ router.patch('/api/restaurants/:id/toggle-accepting', isLoggedInApi, async (req,
         const manager = await resolveManager(req);
         if (!manager) return res.status(403).json({ success: false, error: 'Manager not found' });
 
+        const owns = await verifyRestaurantAccess(req.params.id, manager);
+        if (!owns) return res.status(404).json({ success: false, error: 'Restaurant not found' });
+
         const { rows } = await db.query(
             `UPDATE restaurants
              SET is_accepting_orders = NOT is_accepting_orders, updated_at = CURRENT_TIMESTAMP
-             WHERE id = $1 AND manager_id = $2 RETURNING *`,
-            [req.params.id, manager.id]
+             WHERE id = $1 RETURNING *`,
+            [req.params.id]
         );
         if (!rows.length) return res.status(404).json({ success: false, error: 'Restaurant not found' });
         res.json({ success: true, restaurant: rows[0] });
@@ -1176,12 +1187,9 @@ router.get('/api/menus', isLoggedInApi, async (req, res) => {
         const { restaurantId } = req.query;
         if (!restaurantId) return res.status(400).json({ success: false, error: 'restaurantId is required' });
 
-        // Ownership check
-        const owns = await db.query(
-            'SELECT id FROM restaurants WHERE id = $1 AND manager_id = $2',
-            [restaurantId, manager.id]
-        );
-        if (!owns.rows.length) return res.status(403).json({ success: false, error: 'Access denied' });
+        // Ownership / admin access check
+        const owns = await verifyRestaurantAccess(restaurantId, manager);
+        if (!owns) return res.status(403).json({ success: false, error: 'Access denied' });
 
         let menus;
         try {
@@ -1239,11 +1247,8 @@ router.post('/api/menus', isLoggedInApi, async (req, res) => {
         const { restaurantId, name, description, display_order = 0 } = req.body;
         if (!restaurantId || !name) return res.status(400).json({ success: false, error: 'restaurantId and name are required' });
 
-        const owns = await db.query(
-            'SELECT id FROM restaurants WHERE id = $1 AND manager_id = $2',
-            [restaurantId, manager.id]
-        );
-        if (!owns.rows.length) return res.status(403).json({ success: false, error: 'Access denied' });
+        const owns = await verifyRestaurantAccess(restaurantId, manager);
+        if (!owns) return res.status(403).json({ success: false, error: 'Access denied' });
 
         let menu;
         try {
@@ -1270,14 +1275,9 @@ router.put('/api/menus/:id', isLoggedInApi, async (req, res) => {
         const manager = await resolveManager(req);
         if (!manager) return res.status(403).json({ success: false, error: 'Manager not found' });
 
-        // Ownership via restaurants join
-        const owns = await db.query(
-            `SELECT m.id FROM menus m
-             JOIN restaurants r ON m.restaurant_id = r.id
-             WHERE m.id = $1 AND r.manager_id = $2`,
-            [req.params.id, manager.id]
-        );
-        if (!owns.rows.length) return res.status(403).json({ success: false, error: 'Access denied' });
+        // Ownership / admin check via restaurants join
+        const owns = await verifyMenuAccess(req.params.id, manager);
+        if (!owns) return res.status(403).json({ success: false, error: 'Access denied' });
 
         const { name, description, is_active, display_order } = req.body;
         const { rows } = await db.query(
@@ -1306,13 +1306,8 @@ router.delete('/api/menus/:id', isLoggedInApi, async (req, res) => {
         const manager = await resolveManager(req);
         if (!manager) return res.status(403).json({ success: false, error: 'Manager not found' });
 
-        const owns = await db.query(
-            `SELECT m.id FROM menus m
-             JOIN restaurants r ON m.restaurant_id = r.id
-             WHERE m.id = $1 AND r.manager_id = $2`,
-            [req.params.id, manager.id]
-        );
-        if (!owns.rows.length) return res.status(403).json({ success: false, error: 'Access denied' });
+        const owns = await verifyMenuAccess(req.params.id, manager);
+        if (!owns) return res.status(403).json({ success: false, error: 'Access denied' });
 
         // Cascade delete items first (in case FK constraint doesn't do it)
         await db.query('DELETE FROM menu_items WHERE menu_id = $1', [req.params.id]);
@@ -1335,13 +1330,8 @@ router.get('/api/menu-items/:id', isLoggedInApi, async (req, res) => {
         const manager = await resolveManager(req);
         if (!manager) return res.status(403).json({ success: false, error: 'Manager not found' });
 
-        const owns = await db.query(
-            `SELECT mi.id FROM menu_items mi
-             JOIN restaurants r ON mi.restaurant_id = r.id
-             WHERE mi.id = $1 AND r.manager_id = $2`,
-            [req.params.id, manager.id]
-        );
-        if (!owns.rows.length) return res.status(403).json({ success: false, error: 'Access denied' });
+        const owns = await verifyMenuItemAccess(req.params.id, manager);
+        if (!owns) return res.status(403).json({ success: false, error: 'Access denied' });
 
         let item;
         try {
@@ -1370,11 +1360,8 @@ router.post('/api/menu-items', isLoggedInApi, async (req, res) => {
             return res.status(400).json({ success: false, error: 'menuId, restaurantId, name and price are required' });
         }
 
-        const owns = await db.query(
-            'SELECT id FROM restaurants WHERE id = $1 AND manager_id = $2',
-            [restaurantId, manager.id]
-        );
-        if (!owns.rows.length) return res.status(403).json({ success: false, error: 'Access denied' });
+        const owns = await verifyRestaurantAccess(restaurantId, manager);
+        if (!owns) return res.status(403).json({ success: false, error: 'Access denied' });
 
         let item;
         try {
@@ -1427,13 +1414,8 @@ router.put('/api/menu-items/:id', isLoggedInApi, async (req, res) => {
         const manager = await resolveManager(req);
         if (!manager) return res.status(403).json({ success: false, error: 'Manager not found' });
 
-        const owns = await db.query(
-            `SELECT mi.id FROM menu_items mi
-             JOIN restaurants r ON mi.restaurant_id = r.id
-             WHERE mi.id = $1 AND r.manager_id = $2`,
-            [req.params.id, manager.id]
-        );
-        if (!owns.rows.length) return res.status(403).json({ success: false, error: 'Access denied' });
+        const owns = await verifyMenuItemAccess(req.params.id, manager);
+        if (!owns) return res.status(403).json({ success: false, error: 'Access denied' });
 
         // ----- build safe update from allowed fields -----
         const allowed = [
@@ -1490,13 +1472,8 @@ router.delete('/api/menu-items/:id', isLoggedInApi, async (req, res) => {
         const manager = await resolveManager(req);
         if (!manager) return res.status(403).json({ success: false, error: 'Manager not found' });
 
-        const owns = await db.query(
-            `SELECT mi.id FROM menu_items mi
-             JOIN restaurants r ON mi.restaurant_id = r.id
-             WHERE mi.id = $1 AND r.manager_id = $2`,
-            [req.params.id, manager.id]
-        );
-        if (!owns.rows.length) return res.status(403).json({ success: false, error: 'Access denied' });
+        const owns = await verifyMenuItemAccess(req.params.id, manager);
+        if (!owns) return res.status(403).json({ success: false, error: 'Access denied' });
 
         await db.query('DELETE FROM menu_items WHERE id = $1', [req.params.id]);
         res.json({ success: true, message: 'Item deleted' });
@@ -1512,13 +1489,8 @@ router.patch('/api/menu-items/:id/toggle-availability', isLoggedInApi, async (re
         const manager = await resolveManager(req);
         if (!manager) return res.status(403).json({ success: false, error: 'Manager not found' });
 
-        const owns = await db.query(
-            `SELECT mi.id FROM menu_items mi
-             JOIN restaurants r ON mi.restaurant_id = r.id
-             WHERE mi.id = $1 AND r.manager_id = $2`,
-            [req.params.id, manager.id]
-        );
-        if (!owns.rows.length) return res.status(403).json({ success: false, error: 'Access denied' });
+        const owns = await verifyMenuItemAccess(req.params.id, manager);
+        if (!owns) return res.status(403).json({ success: false, error: 'Access denied' });
 
         const { rows } = await db.query(
             `UPDATE menu_items SET is_available = NOT is_available, updated_at = CURRENT_TIMESTAMP
@@ -1545,14 +1517,11 @@ router.get('/api/orders', isLoggedInApi, async (req, res) => {
         const manager = await resolveManager(req);
         if (!manager) return res.status(403).json({ success: false, error: 'Manager not found' });
 
-        const restaurants = await fetchRestaurants(manager.id);
+        const restaurants = await fetchRestaurants(manager);
         if (!restaurants.length) return res.json({ success: true, orders: [], total: 0, currentPage: 1, totalPages: 0 });
 
         const allIds = restaurants.map(r => r.id);
-        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-        const limit = Math.min(parseInt(req.query.limit, 10) || 15, 100);
-        const offset = (page - 1) * limit;
-        const { restaurant, status, date } = req.query;
+        const { restaurant, status, date, page, limit } = req.query;
 
         // Determine which restaurant IDs to query
         let ids = allIds;
@@ -1561,46 +1530,8 @@ router.get('/api/orders', isLoggedInApi, async (req, res) => {
             ids = [restaurant];
         }
 
-        const params = [ids];
-        let where = 'WHERE o.restaurant_id = ANY($1::uuid[])';
-        let pIdx = 2;
-
-        if (status && status !== 'all') {
-            where += ` AND o.status = $${pIdx++}`;
-            params.push(status);
-        }
-        if (date) {
-            where += ` AND DATE(o.placed_at) = $${pIdx++}`;
-            params.push(date);
-        }
-
-        const countRes = await db.query(
-            `SELECT COUNT(*) AS c FROM orders o ${where}`,
-            params
-        );
-        const total = parseInt(countRes.rows[0].c, 10);
-        const totalPages = Math.ceil(total / limit);
-
-        // Append LIMIT / OFFSET
-        params.push(limit, offset);
-
-        const { rows } = await db.query(`
-            SELECT
-                o.id, o.order_number, o.status, o.total_amount, o.payment_status,
-                o.placed_at, o.delivery_address,
-                r.name  AS restaurant_name,
-                COALESCE(u.first_name || ' ' || u.last_name, 'Unknown Customer') AS customer_name,
-                (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS item_count
-            FROM orders o
-            JOIN  restaurants r ON o.restaurant_id = r.id
-            LEFT JOIN customers c ON o.customer_id  = c.id
-            LEFT JOIN users     u ON c.user_id       = u.id
-            ${where}
-            ORDER BY o.placed_at DESC
-            LIMIT $${pIdx} OFFSET $${pIdx + 1}
-        `, params);
-
-        res.json({ success: true, orders: rows, total, currentPage: page, totalPages });
+        const result = await fetchPaginatedOrders(ids, { status, date, page, limit });
+        res.json({ success: true, ...result });
     } catch (err) {
         console.error('[API GET orders]', err);
         res.status(500).json({ success: false, error: 'Failed to load orders' });
@@ -1782,39 +1713,16 @@ router.get('/api/orders/stats', isLoggedInApi, async (req, res) => {
     }
 });
 
-/** GET /api/manager/orders/:id — full order detail with items */
+/** GET /api/manager/orders/:id — full order detail with items & assigned driver */
 router.get('/api/orders/:id', isLoggedInApi, async (req, res) => {
     try {
         const manager = await resolveManager(req);
         if (!manager) return res.status(403).json({ success: false, error: 'Manager not found' });
 
-        const { rows: [order] } = await db.query(`
-            SELECT
-                o.*,
-                r.name  AS restaurant_name,
-                COALESCE(u.first_name || ' ' || u.last_name, 'Unknown Customer') AS customer_name,
-                u.phone_number AS customer_phone
-            FROM orders o
-            JOIN  restaurants r ON o.restaurant_id = r.id
-            LEFT JOIN customers c ON o.customer_id  = c.id
-            LEFT JOIN users     u ON c.user_id       = u.id
-            WHERE o.id = $1 AND r.manager_id = $2
-        `, [req.params.id, manager.id]);
+        const detail = await fetchOrderDetail(req.params.id, manager);
+        if (!detail) return res.status(404).json({ success: false, error: 'Order not found' });
 
-        if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
-
-        const { rows: items } = await db.query(`
-            SELECT
-                oi.id, oi.quantity, oi.unit_price, oi.total_price,
-                oi.special_instructions, oi.selected_options, oi.allergen_notes,
-                mi.name AS item_name, mi.image_url
-            FROM order_items oi
-            JOIN menu_items  mi ON oi.menu_item_id = mi.id
-            WHERE oi.order_id = $1
-            ORDER BY oi.created_at
-        `, [req.params.id]);
-
-        res.json({ success: true, order, items });
+        res.json({ success: true, ...detail });
     } catch (err) {
         console.error('[API GET orders/:id]', err);
         res.status(500).json({ success: false, error: 'Failed to load order details' });
@@ -2364,20 +2272,6 @@ router.post('/api/drivers/:id/reject', isLoggedInApi, async (req, res) => {
     }
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  UTILITY
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/**
- * Safely convert various truthy representations to a real boolean.
- * @param {*} val      - input value
- * @param {boolean} def - default when val is undefined/null/empty
- */
-function parseBool(val, def = false) {
-    if (val === undefined || val === null || val === '') return def;
-    if (typeof val === 'boolean') return val;
-    if (typeof val === 'string') return val === 'true' || val === '1' || val === 'on';
-    return Boolean(val);
-}
+attachManageRestaurantRoutes(router, { isLoggedIn, isLoggedInApi, resolveManager });
 
 module.exports = router;

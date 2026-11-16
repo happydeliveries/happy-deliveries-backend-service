@@ -130,6 +130,9 @@ app.use('/api/manager', managerRoutes);
 const managerWebRoutes = require('./routes/managerWeb');
 app.use('/manager', managerWebRoutes);
 
+const restaurantWebRoutes = require('./routes/restaurantWeb');
+app.use('/restaurant', restaurantWebRoutes);
+
 // Public Driver Registration Web Portal shortcuts (/driver, /driver/register, /driver/apply)
 app.get(['/driver', '/driver/register', '/driver/apply'], (req, res) => {
   res.render('driver/register', {

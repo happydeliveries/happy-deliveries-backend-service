@@ -151,6 +151,22 @@ exports.login = async (req, res) => {
           error: 'Your driver application is currently pending review by management. You will receive an email once your account is approved and ready to log in.',
         });
       }
+    } else if (user.role === 'restaurant_manager' && profile?.account_type === 'restaurant_partner') {
+      const appStatus = profile?.approval_status || (user.is_active === false ? 'pending' : 'approved');
+      if (appStatus === 'rejected') {
+        return res.status(403).json({
+          success: false,
+          code: 'RESTAURANT_REJECTED',
+          error: 'Your restaurant application was not approved. Please visit the Restaurant Registration Portal to review feedback and resubmit.',
+        });
+      }
+      if (appStatus === 'pending' || user.is_active === false) {
+        return res.status(403).json({
+          success: false,
+          code: 'RESTAURANT_PENDING_APPROVAL',
+          error: 'Your restaurant application is currently pending admin review. You will receive an email once approved.',
+        });
+      }
     } else if (user.is_active === false) {
       return res.status(403).json({
         success: false,

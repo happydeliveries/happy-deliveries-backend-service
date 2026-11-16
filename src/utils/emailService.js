@@ -346,6 +346,149 @@ class EmailService {
       metadata: { type: 'driver_application_rejected', reason },
     });
   }
+
+  static async sendRestaurantApplicationReceivedEmail(ownerUser, restaurantData = {}) {
+    const fullName = `${ownerUser.first_name || ''} ${ownerUser.last_name || ''}`.trim() || 'Restaurant Partner';
+    const restaurantName = restaurantData.name || 'Your Restaurant';
+    const subject = `Happy Deliveries — Restaurant Application Received (${restaurantName})`;
+    const text = [
+      `Hi ${fullName},`,
+      ``,
+      `Thank you for applying to partner with Happy Deliveries for "${restaurantName}"!`,
+      `Your restaurant registration is currently Pending Review by our management team.`,
+      ``,
+      `Submitted Summary:`,
+      `• Restaurant Name: ${restaurantName}`,
+      `• Cuisine: ${restaurantData.cuisine_type || 'General'}`,
+      `• Address: ${restaurantData.address || 'Provided'}`,
+      `• Portal Login Email: ${ownerUser.email}`,
+      ``,
+      `What happens next:`,
+      `1. Happy Deliveries management will review your restaurant profile, address, contact, and payout details.`,
+      `2. You will receive an email as soon as your restaurant is approved (or if any corrections are requested).`,
+      `3. Once approved, log in to the Restaurant Partner Portal to add menus & menu items, update store info, and manage live orders.`,
+      ``,
+      `Best regards,`,
+      `Happy Deliveries Management Team`,
+    ].join('\n');
+
+    const html = `
+      <div style="font-family: Inter, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; color: #111827;">
+        <h2 style="color: #2563eb; margin-top: 0;">Restaurant Application Received</h2>
+        <p>Hi <strong>${fullName}</strong>,</p>
+        <p>Thank you for registering <strong>${restaurantName}</strong> with <strong>Happy Deliveries</strong>! Your application is currently <strong>Pending Review</strong>.</p>
+        <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0; font-size: 14px;">
+          <div><strong>Restaurant:</strong> ${restaurantName}</div>
+          <div><strong>Cuisine:</strong> ${restaurantData.cuisine_type || 'General'}</div>
+          <div><strong>Address:</strong> ${restaurantData.address || 'Provided'}</div>
+          <div><strong>Login Email:</strong> ${ownerUser.email}</div>
+        </div>
+        <p>Once approved by management, you can sign in to the <strong>Restaurant Partner Web Portal</strong> to publish menus, add dishes, accept customer orders, and track delivery drivers.</p>
+        <p style="color: #6b7280; font-size: 13px; margin-top: 24px;">— Happy Deliveries Management Team</p>
+      </div>
+    `;
+
+    return this.sendEmail({
+      to: ownerUser.email,
+      subject,
+      text,
+      html,
+      userId: ownerUser.id,
+      userType: 'restaurant_manager',
+      metadata: { type: 'restaurant_application_submitted', restaurant_name: restaurantName },
+    });
+  }
+
+  static async sendRestaurantApprovedEmail(ownerUser, restaurant = {}, notes = '', portalUrl = '/restaurant/login') {
+    const fullName = `${ownerUser.first_name || ''} ${ownerUser.last_name || ''}`.trim() || 'Restaurant Partner';
+    const restaurantName = restaurant.name || 'Your Restaurant';
+    const subject = `🎉 ${restaurantName} is Approved on Happy Deliveries!`;
+    const text = [
+      `Hi ${fullName},`,
+      ``,
+      `Great news! Your restaurant partner application for "${restaurantName}" has been APPROVED by Happy Deliveries management.`,
+      notes ? `\nManager Note: ${notes}\n` : '',
+      `You can now log in to your Restaurant Partner Portal (${portalUrl}) using:`,
+      `• Email: ${ownerUser.email}`,
+      `• Password: The password you created during registration`,
+      ``,
+      `Inside your portal, you can add your menus and menu items, update store hours & details, accept or reject incoming orders, and track assigned drivers live.`,
+      ``,
+      `Welcome aboard!`,
+      `Happy Deliveries Management Team`,
+    ].filter(Boolean).join('\n');
+
+    const html = `
+      <div style="font-family: Inter, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #bbf7d0; border-radius: 12px; color: #111827;">
+        <div style="display:inline-block; background:#dcfce7; color:#166534; padding:6px 12px; border-radius:999px; font-weight:600; font-size:13px; margin-bottom:12px;">
+          RESTAURANT APPROVED
+        </div>
+        <h2 style="color: #166534; margin-top: 0;">Welcome to Happy Deliveries, ${restaurantName}!</h2>
+        <p>Hi <strong>${fullName}</strong>, your restaurant partner application has been <strong>approved</strong>.</p>
+        ${notes ? `<div style="background:#f0fdf4; border-left:4px solid #16a34a; padding:12px 16px; margin:16px 0;"><strong>Note from Management:</strong><br/>${notes}</div>` : ''}
+        <p>Sign in to your <strong>Restaurant Partner Portal</strong> (${portalUrl}) with <strong>${ownerUser.email}</strong> to add menus, manage items, and start accepting customer orders.</p>
+        <p style="color: #6b7280; font-size: 13px; margin-top: 24px;">— Happy Deliveries Management Team</p>
+      </div>
+    `;
+
+    return this.sendEmail({
+      to: ownerUser.email,
+      subject,
+      text,
+      html,
+      userId: ownerUser.id,
+      userType: 'restaurant_manager',
+      metadata: { type: 'restaurant_application_approved', restaurant_id: restaurant.id, notes },
+    });
+  }
+
+  static async sendRestaurantRejectedEmail(ownerUser, restaurant = {}, reason = '', portalUrl = '/restaurant/register') {
+    const fullName = `${ownerUser.first_name || ''} ${ownerUser.last_name || ''}`.trim() || 'Restaurant Partner';
+    const restaurantName = restaurant.name || 'Your Restaurant';
+    const subject = `Update on Your Happy Deliveries Restaurant Application (${restaurantName})`;
+    const text = [
+      `Hi ${fullName},`,
+      ``,
+      `Thank you for applying to list "${restaurantName}" on Happy Deliveries.`,
+      `After reviewing your submission, we could not approve the restaurant yet.`,
+      ``,
+      `Reason / What needs attention:`,
+      `"${reason}"`,
+      ``,
+      `How to fix & resubmit:`,
+      `Visit the Restaurant Registration Portal (${portalUrl}) and open "Check Application Status" with your email (${ownerUser.email}) to edit your details and resubmit for review.`,
+      ``,
+      `Best regards,`,
+      `Happy Deliveries Management Team`,
+    ].join('\n');
+
+    const html = `
+      <div style="font-family: Inter, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #fecaca; border-radius: 12px; color: #111827;">
+        <div style="display:inline-block; background:#fee2e2; color:#991b1b; padding:6px 12px; border-radius:999px; font-weight:600; font-size:13px; margin-bottom:12px;">
+          ACTION REQUIRED — RESTAURANT NOT APPROVED
+        </div>
+        <h2 style="color: #991b1b; margin-top: 0;">Application Update for ${restaurantName}</h2>
+        <p>Hi <strong>${fullName}</strong>,</p>
+        <p>We reviewed your restaurant application for <strong>Happy Deliveries</strong>, and unfortunately it cannot be approved yet due to:</p>
+        <div style="background: #fef2f2; border-left: 4px solid #dc2626; padding: 14px 16px; border-radius: 6px; margin: 16px 0; color: #7f1d1d;">
+          <strong>What needs attention:</strong><br/>
+          <p style="margin: 6px 0 0; white-space: pre-line;">${reason}</p>
+        </div>
+        <p>Please open <strong>Check Application Status</strong> on the Restaurant Registration Portal (${portalUrl}) to update your details and resubmit.</p>
+        <p style="color: #6b7280; font-size: 13px; margin-top: 24px;">— Happy Deliveries Management Team</p>
+      </div>
+    `;
+
+    return this.sendEmail({
+      to: ownerUser.email,
+      subject,
+      text,
+      html,
+      userId: ownerUser.id,
+      userType: 'restaurant_manager',
+      metadata: { type: 'restaurant_application_rejected', restaurant_id: restaurant.id, reason },
+    });
+  }
 }
 
 module.exports = EmailService;

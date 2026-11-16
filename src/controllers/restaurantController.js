@@ -25,7 +25,10 @@ exports.createRestaurant = async (req, res) => {
 exports.getMyRestaurants = async (req, res) => {
   try {
     const managerProfile = await RestaurantManager.findByUserId(req.user.id);
-    const restaurants = await Restaurant.findByManager(managerProfile.id);
+    if (!managerProfile) {
+      return res.status(404).json({ success: false, error: 'Manager profile not found' });
+    }
+    const restaurants = await Restaurant.findAccessibleByManager(managerProfile, { includePending: true });
     
     res.json({
       success: true,
@@ -46,9 +49,9 @@ exports.updateRestaurant = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
-    // Verify ownership
+    // Verify ownership (platform admins can manage any restaurant; partners only their own)
     const managerProfile = await RestaurantManager.findByUserId(req.user.id);
-    const restaurants = await Restaurant.findByManager(managerProfile.id);
+    const restaurants = await Restaurant.findAccessibleByManager(managerProfile, { includePending: true });
     const isOwner = restaurants.some(r => r.id === id);
 
     if (!isOwner) {
@@ -56,8 +59,8 @@ exports.updateRestaurant = async (req, res) => {
     }
 
     // Handle cuisine_type string-to-array conversion if needed
-    if (typeof updates.cuisine_type === 'string') {
-      updates.cuisine_type = updates.cuisine_type.split(',').map(i => i.trim());
+    if (Array.isArray(updates.cuisine_type)) {
+      updates.cuisine_type = updates.cuisine_type.map(i => String(i).trim()).filter(Boolean).join(', ');
     }
 
     const updatedRestaurant = await Restaurant.update(id, updates);
@@ -150,7 +153,7 @@ exports.createMenu = async (req, res) => {
     
     // Verify restaurant ownership
     const managerProfile = await RestaurantManager.findByUserId(req.user.id);
-    const restaurants = await Restaurant.findByManager(managerProfile.id);
+    const restaurants = await Restaurant.findAccessibleByManager(managerProfile, { includePending: true });
     
     const restaurant = restaurants.find(r => r.id === restaurantId);
     if (!restaurant) {
@@ -205,7 +208,7 @@ exports.getStats = async (req, res) => {
     }
 
     // FIX: Fetch the restaurants so the variable is defined
-    const restaurants = await Restaurant.findByManager(managerProfile.id);
+    const restaurants = await Restaurant.findAccessibleByManager(managerProfile);
 
     res.json({
       success: true,
@@ -229,7 +232,7 @@ exports.addMenuItem = async (req, res) => {
     
     // Verify restaurant ownership
     const managerProfile = await RestaurantManager.findByUserId(req.user.id);
-    const restaurants = await Restaurant.findByManager(managerProfile.id);
+    const restaurants = await Restaurant.findAccessibleByManager(managerProfile, { includePending: true });
     
     const restaurant = restaurants.find(r => r.id === restaurantId);
     if (!restaurant) {
@@ -296,7 +299,7 @@ exports.updateMenuItem = async (req, res) => {
     
     // Security: Verify ownership first
     const managerProfile = await RestaurantManager.findByUserId(req.user.id);
-    const restaurants = await Restaurant.findByManager(managerProfile.id);
+    const restaurants = await Restaurant.findAccessibleByManager(managerProfile, { includePending: true });
     if (!restaurants.some(r => r.id === restaurantId)) {
       return res.status(403).json({ success: false, error: 'Not authorized' });
     }

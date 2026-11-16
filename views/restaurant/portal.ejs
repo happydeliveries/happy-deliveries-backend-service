@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title || 'Restaurant Partner Portal · Happy Deliveries' %></title>
+  <link rel="shortcut icon" href="https://res.cloudinary.com/dpdira4rd/image/upload/v1794689689/logo-square_gmpkuq.png" type="image/x-icon">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    :root {
+      --background: 0 0% 100%;
+      --foreground: 222.2 84% 4.9%;
+      --card: 0 0% 100%;
+      --muted: 210 40% 96.1%;
+      --muted-foreground: 215.4 16.3% 46.9%;
+      --border: 214.3 31.8% 91.4%;
+      --input: 214.3 31.8% 91.4%;
+      --primary: 221.2 83.2% 53.3%;
+      --primary-foreground: 210 40% 98%;
+      --destructive: 0 84.2% 60.2%;
+      --radius: 0.65rem;
+      --sidebar-width: 16rem;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; border-color: hsl(var(--border)); }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f8fafc;
+      color: hsl(var(--foreground));
+      line-height: 1.5;
+    }
+    .app-container { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: var(--sidebar-width); height: 100vh; position: fixed; left: 0; top: 0;
+      background: #fff; border-right: 1px solid hsl(var(--border));
+      display: flex; flex-direction: column; z-index: 60;
+    }
+    .sidebar-header {
+      padding: 1.25rem 1.35rem; display: flex; align-items: center; gap: 0.65rem;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .sidebar-logo {
+      width: 2.2rem; height: 2.2rem; border-radius: 8px;
+      background: url('https://res.cloudinary.com/dpdira4rd/image/upload/v1794689123/logo-square_pzavip.png') center/cover no-repeat;
+    }
+    .sidebar-title { font-size: 1rem; font-weight: 700; }
+    .sidebar-sub { font-size: 0.72rem; color: hsl(var(--muted-foreground)); }
+    .sidebar-content { flex: 1; padding: 0.75rem; overflow-y: auto; }
+    .sidebar-menu { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+    .sidebar-menu-item {
+      display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+      padding: 0.6rem 0.85rem; border-radius: 8px; font-size: 0.875rem; font-weight: 500;
+      color: hsl(var(--foreground)); text-decoration: none; cursor: pointer; border: none; background: transparent; width: 100%; text-align: left;
+      transition: background 0.15s;
+    }
+    .sidebar-menu-item:hover { background: hsl(var(--muted)); }
+    .sidebar-menu-item.active { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+    .sidebar-menu-left { display: flex; align-items: center; gap: 0.65rem; }
+    .sidebar-footer { padding: 1rem; border-top: 1px solid hsl(var(--border)); }
+    .sidebar-user { display: flex; align-items: center; gap: 0.7rem; }
+    .avatar {
+      width: 2.1rem; height: 2.1rem; border-radius: 50%; background: #eff6ff; color: #1d4ed8;
+      display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem;
+      flex-shrink: 0; overflow: hidden;
+    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+    .main-content { flex: 1; margin-left: var(--sidebar-width); min-width: 0; }
+    @media (max-width: 820px) {
+      .sidebar { transform: translateX(-100%); transition: transform 0.2s; }
+      .sidebar.open { transform: translateX(0); }
+      .main-content { margin-left: 0; }
+    }
+
+    .topbar {
+      background: #fff; border-bottom: 1px solid hsl(var(--border)); padding: 0.9rem 1.75rem;
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+      position: sticky; top: 0; z-index: 40;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap; }
+    .topbar-right { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+    .live-pill {
+      display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.35rem 0.75rem;
+      border-radius: 999px; font-size: 0.76rem; font-weight: 600;
+      border: 1px solid hsl(var(--border)); background: #f8fafc;
+    }
+    .dot-green { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; display: inline-block; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
+      padding: 0.5rem 0.95rem; border-radius: var(--radius); font-size: 0.85rem;
+      font-weight: 600; cursor: pointer; border: none; text-decoration: none;
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .btn-primary { background: hsl(var(--primary)); color: #fff; }
+    .btn-primary:hover { opacity: 0.92; }
+    .btn-success { background: #16a34a; color: #fff; }
+    .btn-success:hover { background: #15803d; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-outline { background: #fff; border: 1px solid hsl(var(--input)); color: hsl(var(--foreground)); }
+    .btn-outline:hover { background: hsl(var(--muted)); }
+    .btn-ghost { background: transparent; color: hsl(var(--foreground)); }
+    .btn-ghost:hover { background: hsl(var(--muted)); }
+    .btn-sm { padding: 0.35rem 0.7rem; font-size: 0.76rem; }
+
+    .page-container { padding: 1.5rem 1.75rem; display: flex; flex-direction: column; gap: 1.35rem; }
+    .section-panel { display: none; flex-direction: column; gap: 1.35rem; }
+    .section-panel.active { display: flex; }
+
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    @media (max-width: 1100px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } .grid-3 { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 640px) { .grid-4, .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+    .card { background: #fff; border: 1px solid hsl(var(--border)); border-radius: var(--radius); overflow: hidden; }
+    .card-header { padding: 1.1rem 1.35rem; border-bottom: 1px solid hsl(var(--border)); display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+    .card-title { font-size: 1rem; font-weight: 700; }
+    .card-body { padding: 1.25rem 1.35rem; }
+
+    .stat-card { padding: 1.15rem 1.25rem; }
+    .stat-label { font-size: 0.78rem; color: hsl(var(--muted-foreground)); font-weight: 600; }
+    .stat-value { font-size: 1.65rem; font-weight: 800; margin-top: 0.25rem; }
+    .stat-sub { font-size: 0.75rem; color: hsl(var(--muted-foreground)); margin-top: 0.2rem; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600;
+    }
+    .badge-yellow { background: #fef3c7; color: #92400e; }
+    .badge-green  { background: #dcfce7; color: #166534; }
+    .badge-red    { background: #fee2e2; color: #991b1b; }
+    .badge-blue   { background: #dbeafe; color: #1e40af; }
+    .badge-purple { background: #f3e8ff; color: #6b21a8; }
+    .badge-gray   { background: #f1f5f9; color: #334155; }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.86rem; }
+    th {
+      padding: 0.8rem 1rem; background: #f8fafc; font-size: 0.73rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em; color: hsl(var(--muted-foreground));
+      border-bottom: 1px solid hsl(var(--border)); white-space: nowrap;
+    }
+    td { padding: 0.85rem 1rem; border-bottom: 1px solid hsl(var(--border)); vertical-align: middle; }
+    tr:hover td { background: #f8fafc; }
+
+    .form-group { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.85rem; }
+    .form-label { font-size: 0.8rem; font-weight: 600; }
+    .form-input, .form-select, textarea.form-input {
+      width: 100%; padding: 0.55rem 0.75rem; border: 1px solid hsl(var(--input));
+      border-radius: var(--radius); font-size: 0.875rem; font-family: inherit; outline: none;
+      background: #fff;
+    }
+    .form-input:focus, .form-select:focus { border-color: hsl(var(--primary)); box-shadow: 0 0 0 2px rgba(37,99,235,0.14); }
+
+    .menu-items-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+    .dish-card {
+      border: 1px solid hsl(var(--border)); border-radius: var(--radius); overflow: hidden; background: #fff;
+      display: flex; flex-direction: column;
+    }
+    .dish-img { height: 145px; background: #f1f5f9; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; color: #94a3b8; }
+    .dish-img img { width: 100%; height: 100%; object-fit: cover; }
+    .dish-body { padding: 0.9rem; flex: 1; display: flex; flex-direction: column; gap: 0.45rem; }
+
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.55); backdrop-filter: blur(2px);
+      display: none; align-items: center; justify-content: center; z-index: 120; padding: 1rem;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-box {
+      background: #fff; border-radius: 12px; width: 100%; max-width: 760px; max-height: 90vh;
+      display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+    }
+    .modal-header { padding: 1.15rem 1.35rem; border-bottom: 1px solid hsl(var(--border)); display: flex; justify-content: space-between; align-items: center; }
+    .modal-body { padding: 1.25rem 1.35rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; }
+    .modal-footer { padding: 0.95rem 1.35rem; border-top: 1px solid hsl(var(--border)); display: flex; justify-content: flex-end; gap: 0.6rem; background: #f8fafc; }
+
+    .driver-card {
+      border: 1px solid #bfdbfe; background: #eff6ff; border-radius: 10px; padding: 0.95rem 1.1rem;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.65rem;
+    }
+    @media (max-width: 640px) { .driver-card { grid-template-columns: 1fr; } }
+
+    .toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 200; display: flex; flex-direction: column; gap: 0.5rem; max-width: 380px; }
+    .toast {
+      background: #0f172a; color: #fff; padding: 0.85rem 1.1rem; border-radius: 10px;
+      font-size: 0.84rem; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+    .settings-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 0.75rem; margin-bottom: 1rem; }
+    .settings-tab-btn {
+      padding: 0.45rem 0.9rem; border-radius: 8px; border: 1px solid hsl(var(--border));
+      background: #fff; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+    }
+    .settings-tab-btn.active { background: hsl(var(--primary)); color: #fff; border-color: hsl(var(--primary)); }
+    .settings-pane { display: none; }
+    .settings-pane.active { display: block; }
+  </style>
+</head>
+<body>
+<div class="app-container">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo"></div>
+      <div>
+        <div class="sidebar-title">Happy Deliveries</div>
+        <div class="sidebar-sub">Restaurant Partner</div>
+      </div>
+    </div>
+    <nav class="sidebar-content">
+      <ul class="sidebar-menu">
+        <li>
+          <button class="sidebar-menu-item <%= activeSection === 'overview' ? 'active' : '' %>" data-nav="overview" onclick="switchSection('overview', '/restaurant/dashboard')">
+            <span class="sidebar-menu-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+              <span>Dashboard</span>
+            </span>
+          </button>
+        </li>
+        <li>
+          <button class="sidebar-menu-item <%= activeSection === 'orders' ? 'active' : '' %>" data-nav="orders" onclick="switchSection('orders', '/restaurant/orders')">
+            <span class="sidebar-menu-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 16H8"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M4 3h16v18l-2-1-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/></svg>
+              <span>Orders & Drivers</span>
+            </span>
+            <span class="badge badge-yellow" id="sidebarPendingBadge" style="display:none;">0</span>
+          </button>
+        </li>
+        <li>
+          <button class="sidebar-menu-item <%= activeSection === 'menus' ? 'active' : '' %>" data-nav="menus" onclick="switchSection('menus', '/restaurant/menus')">
+            <span class="sidebar-menu-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m16 2-2.3 2.3a3 3 0 0 0 0 4.2l1.8 1.8a3 3 0 0 0 4.2 0L22 8"/><path d="M15 15 3.3 3.3a4.2 4.2 0 0 0 0 6l7.3 7.3c.7.7 2 .7 2.8 0L15 15Zm0 0 7 7"/></svg>
+              <span>Menus & Dishes</span>
+            </span>
+          </button>
+        </li>
+        <li>
+          <button class="sidebar-menu-item <%= activeSection === 'settings' ? 'active' : '' %>" data-nav="settings" onclick="switchSection('settings', '/restaurant/settings')">
+            <span class="sidebar-menu-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg>
+              <span>Store Info & Settings</span>
+            </span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="avatar">
+          <% if (restaurant.logo_url) { %>
+            <img src="<%= restaurant.logo_url %>" alt="<%= restaurant.name %>" onerror="this.remove()">
+          <% } else { %>
+            <%= (partner.first_name || 'R')[0] %>
+          <% } %>
+        </div>
+        <div style="min-width:0;">
+          <div style="font-size:0.84rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><%= restaurant.name %></div>
+          <div style="font-size:0.74rem;color:hsl(var(--muted-foreground));"><%= partner.first_name %> <%= partner.last_name %></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('sidebar').classList.toggle('open')" style="display:none;" id="mobileMenuBtn">☰ Menu</button>
+        <% if (restaurants.length > 1) { %>
+          <select class="form-select" style="width:auto;font-weight:600;" onchange="changeStore(this.value)">
+            <% restaurants.forEach((r) => { %>
+              <option value="<%= r.id %>" <%= r.id === restaurant.id ? 'selected' : '' %>><%= r.name %></option>
+            <% }) %>
+          </select>
+        <% } else { %>
+          <strong style="font-size:1rem;"><%= restaurant.name %></strong>
+        <% } %>
+
+        <button class="btn btn-sm <%= restaurant.is_accepting_orders ? 'btn-success' : 'btn-outline' %>" id="acceptingOrdersBtn" onclick="toggleAcceptingOrders()">
+          <%= restaurant.is_accepting_orders ? '● Accepting Orders' : '○ Orders Paused' %>
+        </button>
+
+        <span class="live-pill">
+          <span class="dot-green"></span>
+          <span id="socketStateText">Live Updates Active</span>
+        </span>
+      </div>
+      <div class="topbar-right">
+        <a href="/restaurant/logout" class="btn btn-outline btn-sm">Log out</a>
+      </div>
+    </header>
+
+    <div class="page-container">
+      <!-- ════════════ SECTION 1: OVERVIEW ════════════ -->
+      <section class="section-panel <%= activeSection === 'overview' ? 'active' : '' %>" id="sec-overview">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h1 style="font-size:1.65rem;font-weight:800;">Welcome back, <%= partner.first_name || 'Partner' %></h1>
+            <p style="font-size:0.86rem;color:hsl(var(--muted-foreground));">Live snapshot of orders, assigned delivery drivers, and menu items for <%= restaurant.name %>.</p>
+          </div>
+          <div style="display:flex;gap:0.5rem;">
+            <button class="btn btn-outline" onclick="switchSection('menus', '/restaurant/menus')">+ Add Dish / Menu</button>
+            <button class="btn btn-primary" onclick="refreshPortal()">Refresh</button>
+          </div>
+        </div>
+
+        <div class="grid-4">
+          <div class="card stat-card" style="border-left:4px solid #f59e0b;cursor:pointer;" onclick="switchSection('orders', '/restaurant/orders')">
+            <div class="stat-label">Pending Approval</div>
+            <div class="stat-value" id="ovPendingOrders" style="color:#d97706;">0</div>
+            <div class="stat-sub">Tap Accept so customers can pay</div>
+          </div>
+          <div class="card stat-card" style="border-left:4px solid #2563eb;">
+            <div class="stat-label">Active Orders</div>
+            <div class="stat-value" id="ovActiveOrders" style="color:#2563eb;">0</div>
+            <div class="stat-sub">Preparing & out for delivery</div>
+          </div>
+          <div class="card stat-card" style="border-left:4px solid #16a34a;">
+            <div class="stat-label">Today's Revenue</div>
+            <div class="stat-value" id="ovTodayRevenue" style="color:#16a34a;">R0.00</div>
+            <div class="stat-sub"><span id="ovTodayOrders">0</span> orders today</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Catalog Size</div>
+            <div class="stat-value" id="ovMenuItems">0</div>
+            <div class="stat-sub"><span id="ovMenusCount">0</span> menus active</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Recent Orders & Driver Assignments</div>
+              <div style="font-size:0.78rem;color:hsl(var(--muted-foreground));">Accept new orders immediately and monitor which driver picks them up.</div>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="switchSection('orders', '/restaurant/orders')">View All Orders →</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Order #</th>
+                  <th>Customer</th>
+                  <th>Total & Payment</th>
+                  <th>Driver Assigned</th>
+                  <th>Status</th>
+                  <th style="text-align:right;">Quick Actions</th>
+                </tr>
+              </thead>
+              <tbody id="ovRecentOrdersBody">
+                <tr><td colspan="6" style="text-align:center;padding:2rem;">Loading orders...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════════ SECTION 2: ORDERS & ASSIGNED DRIVERS ════════════ -->
+      <section class="section-panel <%= activeSection === 'orders' ? 'active' : '' %>" id="sec-orders">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h1 style="font-size:1.65rem;font-weight:800;">Live Orders & Driver Tracking</h1>
+            <p style="font-size:0.86rem;color:hsl(var(--muted-foreground));">Accept/reject incoming orders, mark food ready for pickup, and inspect the driver assigned to each delivery.</p>
+          </div>
+          <button class="btn btn-primary" onclick="loadOrders(1)">Refresh Orders</button>
+        </div>
+
+        <div class="card" style="padding:1rem 1.25rem;display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;">
+          <div style="flex:1;min-width:180px;">
+            <label class="form-label">Order Status</label>
+            <select class="form-select" id="orderFilterStatus" onchange="loadOrders(1)">
+              <option value="all">All Orders</option>
+              <option value="pending">Pending Approval</option>
+              <option value="ordering_at_restaurant">Accepted / Preparing</option>
+              <option value="accepted_by_driver">Driver Assigned</option>
+              <option value="order_ready">Ready for Pickup</option>
+              <option value="picked_up">Picked Up</option>
+              <option value="on_the_way">On the Way</option>
+              <option value="arrived">Arrived at Customer</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:160px;">
+            <label class="form-label">Date</label>
+            <input type="date" class="form-input" id="orderFilterDate" onchange="loadOrders(1)">
+          </div>
+          <button class="btn btn-outline" onclick="resetOrderFilters()">Reset</button>
+        </div>
+
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Order #</th>
+                  <th>Customer</th>
+                  <th>Items</th>
+                  <th>Total</th>
+                  <th>Assigned Driver</th>
+                  <th>Status</th>
+                  <th>Placed</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="ordersTableBody">
+                <tr><td colspan="8" style="text-align:center;padding:2rem;">Loading orders...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:0.9rem 1.25rem;display:flex;justify-content:space-between;align-items:center;" id="ordersPagination"></div>
+        </div>
+      </section>
+
+      <!-- ════════════ SECTION 3: MENUS & DISHES ════════════ -->
+      <section class="section-panel <%= activeSection === 'menus' ? 'active' : '' %>" id="sec-menus">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h1 style="font-size:1.65rem;font-weight:800;">Menus & Menu Items</h1>
+            <p style="font-size:0.86rem;color:hsl(var(--muted-foreground));">Create menus, add dishes with pricing/discounts/customizations, and toggle item availability live.</p>
+          </div>
+          <div style="display:flex;gap:0.5rem;">
+            <button class="btn btn-outline" onclick="loadMenus()">Refresh</button>
+            <button class="btn btn-primary" onclick="openMenuModal()">+ Create Menu Category</button>
+          </div>
+        </div>
+
+        <div id="menusContainer">
+          <div class="card card-body" style="text-align:center;color:hsl(var(--muted-foreground));">Loading menus...</div>
+        </div>
+      </section>
+
+      <!-- ════════════ SECTION 4: STORE INFO & SETTINGS ════════════ -->
+      <section class="section-panel <%= activeSection === 'settings' ? 'active' : '' %>" id="sec-settings">
+        <div>
+          <h1 style="font-size:1.65rem;font-weight:800;">Restaurant Info & Store Settings</h1>
+          <p style="font-size:0.86rem;color:hsl(var(--muted-foreground));">Update basic details, opening hours, pickup GPS pin, delivery radius, and branding images anytime.</p>
+        </div>
+
+        <div class="card card-body">
+          <div class="settings-tabs">
+            <button type="button" class="settings-tab-btn active" onclick="switchSettingsPane('basic', this)">Basic Info</button>
+            <button type="button" class="settings-tab-btn" onclick="switchSettingsPane('location', this)">Address & GPS Pin</button>
+            <button type="button" class="settings-tab-btn" onclick="switchSettingsPane('ops', this)">Operations & Availability</button>
+            <button type="button" class="settings-tab-btn" onclick="switchSettingsPane('branding', this)">Logo & Cover Images</button>
+          </div>
+
+          <form id="storeSettingsForm" onsubmit="saveStoreSettings(event)">
+            <div class="settings-pane active" id="pane-basic">
+              <div class="form-group">
+                <label class="form-label">Restaurant Name *</label>
+                <input type="text" class="form-input" name="name" id="st_name" required value="<%= restaurant.name %>">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea class="form-input" name="description" id="st_description" rows="3"><%= restaurant.description || '' %></textarea>
+              </div>
+              <div class="grid-2">
+                <div class="form-group">
+                  <label class="form-label">Cuisine Type</label>
+                  <input type="text" class="form-input" name="cuisine_type" id="st_cuisine" value="<%= restaurant.cuisine_type || '' %>">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Opening Hours</label>
+                  <input type="text" class="form-input" name="opening_hours_display" id="st_hours" value="<%= restaurant.opening_hours_display || '08:00 - 21:00' %>">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Contact Phone</label>
+                  <input type="tel" class="form-input" name="phone_number" id="st_phone" value="<%= restaurant.phone_number || '' %>">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Contact Email</label>
+                  <input type="email" class="form-input" name="email" id="st_email" value="<%= restaurant.email || '' %>">
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-pane" id="pane-location">
+              <div class="form-group">
+                <label class="form-label">Full Address *</label>
+                <textarea class="form-input" name="address" id="st_address" rows="2" required><%= restaurant.address %></textarea>
+              </div>
+              <div class="grid-2">
+                <div class="form-group">
+                  <label class="form-label">Latitude</label>
+                  <input type="number" step="any" class="form-input" name="latitude" id="st_lat" value="<%= restaurant.lat || '' %>" oninput="updateStoreMap()">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Longitude</label>
+                  <div style="display:flex;gap:8px;">
+                    <input type="number" step="any" class="form-input" name="longitude" id="st_lng" value="<%= restaurant.lng || '' %>" oninput="updateStoreMap()">
+                    <button type="button" class="btn btn-outline" onclick="detectStoreLocation()">GPS</button>
+                  </div>
+                </div>
+              </div>
+              <div id="storeMapPreview" style="height:240px;border:1px solid hsl(var(--border));border-radius:8px;overflow:hidden;margin-top:8px;"></div>
+            </div>
+
+            <div class="settings-pane" id="pane-ops">
+              <div class="grid-2">
+                <div class="form-group">
+                  <label class="form-label">Preparation Time (minutes)</label>
+                  <input type="number" min="5" max="120" class="form-input" name="preparation_time_minutes" value="<%= restaurant.preparation_time_minutes || 20 %>">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Delivery Radius (km)</label>
+                  <input type="number" min="1" max="50" class="form-input" name="delivery_radius_km" value="<%= restaurant.delivery_radius_km || 5 %>">
+                </div>
+              </div>
+              <div style="display:flex;gap:2rem;margin-top:0.5rem;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;font-size:0.88rem;cursor:pointer;">
+                  <input type="checkbox" name="is_active" <%= restaurant.is_active ? 'checked' : '' %>> Store Visible on Customer App
+                </label>
+                <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;font-size:0.88rem;cursor:pointer;">
+                  <input type="checkbox" name="is_accepting_orders" <%= restaurant.is_accepting_orders ? 'checked' : '' %>> Accepting New Customer Orders
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-pane" id="pane-branding">
+              <div class="grid-2">
+                <div class="form-group">
+                  <label class="form-label">Logo URL</label>
+                  <input type="text" class="form-input" name="logo_url" id="st_logo_url" value="<%= restaurant.logo_url || '' %>" placeholder="https://...">
+                  <input type="file" accept="image/*" style="margin-top:6px;font-size:0.8rem;" onchange="uploadImageToField(this, 'st_logo_url')">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Cover Image URL</label>
+                  <input type="text" class="form-input" name="cover_image_url" id="st_cover_url" value="<%= restaurant.cover_image_url || '' %>" placeholder="https://...">
+                  <input type="file" accept="image/*" style="margin-top:6px;font-size:0.8rem;" onchange="uploadImageToField(this, 'st_cover_url')">
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid hsl(var(--border));display:flex;justify-content:flex-end;">
+              <button type="submit" class="btn btn-primary" id="saveSettingsBtn">Save Restaurant Settings</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- ORDER DETAIL & DRIVER MODAL -->
+<div class="modal-backdrop" id="orderDetailModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 style="font-size:1.1rem;font-weight:700;" id="orderModalTitle">Order Detail</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('orderDetailModal')">✕</button>
+    </div>
+    <div class="modal-body" id="orderModalBody"></div>
+    <div class="modal-footer" id="orderModalFooter">
+      <button class="btn btn-outline" onclick="closeModal('orderDetailModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE / EDIT MENU MODAL -->
+<div class="modal-backdrop" id="menuModal">
+  <div class="modal-box" style="max-width:500px;">
+    <div class="modal-header">
+      <h3 style="font-size:1.05rem;font-weight:700;" id="menuModalTitle">Create Menu Category</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('menuModal')">✕</button>
+    </div>
+    <form onsubmit="saveMenu(event)">
+      <div class="modal-body">
+        <input type="hidden" id="menuEditId">
+        <div class="form-group">
+          <label class="form-label">Menu Name *</label>
+          <input type="text" class="form-input" id="menuNameInput" required placeholder="e.g. Signature Burgers, Grills, Beverages">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-input" id="menuDescInput" rows="2" placeholder="Optional description for customers..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Display Order</label>
+          <input type="number" class="form-input" id="menuOrderInput" value="0">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('menuModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Menu</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- CREATE / EDIT MENU ITEM MODAL -->
+<div class="modal-backdrop" id="itemModal">
+  <div class="modal-box" style="max-width:650px;">
+    <div class="modal-header">
+      <h3 style="font-size:1.05rem;font-weight:700;" id="itemModalTitle">Add Menu Item</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('itemModal')">✕</button>
+    </div>
+    <form onsubmit="saveMenuItem(event)">
+      <div class="modal-body">
+        <input type="hidden" id="itemEditId">
+        <input type="hidden" id="itemMenuId">
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Dish / Item Name *</label>
+            <input type="text" class="form-input" id="itemNameInput" required placeholder="e.g. Double Cheese Smash Burger">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Category *</label>
+            <input type="text" class="form-input" id="itemCategoryInput" required value="Main Course" placeholder="e.g. Burgers, Sides, Drinks">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Price (ZAR) *</label>
+            <input type="number" step="0.01" min="0" class="form-input" id="itemPriceInput" required placeholder="89.00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Discounted Price (Optional)</label>
+            <input type="number" step="0.01" min="0" class="form-input" id="itemDiscountInput" placeholder="Leave blank if none">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Prep Time (mins)</label>
+            <input type="number" min="1" class="form-input" id="itemPrepInput" value="15">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Calories (Optional)</label>
+            <input type="number" min="0" class="form-input" id="itemCaloriesInput" value="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-input" id="itemDescInput" rows="2" placeholder="Ingredients, sauce, portion size..."></textarea>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Image URL</label>
+            <input type="text" class="form-input" id="itemImageInput" placeholder="https://...">
+            <input type="file" accept="image/*" style="margin-top:5px;font-size:0.78rem;" onchange="uploadImageToField(this, 'itemImageInput')">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tags (comma-separated)</label>
+            <input type="text" class="form-input" id="itemTagsInput" placeholder="halal, spicy, chef special">
+          </div>
+        </div>
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:0.25rem;">
+          <label style="display:flex;align-items:center;gap:0.45rem;font-size:0.84rem;font-weight:600;cursor:pointer;">
+            <input type="checkbox" id="itemAvailInput" checked> Available
+          </label>
+          <label style="display:flex;align-items:center;gap:0.45rem;font-size:0.84rem;font-weight:600;cursor:pointer;">
+            <input type="checkbox" id="itemPopularInput"> Mark as Popular
+          </label>
+          <label style="display:flex;align-items:center;gap:0.45rem;font-size:0.84rem;font-weight:600;cursor:pointer;">
+            <input type="checkbox" id="itemVegInput"> Vegetarian
+          </label>
+        </div>
+        <div class="form-group" style="margin-top:0.5rem;">
+          <label class="form-label">Customizations / Add-ons JSON (Optional)</label>
+          <textarea class="form-input" id="itemCustomizationsInput" rows="2" placeholder='[{"name":"Size","required":true,"options":[{"name":"Regular","price":0},{"name":"Large","price":25}]}]'></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('itemModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Dish</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const RESTAURANT_ID = "<%= restaurant.id %>";
+  const MANAGER_ID = "<%= manager.id %>";
+  const RESTAURANT_IDS = <%- JSON.stringify(restaurants.map(r => r.id)) %>;
+  let currentOrderIdOpen = null;
+  let currentOrderPage = 1;
+
+  const STATUS_BADGE_MAP = {
+    pending: 'badge-yellow',
+    ordering_at_restaurant: 'badge-blue',
+    accepted_by_driver: 'badge-purple',
+    order_ready: 'badge-green',
+    picked_up: 'badge-blue',
+    on_the_way: 'badge-blue',
+    arrived: 'badge-green',
+    delivered: 'badge-green',
+    cancelled: 'badge-red',
+    no_drivers_available: 'badge-red',
+  };
+
+  function esc(val) {
+    if (val === null || val === undefined) return '';
+    return String(val).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function fmtMoney(n) { return parseFloat(n || 0).toFixed(2); }
+  function fmtDateTime(d) {
+    if (!d) return '—';
+    return new Date(d).toLocaleString('en-ZA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function fmtStatus(st, payStatus) {
+    if (st === 'ordering_at_restaurant') {
+      return payStatus === 'completed' ? 'Paid · Preparing' : 'Accepted · Awaiting Customer Payment';
+    }
+    const labels = {
+      pending: 'Pending Approval',
+      accepted_by_driver: 'Driver Assigned',
+      order_ready: 'Ready for Pickup',
+      picked_up: 'Picked Up by Driver',
+      on_the_way: 'On the Way',
+      arrived: 'Arrived at Customer',
+      delivered: 'Delivered',
+      cancelled: 'Cancelled',
+      no_drivers_available: 'No Drivers Available',
+    };
+    return labels[st] || st;
+  }
+
+  function playAlertTone() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [660, 880].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.12, ctx.currentTime + i * 0.14);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.14 + 0.25);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + i * 0.14);
+        osc.stop(ctx.currentTime + i * 0.14 + 0.26);
+      });
+    } catch (_) {}
+  }
+
+  function showToast(title, subtitle) {
+    const c = document.getElementById('toastContainer');
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.innerHTML = `<div style="font-weight:700;">${esc(title)}</div>${subtitle ? `<div style="font-size:0.78rem;color:#cbd5e1;margin-top:2px;">${esc(subtitle)}</div>` : ''}`;
+    c.appendChild(el);
+    setTimeout(() => el.remove(), 5500);
+  }
+
+  function openModal(id) { document.getElementById(id).classList.add('open'); }
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+    if (id === 'orderDetailModal') currentOrderIdOpen = null;
+  }
+
+  function changeStore(id) {
+    window.location.href = `${window.location.pathname}?restaurantId=${encodeURIComponent(id)}`;
+  }
+
+  function switchSection(section, urlPath) {
+    document.querySelectorAll('.section-panel').forEach((p) => p.classList.remove('active'));
+    document.getElementById('sec-' + section)?.classList.add('active');
+    document.querySelectorAll('[data-nav]').forEach((b) => {
+      b.classList.toggle('active', b.dataset.nav === section);
+    });
+    if (urlPath && window.history?.pushState) {
+      window.history.pushState({}, '', `${urlPath}?restaurantId=${encodeURIComponent(RESTAURANT_ID)}`);
+    }
+    if (section === 'orders') loadOrders(currentOrderPage);
+    if (section === 'menus') loadMenus();
+    if (section === 'settings') updateStoreMap();
+  }
+
+  function renderDriverSummaryCell(o) {
+    if (o.driver_name) {
+      const veh = [o.driver_vehicle_color, o.driver_vehicle_model || o.driver_vehicle_type].filter(Boolean).join(' ');
+      return `
+        <div>
+          <div style="font-weight:600;color:#1e40af;">🚗 ${esc(o.driver_name)}</div>
+          <div style="font-size:0.75rem;color:hsl(var(--muted-foreground));">${esc(o.driver_phone || '')}</div>
+          ${veh || o.driver_vehicle_plate ? `<div style="font-size:0.74rem;color:#475569;">${esc(veh)} ${o.driver_vehicle_plate ? '· <strong>' + esc(o.driver_vehicle_plate) + '</strong>' : ''}</div>` : ''}
+        </div>
+      `;
+    }
+    if (o.status === 'pending') return '<span style="font-size:0.76rem;color:hsl(var(--muted-foreground));">Approve order first</span>';
+    if (o.payment_status !== 'completed' && o.status === 'ordering_at_restaurant') return '<span style="font-size:0.76rem;color:hsl(var(--muted-foreground));">Waiting customer payment</span>';
+    if (o.status === 'cancelled' || o.status === 'no_drivers_available') return '<span style="font-size:0.76rem;color:#991b1b;">Unassigned</span>';
+    return '<span class="badge badge-gray">Searching for driver...</span>';
+  }
+
+  function renderOrderActionButtons(o) {
+    const btns = [];
+    if (o.status === 'pending') {
+      btns.push(`<button class="btn btn-success btn-sm" onclick="acceptOrder('${o.id}', this)">Accept</button>`);
+      btns.push(`<button class="btn btn-danger btn-sm" onclick="rejectOrder('${o.id}', this)">Reject</button>`);
+    } else if ((o.status === 'ordering_at_restaurant' || o.status === 'accepted_by_driver') && o.payment_status === 'completed') {
+      btns.push(`<button class="btn btn-primary btn-sm" onclick="updateOrderStatus('${o.id}', 'order_ready', this)">Mark Ready</button>`);
+    }
+    btns.push(`<button class="btn btn-outline btn-sm" onclick="openOrderModal('${o.id}')">Details</button>`);
+    return `<div style="display:inline-flex;gap:0.35rem;flex-wrap:wrap;justify-content:flex-end;">${btns.join('')}</div>`;
+  }
+
+  async function refreshPortal() {
+    try {
+      const res = await fetch(`/restaurant/api/portal/summary?restaurantId=${encodeURIComponent(RESTAURANT_ID)}`);
+      const data = await res.json();
+      if (!data.success) return;
+
+      const s = data.stats || {};
+      document.getElementById('ovPendingOrders').textContent = s.pending_orders || 0;
+      document.getElementById('ovActiveOrders').textContent = s.active_orders || 0;
+      document.getElementById('ovTodayRevenue').textContent = 'R' + fmtMoney(s.today_revenue);
+      document.getElementById('ovTodayOrders').textContent = s.today_orders || 0;
+      document.getElementById('ovMenuItems').textContent = s.item_count || 0;
+      document.getElementById('ovMenusCount').textContent = s.menu_count || 0;
+
+      const badge = document.getElementById('sidebarPendingBadge');
+      if (s.pending_orders > 0) {
+        badge.style.display = 'inline-flex';
+        badge.textContent = s.pending_orders;
+      } else {
+        badge.style.display = 'none';
+      }
+
+      const orders = data.recentOrders || [];
+      const tbody = document.getElementById('ovRecentOrdersBody');
+      if (!orders.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:hsl(var(--muted-foreground));">No orders yet for this restaurant.</td></tr>';
+      } else {
+        tbody.innerHTML = orders.map((o) => `
+          <tr>
+            <td><strong>#${esc(o.order_number || o.id.slice(0,8).toUpperCase())}</strong><div style="font-size:0.74rem;color:hsl(var(--muted-foreground));">${fmtDateTime(o.placed_at)}</div></td>
+            <td>${esc(o.customer_name)}</td>
+            <td><strong>R${fmtMoney(o.total_amount)}</strong><div style="font-size:0.74rem;color:hsl(var(--muted-foreground));">${esc(o.payment_status)}</div></td>
+            <td>${renderDriverSummaryCell(o)}</td>
+            <td><span class="badge ${STATUS_BADGE_MAP[o.status] || 'badge-gray'}">${esc(fmtStatus(o.status, o.payment_status))}</span></td>
+            <td style="text-align:right;">${renderOrderActionButtons(o)}</td>
+          </tr>
+        `).join('');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function loadOrders(page = 1) {
+    currentOrderPage = page;
+    const status = document.getElementById('orderFilterStatus').value;
+    const date = document.getElementById('orderFilterDate').value;
+    const params = new URLSearchParams({ restaurantId: RESTAURANT_ID, page, limit: 15 });
+    if (status && status !== 'all') params.set('status', status);
+    if (date) params.set('date', date);
+
+    try {
+      const res = await fetch('/restaurant/api/orders?' + params.toString());
+      const data = await res.json();
+      const tbody = document.getElementById('ordersTableBody');
+      const orders = data.orders || [];
+
+      if (!orders.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:hsl(var(--muted-foreground));">No orders match these filters.</td></tr>';
+      } else {
+        tbody.innerHTML = orders.map((o) => `
+          <tr>
+            <td><strong>#${esc(o.order_number || o.id.slice(0,8).toUpperCase())}</strong></td>
+            <td>${esc(o.customer_name)}</td>
+            <td>${o.item_count || 0} items</td>
+            <td><strong>R${fmtMoney(o.total_amount)}</strong><div style="font-size:0.73rem;color:hsl(var(--muted-foreground));">${esc(o.payment_status)}</div></td>
+            <td>${renderDriverSummaryCell(o)}</td>
+            <td><span class="badge ${STATUS_BADGE_MAP[o.status] || 'badge-gray'}">${esc(fmtStatus(o.status, o.payment_status))}</span></td>
+            <td style="font-size:0.78rem;color:hsl(var(--muted-foreground));">${fmtDateTime(o.placed_at)}</td>
+            <td style="text-align:right;">${renderOrderActionButtons(o)}</td>
+          </tr>
+        `).join('');
+      }
+
+      const pag = document.getElementById('ordersPagination');
+      pag.innerHTML = `
+        <span style="font-size:0.8rem;color:hsl(var(--muted-foreground));">Page ${data.currentPage || 1} of ${data.totalPages || 1} (${data.total || 0} orders)</span>
+        <div style="display:flex;gap:0.4rem;">
+          <button class="btn btn-outline btn-sm" ${(data.currentPage || 1) <= 1 ? 'disabled' : ''} onclick="loadOrders(${(data.currentPage || 1) - 1})">Previous</button>
+          <button class="btn btn-outline btn-sm" ${(data.currentPage || 1) >= (data.totalPages || 1) ? 'disabled' : ''} onclick="loadOrders(${(data.currentPage || 1) + 1})">Next</button>
+        </div>
+      `;
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  function resetOrderFilters() {
+    document.getElementById('orderFilterStatus').value = 'all';
+    document.getElementById('orderFilterDate').value = '';
+    loadOrders(1);
+  }
+
+  async function openOrderModal(orderId) {
+    currentOrderIdOpen = orderId;
+    document.getElementById('orderModalBody').innerHTML = '<div style="padding:1.5rem;text-align:center;">Loading order...</div>';
+    openModal('orderDetailModal');
+
+    try {
+      const res = await fetch(`/restaurant/api/orders/${orderId}`);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to load order');
+
+      const o = data.order;
+      const items = data.items || [];
+      let addrStr = '—';
+      try {
+        const a = typeof o.delivery_address === 'string' ? JSON.parse(o.delivery_address) : o.delivery_address;
+        if (a) addrStr = [a.street, a.city, a.postal_code, a.instructions].filter(Boolean).join(', ') || a.formatted || JSON.stringify(a);
+      } catch (_) {
+        addrStr = String(o.delivery_address || '—');
+      }
+
+      document.getElementById('orderModalTitle').textContent = `Order #${o.order_number || o.id.slice(0,8).toUpperCase()}`;
+      document.getElementById('orderModalBody').innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+          <span class="badge ${STATUS_BADGE_MAP[o.status] || 'badge-gray'}" style="font-size:0.84rem;padding:0.35rem 0.75rem;">${esc(fmtStatus(o.status, o.payment_status))}</span>
+          <span class="badge badge-gray">Payment: ${esc(o.payment_status)} · ${esc(o.payment_method || 'card')}</span>
+        </div>
+
+        ${o.driver_name ? `
+          <div class="driver-card">
+            <div><div style="font-size:0.72rem;color:#1e3a8a;font-weight:700;">ASSIGNED DRIVER</div><div style="font-weight:800;font-size:0.95rem;">${esc(o.driver_name)}</div></div>
+            <div><div style="font-size:0.72rem;color:#1e3a8a;font-weight:700;">PHONE</div><div style="font-weight:700;"><a href="tel:${esc(o.driver_phone)}" style="color:#1d4ed8;">${esc(o.driver_phone || '—')}</a></div></div>
+            <div><div style="font-size:0.72rem;color:#1e3a8a;font-weight:700;">VEHICLE & PLATE</div><div style="font-weight:700;">${esc([o.driver_vehicle_color, o.driver_vehicle_model || o.driver_vehicle_type].filter(Boolean).join(' '))} ${o.driver_vehicle_plate ? '(' + esc(o.driver_vehicle_plate) + ')' : ''}</div></div>
+          </div>
+        ` : `<div style="background:#f8fafc;border:1px solid hsl(var(--border));padding:0.85rem;border-radius:8px;font-size:0.84rem;color:hsl(var(--muted-foreground));">Driver: ${o.status === 'pending' ? 'Accept this order first so the customer can pay and dispatch a driver.' : o.payment_status !== 'completed' ? 'Awaiting customer payment completion before dispatching to nearby drivers.' : 'Waiting for an available nearby driver to accept...'}</div>`}
+
+        <div>
+          <h4 style="font-size:0.8rem;text-transform:uppercase;color:hsl(var(--muted-foreground));margin-bottom:0.5rem;">Order Items</h4>
+          ${items.map((it) => `
+            <div style="display:flex;justify-content:space-between;padding:0.55rem 0;border-bottom:1px solid hsl(var(--border));gap:1rem;">
+              <div>
+                <div style="font-weight:600;">${esc(it.item_name)} × ${it.quantity}</div>
+                ${it.special_instructions ? `<div style="font-size:0.78rem;color:#b45309;">Note: ${esc(it.special_instructions)}</div>` : ''}
+              </div>
+              <div style="font-weight:700;">R${fmtMoney(it.total_price ?? (it.unit_price * it.quantity))}</div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="grid-2" style="background:#f8fafc;padding:0.9rem;border-radius:8px;">
+          <div>
+            <div style="font-size:0.75rem;font-weight:700;color:hsl(var(--muted-foreground));">CUSTOMER</div>
+            <div style="font-weight:600;margin-top:2px;">${esc(o.customer_name)}</div>
+            <div style="font-size:0.82rem;">${esc(o.customer_phone || '—')}</div>
+            <div style="font-size:0.8rem;color:hsl(var(--muted-foreground));margin-top:4px;">${esc(addrStr)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div>Subtotal: <strong>R${fmtMoney(o.subtotal)}</strong></div>
+            <div>Delivery: <strong>R${fmtMoney(o.delivery_fee)}</strong></div>
+            <div>Tax: <strong>R${fmtMoney(o.tax_amount)}</strong></div>
+            ${parseFloat(o.tip_amount || 0) > 0 ? `<div>Tip: <strong>R${fmtMoney(o.tip_amount)}</strong></div>` : ''}
+            <div style="font-size:1.05rem;font-weight:800;margin-top:4px;color:hsl(var(--primary));">Total: R${fmtMoney(o.total_amount)}</div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('orderModalFooter').innerHTML = `
+        ${o.status === 'pending' ? `
+          <button class="btn btn-danger" onclick="rejectOrder('${o.id}', this)">Reject Order</button>
+          <button class="btn btn-success" onclick="acceptOrder('${o.id}', this)">Accept Order</button>
+        ` : (['ordering_at_restaurant', 'accepted_by_driver'].includes(o.status) && o.payment_status === 'completed') ? `
+          <button class="btn btn-primary" onclick="updateOrderStatus('${o.id}', 'order_ready', this)">Mark Ready for Pickup</button>
+        ` : ''}
+        <button class="btn btn-outline" onclick="closeModal('orderDetailModal')">Close</button>
+      `;
+    } catch (err) {
+      document.getElementById('orderModalBody').innerHTML = `<div style="color:#dc2626;">${esc(err.message)}</div>`;
+    }
+  }
+
+  async function acceptOrder(id, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch(`/restaurant/api/orders/${id}/accept`, { method: 'POST' });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to accept');
+      showToast('Order Accepted', data.message);
+      refreshPortal();
+      loadOrders(currentOrderPage);
+      if (currentOrderIdOpen === id) openOrderModal(id);
+    } catch (err) {
+      showToast('Error', err.message);
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function rejectOrder(id, btn) {
+    if (!confirm('Reject and cancel this order? Any completed payment will be refunded automatically.')) return;
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch(`/restaurant/api/orders/${id}/reject`, { method: 'POST' });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to reject');
+      showToast('Order Rejected', data.message);
+      refreshPortal();
+      loadOrders(currentOrderPage);
+      if (currentOrderIdOpen === id) openOrderModal(id);
+    } catch (err) {
+      showToast('Error', err.message);
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function updateOrderStatus(id, status, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch(`/restaurant/api/orders/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Status update failed');
+      showToast('Order Updated', `Order marked as ${status.replace(/_/g, ' ')}.`);
+      refreshPortal();
+      loadOrders(currentOrderPage);
+      if (currentOrderIdOpen === id) openOrderModal(id);
+    } catch (err) {
+      showToast('Error', err.message);
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  // ── MENUS & ITEMS ───────────────────────────────────────────────────────────
+  let loadedMenus = [];
+
+  async function loadMenus() {
+    try {
+      const res = await fetch(`/restaurant/api/menus?restaurantId=${encodeURIComponent(RESTAURANT_ID)}`);
+      const data = await res.json();
+      loadedMenus = data.menus || [];
+      const container = document.getElementById('menusContainer');
+
+      if (!loadedMenus.length) {
+        container.innerHTML = `
+          <div class="card card-body" style="text-align:center;padding:3rem;">
+            <h3 style="font-weight:700;margin-bottom:0.4rem;">No menus created yet</h3>
+            <p style="font-size:0.86rem;color:hsl(var(--muted-foreground));margin-bottom:1rem;">Create your first menu category (e.g. Mains, Grill, Drinks) to start adding dishes.</p>
+            <button class="btn btn-primary" onclick="openMenuModal()">+ Create First Menu</button>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = loadedMenus.map((m) => `
+        <div class="card" style="margin-bottom:1.15rem;">
+          <div class="card-header" style="background:#0f172a;color:#fff;">
+            <div>
+              <div class="card-title">${esc(m.name)} <span class="badge badge-gray" style="margin-left:6px;">${(m.items || []).length} items</span></div>
+              ${m.description ? `<div style="font-size:0.78rem;color:#cbd5e1;margin-top:2px;">${esc(m.description)}</div>` : ''}
+            </div>
+            <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+              <button class="btn btn-sm" style="background:#2563eb;color:#fff;" onclick="openItemModal('${m.id}')">+ Add Dish</button>
+              <button class="btn btn-sm" style="background:rgba(255,255,255,0.14);color:#fff;" onclick="openMenuModal('${m.id}')">Edit Menu</button>
+              <button class="btn btn-sm" style="background:#dc2626;color:#fff;" onclick="deleteMenu('${m.id}')">Delete</button>
+            </div>
+          </div>
+          <div class="card-body">
+            ${(m.items || []).length ? `
+              <div class="menu-items-grid">
+                ${m.items.map((it) => `
+                  <div class="dish-card">
+                    <div class="dish-img">
+                      ${it.image_url ? `<img src="${esc(it.image_url)}" alt="${esc(it.name)}" onerror="this.remove()">` : '<span>No Image</span>'}
+                    </div>
+                    <div class="dish-body">
+                      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
+                        <strong style="font-size:0.95rem;">${esc(it.name)}</strong>
+                        <span style="font-weight:800;color:#2563eb;white-space:nowrap;">R${fmtMoney(it.discounted_price || it.price)}</span>
+                      </div>
+                      <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+                        <span class="badge badge-gray">${esc(it.category || 'General')}</span>
+                        ${it.is_popular ? '<span class="badge badge-yellow">Popular</span>' : ''}
+                        ${it.is_veg ? '<span class="badge badge-green">Veg</span>' : ''}
+                        <span class="badge ${it.is_available ? 'badge-green' : 'badge-red'}">${it.is_available ? 'Available' : 'Sold Out'}</span>
+                      </div>
+                      ${it.description ? `<p style="font-size:0.78rem;color:hsl(var(--muted-foreground));">${esc(it.description)}</p>` : ''}
+                      <div style="margin-top:auto;padding-top:0.6rem;display:flex;gap:0.35rem;flex-wrap:wrap;">
+                        <button class="btn btn-outline btn-sm" onclick="toggleItemAvail('${it.id}')">${it.is_available ? 'Pause' : 'Enable'}</button>
+                        <button class="btn btn-outline btn-sm" onclick="openItemModal('${m.id}', '${it.id}')">Edit</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteMenuItem('${it.id}')">Delete</button>
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : `<div style="text-align:center;padding:1.5rem;color:hsl(var(--muted-foreground));font-size:0.85rem;">No items in this menu yet. Click "+ Add Dish" above!</div>`}
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  function openMenuModal(menuId = '') {
+    const existing = loadedMenus.find((m) => m.id === menuId);
+    document.getElementById('menuEditId').value = existing ? existing.id : '';
+    document.getElementById('menuNameInput').value = existing ? existing.name : '';
+    document.getElementById('menuDescInput').value = existing ? (existing.description || '') : '';
+    document.getElementById('menuOrderInput').value = existing ? (existing.display_order || 0) : 0;
+    document.getElementById('menuModalTitle').textContent = existing ? 'Edit Menu Category' : 'Create Menu Category';
+    openModal('menuModal');
+  }
+
+  async function saveMenu(e) {
+    e.preventDefault();
+    const id = document.getElementById('menuEditId').value;
+    const payload = {
+      restaurantId: RESTAURANT_ID,
+      name: document.getElementById('menuNameInput').value.trim(),
+      description: document.getElementById('menuDescInput').value.trim(),
+      display_order: document.getElementById('menuOrderInput').value,
+    };
+    const res = await fetch(id ? `/restaurant/api/menus/${id}` : '/restaurant/api/menus', {
+      method: id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!data.success) return showToast('Error', data.error);
+    closeModal('menuModal');
+    showToast('Menu Saved', 'Menu category updated.');
+    loadMenus();
+    refreshPortal();
+  }
+
+  async function deleteMenu(menuId) {
+    if (!confirm('Delete this menu category and all its items?')) return;
+    const res = await fetch(`/restaurant/api/menus/${menuId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!data.success) return showToast('Error', data.error);
+    showToast('Menu Deleted', 'Menu removed.');
+    loadMenus();
+    refreshPortal();
+  }
+
+  function openItemModal(menuId, itemId = '') {
+    document.getElementById('itemMenuId').value = menuId;
+    document.getElementById('itemEditId').value = itemId || '';
+    const menu = loadedMenus.find((m) => m.id === menuId);
+    const existing = menu?.items?.find((i) => i.id === itemId);
+
+    document.getElementById('itemModalTitle').textContent = existing ? `Edit ${existing.name}` : 'Add New Menu Item';
+    document.getElementById('itemNameInput').value = existing ? existing.name : '';
+    document.getElementById('itemCategoryInput').value = existing ? (existing.category || 'Main Course') : 'Main Course';
+    document.getElementById('itemPriceInput').value = existing ? existing.price : '';
+    document.getElementById('itemDiscountInput').value = existing?.discounted_price || '';
+    document.getElementById('itemPrepInput').value = existing?.preparation_time_minutes || 15;
+    document.getElementById('itemCaloriesInput').value = existing?.calories || 0;
+    document.getElementById('itemDescInput').value = existing?.description || '';
+    document.getElementById('itemImageInput').value = existing?.image_url || '';
+    document.getElementById('itemTagsInput').value = Array.isArray(existing?.tags) ? existing.tags.join(', ') : '';
+    document.getElementById('itemAvailInput').checked = existing ? Boolean(existing.is_available) : true;
+    document.getElementById('itemPopularInput').checked = existing ? Boolean(existing.is_popular) : false;
+    document.getElementById('itemVegInput').checked = existing ? Boolean(existing.is_veg) : false;
+    document.getElementById('itemCustomizationsInput').value = existing?.customizations && Array.isArray(existing.customizations) && existing.customizations.length
+      ? JSON.stringify(existing.customizations)
+      : '';
+    openModal('itemModal');
+  }
+
+  async function saveMenuItem(e) {
+    e.preventDefault();
+    const id = document.getElementById('itemEditId').value;
+    let customizations = [];
+    const rawCust = document.getElementById('itemCustomizationsInput').value.trim();
+    if (rawCust) {
+      try {
+        customizations = JSON.parse(rawCust);
+      } catch (_) {
+        return showToast('Invalid Customizations JSON', 'Please check your JSON array formatting.');
+      }
+    }
+
+    const payload = {
+      menuId: document.getElementById('itemMenuId').value,
+      restaurantId: RESTAURANT_ID,
+      name: document.getElementById('itemNameInput').value.trim(),
+      category: document.getElementById('itemCategoryInput').value.trim(),
+      price: parseFloat(document.getElementById('itemPriceInput').value),
+      discounted_price: document.getElementById('itemDiscountInput').value ? parseFloat(document.getElementById('itemDiscountInput').value) : null,
+      preparation_time_minutes: parseInt(document.getElementById('itemPrepInput').value, 10) || 15,
+      calories: parseInt(document.getElementById('itemCaloriesInput').value, 10) || 0,
+      description: document.getElementById('itemDescInput').value.trim(),
+      image_url: document.getElementById('itemImageInput').value.trim() || null,
+      tags: document.getElementById('itemTagsInput').value.split(',').map(t => t.trim()).filter(Boolean),
+      is_available: document.getElementById('itemAvailInput').checked,
+      is_popular: document.getElementById('itemPopularInput').checked,
+      is_veg: document.getElementById('itemVegInput').checked,
+      customizations,
+    };
+
+    const res = await fetch(id ? `/restaurant/api/menu-items/${id}` : '/restaurant/api/menu-items', {
+      method: id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!data.success) return showToast('Error', data.error);
+    closeModal('itemModal');
+    showToast('Dish Saved', `${payload.name} saved cleanly.`);
+    loadMenus();
+    refreshPortal();
+  }
+
+  async function toggleItemAvail(itemId) {
+    const res = await fetch(`/restaurant/api/menu-items/${itemId}/toggle-availability`, { method: 'PATCH' });
+    const data = await res.json();
+    if (data.success) {
+      loadMenus();
+      showToast('Item Updated', `${data.item.name} is now ${data.item.is_available ? 'Available' : 'Sold Out'}.`);
+    }
+  }
+
+  async function deleteMenuItem(itemId) {
+    if (!confirm('Delete this menu item?')) return;
+    const res = await fetch(`/restaurant/api/menu-items/${itemId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      loadMenus();
+      refreshPortal();
+      showToast('Dish Deleted', 'Item removed.');
+    }
+  }
+
+  // ── SETTINGS & STORE TOGGLE ────────────────────────────────────────────────
+  function switchSettingsPane(pane, btn) {
+    document.querySelectorAll('.settings-pane').forEach((p) => p.classList.remove('active'));
+    document.querySelectorAll('.settings-tab-btn').forEach((b) => b.classList.remove('active'));
+    document.getElementById('pane-' + pane)?.classList.add('active');
+    if (btn) btn.classList.add('active');
+    if (pane === 'location') updateStoreMap();
+  }
+
+  function updateStoreMap() {
+    const lat = document.getElementById('st_lat')?.value?.trim();
+    const lng = document.getElementById('st_lng')?.value?.trim();
+    const box = document.getElementById('storeMapPreview');
+    if (!box) return;
+    if (lat && lng) {
+      box.innerHTML = `<iframe width="100%" height="100%" frameborder="0" style="border:0;" src="https://maps.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}&z=15&output=embed"></iframe>`;
+    } else {
+      box.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;color:#64748b;font-size:0.85rem;">Enter coordinates to preview map</div>';
+    }
+  }
+
+  function detectStoreLocation() {
+    navigator.geolocation?.getCurrentPosition((pos) => {
+      document.getElementById('st_lat').value = pos.coords.latitude.toFixed(6);
+      document.getElementById('st_lng').value = pos.coords.longitude.toFixed(6);
+      updateStoreMap();
+    });
+  }
+
+  async function uploadImageToField(fileInput, targetInputId) {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('image', file);
+    showToast('Uploading Image...', file.name);
+    try {
+      const res = await fetch('/restaurant/api/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Upload failed');
+      document.getElementById(targetInputId).value = data.url;
+      showToast('Upload Complete', 'Image URL filled automatically.');
+    } catch (err) {
+      showToast('Upload Note', err.message);
+    }
+  }
+
+  async function saveStoreSettings(e) {
+    e.preventDefault();
+    const form = e.target;
+    const fd = new FormData(form);
+    const payload = Object.fromEntries(fd.entries());
+    payload.restaurantId = RESTAURANT_ID;
+    payload.is_active = form.querySelector('input[name="is_active"]').checked ? 'true' : 'false';
+    payload.is_accepting_orders = form.querySelector('input[name="is_accepting_orders"]').checked ? 'true' : 'false';
+
+    const btn = document.getElementById('saveSettingsBtn');
+    btn.disabled = true;
+    try {
+      const res = await fetch('/restaurant/api/restaurant', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Update failed');
+      showToast('Settings Saved', 'Your restaurant profile has been updated.');
+      const acceptBtn = document.getElementById('acceptingOrdersBtn');
+      const accepting = Boolean(data.restaurant.is_accepting_orders);
+      acceptBtn.className = 'btn btn-sm ' + (accepting ? 'btn-success' : 'btn-outline');
+      acceptBtn.textContent = accepting ? '● Accepting Orders' : '○ Orders Paused';
+    } catch (err) {
+      showToast('Error', err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function toggleAcceptingOrders() {
+    const res = await fetch(`/restaurant/api/restaurant/toggle-accepting?restaurantId=${encodeURIComponent(RESTAURANT_ID)}`, {
+      method: 'PATCH',
+    });
+    const data = await res.json();
+    if (data.success) {
+      const accepting = Boolean(data.restaurant.is_accepting_orders);
+      const btn = document.getElementById('acceptingOrdersBtn');
+      btn.className = 'btn btn-sm ' + (accepting ? 'btn-success' : 'btn-outline');
+      btn.textContent = accepting ? '● Accepting Orders' : '○ Orders Paused';
+      showToast('Store Status Changed', accepting ? 'Your restaurant is accepting new orders.' : 'New orders paused temporarily.');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.innerWidth <= 820) document.getElementById('mobileMenuBtn').style.display = 'inline-flex';
+    refreshPortal();
+    if ("<%= activeSection %>" === 'orders') loadOrders(1);
+    if ("<%= activeSection %>" === 'menus') loadMenus();
+    if ("<%= activeSection %>" === 'settings') updateStoreMap();
+
+    if (typeof io !== 'undefined') {
+      const socket = io();
+      socket.on('connect', () => {
+        socket.emit('join_manager_room', { managerId: MANAGER_ID, restaurantIds: RESTAURANT_IDS });
+        document.getElementById('socketStateText').textContent = 'Live Connected';
+      });
+      socket.on('new_order', (payload) => {
+        playAlertTone();
+        showToast('🔔 New Incoming Order!', `Order #${payload?.order_number || ''} requires your acceptance.`);
+        refreshPortal();
+        loadOrders(currentOrderPage);
+      });
+      socket.on('driver_assigned', (payload) => {
+        showToast('🚗 Driver Accepted Order', `A driver accepted Order #${payload?.order_number || ''}!`);
+        refreshPortal();
+        loadOrders(currentOrderPage);
+        if (currentOrderIdOpen && currentOrderIdOpen === payload?.order_id) openOrderModal(currentOrderIdOpen);
+      });
+      socket.on('order_updated', (payload) => {
+        refreshPortal();
+        loadOrders(currentOrderPage);
+        if (currentOrderIdOpen && (currentOrderIdOpen === payload?.orderId || currentOrderIdOpen === payload?.order?.id)) {
+          openOrderModal(currentOrderIdOpen);
+        }
+      });
+    }
+  });
+</script>
+</body>
+</html>

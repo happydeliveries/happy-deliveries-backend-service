@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title || 'Restaurant Partner Login · Happy Deliveries' %></title>
+  <link rel="shortcut icon" href="https://res.cloudinary.com/dpdira4rd/image/upload/v1794689689/logo-square_gmpkuq.png" type="image/x-icon">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f4f6fa;
+      --surface: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .auth-shell {
+      width: 100%;
+      max-width: 960px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      box-shadow: 0 20px 35px -10px rgba(15, 23, 42, 0.08);
+    }
+
+    @media (max-width: 768px) {
+      .auth-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-pane {
+        display: none;
+      }
+    }
+
+    .form-pane {
+      padding: 2.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.75rem;
+    }
+
+    .brand-logo {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: url('https://res.cloudinary.com/dpdira4rd/image/upload/v1794689123/logo-square_pzavip.png') center/cover no-repeat;
+      border: 1px solid var(--border);
+    }
+
+    .brand h1 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .brand span {
+      font-size: 0.78rem;
+      color: var(--muted);
+      display: block;
+    }
+
+    .heading {
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.35rem;
+    }
+
+    .sub {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+
+    .alert {
+      padding: 0.85rem 1rem;
+      border-radius: 10px;
+      font-size: 0.86rem;
+      margin-bottom: 1.1rem;
+      line-height: 1.45;
+    }
+
+    .alert-error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+    }
+
+    .alert-success {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+    }
+
+    .field {
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+      color: #334155;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.72rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.92rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 0.8rem 1rem;
+      border-radius: 10px;
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 0.35rem;
+      transition: background 0.15s;
+    }
+
+    .btn-submit:hover {
+      background: var(--primary-hover);
+    }
+
+    .links-box {
+      margin-top: 1.5rem;
+      padding-top: 1.2rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .links-box a {
+      color: var(--primary);
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .links-box a:hover {
+      text-decoration: underline;
+    }
+
+    .hero-pane {
+      background: linear-gradient(145deg, #0f172a 0%, #1e293b 55%, #1d4ed8 100%);
+      color: #fff;
+      padding: 2.75rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      margin-top: 1.5rem;
+    }
+
+    .feature-list li {
+      display: flex;
+      gap: 0.7rem;
+      align-items: flex-start;
+      font-size: 0.9rem;
+      color: #e2e8f0;
+    }
+
+    .dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.16);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="auth-shell">
+    <div class="form-pane">
+      <div class="brand">
+        <div class="brand-logo"></div>
+        <div>
+          <h1>Happy Deliveries</h1>
+          <span>Restaurant Partner Portal</span>
+        </div>
+      </div>
+
+      <h2 class="heading">Partner Sign In</h2>
+      <p class="sub">Manage your restaurant info, menus, dishes, and live customer orders.</p>
+
+      <% if (locals.error) { %>
+      <div class="alert alert-error"><%= locals.error %></div>
+      <% } %>
+      <% if (locals.success) { %>
+      <div class="alert alert-success"><%= locals.success %></div>
+      <% } %>
+
+      <form action="/restaurant/login" method="POST">
+        <div class="field">
+          <label for="email">Partner Email Address</label>
+          <input type="email" id="email" name="email" required placeholder="owner@restaurant.co.za" autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required placeholder="Enter your password" autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn-submit">Sign In to Partner Portal →</button>
+      </form>
+
+      <div class="links-box">
+        <div>New restaurant partner? <a href="/restaurant/register">Register your restaurant →</a></div>
+        <div>Already applied? <a href="/restaurant/register?tab=status">Check application status / resubmit</a></div>
+      </div>
+    </div>
+
+    <div class="hero-pane">
+      <div>
+        <div style="display:inline-block;padding:0.35rem 0.75rem;border-radius:999px;background:rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;letter-spacing:0.04em;">
+          RESTAURANT PARTNER SUITE
+        </div>
+        <h2 style="font-size:1.75rem;font-weight:800;margin-top:1rem;line-height:1.25;">
+          Run your store on Happy Deliveries in real time
+        </h2>
+        <ul class="feature-list">
+          <li><span class="dot">1</span><span>Receive instant new order alerts, accept or reject orders, and mark dishes ready for pickup.</span></li>
+          <li><span class="dot">2</span><span>See which delivery driver accepted each order, their phone number, and vehicle details live.</span></li>
+          <li><span class="dot">3</span><span>Build and update menus, dishes, prices, modifiers, tags, and opening hours anytime.</span></li>
+        </ul>
+      </div>
+      <div style="font-size:0.78rem;color:#94a3b8;">
+        Happy Deliveries Management & Partner Network
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>
