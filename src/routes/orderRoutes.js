@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {
+  getDeliveryQuote,
   createOrder,
   getOrder,
   getMyOrders,
@@ -13,6 +14,9 @@ const {
   rateOrder
 } = require('../controllers/orderController');
 const { auth, authorize } = require('../middleware/auth');
+
+// Public/customer delivery distance, radial fee & store hours quote
+router.post('/delivery-quote', getDeliveryQuote);
 
 // Customer routes
 router.post('/', auth, authorize('customer'), createOrder);

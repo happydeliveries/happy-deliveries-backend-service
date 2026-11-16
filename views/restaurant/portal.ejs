@@ -292,6 +292,10 @@
           <%= restaurant.is_accepting_orders ? '● Accepting Orders' : '○ Orders Paused' %>
         </button>
 
+        <span class="badge <%= restaurant.is_within_hours === false ? 'badge-yellow' : 'badge-gray' %>" id="scheduleHoursBadge" title="Customers can only order within opening hours">
+          🕒 <%= restaurant.is_within_hours === false ? 'Outside Hours' : 'Hours Open' %> (<%= restaurant.opening_hours_display || '08:00 - 21:00' %>)
+        </span>
+
         <span class="live-pill">
           <span class="dot-green"></span>
           <span id="socketStateText">Live Updates Active</span>

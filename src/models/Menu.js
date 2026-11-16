@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { applyAvailabilityToRestaurant } = require('../utils/restaurantHours');
 
 class Menu {
 
@@ -277,6 +278,8 @@ class Menu {
         r.name as restaurant_name,
         r.logo_url as restaurant_logo,
         r.average_rating as restaurant_rating,
+        r.opening_hours,
+        r.is_active,
         r.is_accepting_orders,
         ${distanceSelect}
       FROM menu_items mi
@@ -293,7 +296,7 @@ class Menu {
     `;
 
     const result = await db.query(query, values);
-    return result.rows;
+    return result.rows.map(applyAvailabilityToRestaurant);
   }
 
   // Get single menu item by ID (For editing)
@@ -372,6 +375,8 @@ class Menu {
           r.name as restaurant_name,
           r.logo_url as restaurant_logo,
           r.average_rating as restaurant_rating,
+          r.opening_hours,
+          r.is_active,
           r.is_accepting_orders,
           ST_Distance(
             r.location::geography,
@@ -401,6 +406,8 @@ class Menu {
           r.name as restaurant_name,
           r.logo_url as restaurant_logo,
           r.average_rating as restaurant_rating,
+          r.opening_hours,
+          r.is_active,
           r.is_accepting_orders
         FROM menu_items mi
         JOIN restaurants r ON mi.restaurant_id = r.id
@@ -415,7 +422,7 @@ class Menu {
       `;
 
     const result = await db.query(query, values);
-    return result.rows;
+    return result.rows.map(applyAvailabilityToRestaurant);
   }
 
   // static async getDiscoveryMenus(limit = 10) {
@@ -458,6 +465,9 @@ class Menu {
         mi.*,
         r.name as restaurant_name,
         r.logo_url as restaurant_logo,
+        r.opening_hours,
+        r.is_active,
+        r.is_accepting_orders,
         ST_Distance(
           r.location::geography,
           ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
@@ -479,7 +489,7 @@ class Menu {
     `;
     
     const result = await db.query(query, [lng, lat, radiusKm, `%${category}%`, limit]);
-    return result.rows;
+    return result.rows.map(applyAvailabilityToRestaurant).filter((row) => row.is_open_now);
   }
 
   static async getDiscoveryMenus(limit = 8) {
@@ -584,6 +594,8 @@ class Menu {
         r.name as restaurant_name,
         r.logo_url as restaurant_logo,
         r.average_rating as restaurant_rating,
+        r.opening_hours,
+        r.is_active,
         r.is_accepting_orders
       FROM menu_items mi
       JOIN restaurants r ON mi.restaurant_id = r.id
@@ -596,7 +608,7 @@ class Menu {
       LIMIT ${limitParam}
     `;
     const result = await db.query(query, values);
-    return result.rows;
+    return result.rows.map(applyAvailabilityToRestaurant);
   }
 }
 

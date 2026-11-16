@@ -1,5 +1,7 @@
 const db = require('../config/database');
 const bcrypt = require('bcryptjs');
+const { evaluateRestaurantAvailability, applyAvailabilityToRestaurant } = require('../utils/restaurantHours');
+const { calculateRadialDeliveryFee } = require('../utils/deliveryPricing');
 
 let schemaEnsurePromise = null;
 
@@ -58,11 +60,23 @@ class Restaurant {
       approvalStatus = rawApp.approval_status;
     }
 
+    const avail = evaluateRestaurantAvailability({
+      ...row,
+      is_active: row.is_active,
+      is_accepting_orders: row.is_accepting_orders,
+      opening_hours: row.opening_hours,
+    });
+
     return {
       ...row,
       lat: row.lat !== undefined && row.lat !== null ? Number(row.lat) : (row.latitude !== undefined ? Number(row.latitude) : null),
       lng: row.lng !== undefined && row.lng !== null ? Number(row.lng) : (row.longitude !== undefined ? Number(row.longitude) : null),
-      opening_hours_display: this.parseOpeningHoursDisplay(row.opening_hours),
+      opening_hours_display: avail.opening_hours_display,
+      is_within_hours: avail.is_within_hours,
+      is_open_now: avail.is_open_now,
+      opens_at: avail.opens_at,
+      closes_at: avail.closes_at,
+      closed_reason: avail.is_open_now ? null : avail.status_message,
       approval_status: approvalStatus,
       rejection_reason: row.rejection_reason ?? rawApp.rejection_reason ?? null,
       reviewed_at: row.reviewed_at ?? rawApp.reviewed_at ?? null,
@@ -640,6 +654,8 @@ class Restaurant {
   static async findById(id) {
     const query = `
       SELECT r.*, 
+             ST_Y(r.location::geometry) AS latitude,
+             ST_X(r.location::geometry) AS longitude,
              u.first_name as manager_first_name,
              u.last_name as manager_last_name,
              u.email as manager_email
@@ -650,7 +666,7 @@ class Restaurant {
     `;
     
     const result = await db.query(query, [id]);
-    return result.rows[0];
+    return result.rows[0] ? applyAvailabilityToRestaurant(result.rows[0]) : null;
   }
 
   // Get restaurants by manager
@@ -811,7 +827,31 @@ class Restaurant {
     query += ` ORDER BY COALESCE(r.is_accepting_orders, true) DESC, distance_meters ASC`;
 
     const result = await db.query(query, values);
-    return result.rows;
+    let rows = result.rows.map((row) => {
+      const enriched = applyAvailabilityToRestaurant(row);
+      const distKm = Number.isFinite(Number(enriched.distance_meters))
+        ? +(Number(enriched.distance_meters) / 1000).toFixed(2)
+        : null;
+      return {
+        ...enriched,
+        distance_km: distKm,
+        estimated_delivery_fee: distKm !== null
+          ? calculateRadialDeliveryFee(distKm, enriched.delivery_radius_km)
+          : null,
+      };
+    });
+
+    if (isOpen === true) {
+      rows = rows.filter((r) => r.is_open_now === true);
+    }
+
+    rows.sort((a, b) => {
+      const openDiff = (b.is_open_now ? 1 : 0) - (a.is_open_now ? 1 : 0);
+      if (openDiff !== 0) return openDiff;
+      return (Number(a.distance_meters) || 0) - (Number(b.distance_meters) || 0);
+    });
+
+    return rows;
 
   } catch (error) {
     console.error('❌ Error in Restaurant.search:', error.message);

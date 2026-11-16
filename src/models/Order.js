@@ -9,6 +9,8 @@ const {
   emitDriversEvent
 } = require('../socket');
 const { sanitizeOrderForDriver } = require('../utils/driverOrderSanitizer');
+const { evaluateRestaurantAvailability } = require('../utils/restaurantHours');
+const { resolveAddressCoordinates, evaluateDeliveryForOrder } = require('../utils/deliveryPricing');
 
 function normalizePointCoords(pt) {
   if (!pt) return null;
@@ -84,6 +86,18 @@ class Order {
     }
     
     const order_number = `ORD-${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+
+    // Resolve customer drop-off coordinates before opening a DB transaction
+    const resolvedCoords = await resolveAddressCoordinates(delivery_address);
+    const enrichedDeliveryAddress =
+      delivery_address && typeof delivery_address === 'object'
+        ? {
+            ...delivery_address,
+            ...(resolvedCoords
+              ? { latitude: resolvedCoords.latitude, longitude: resolvedCoords.longitude }
+              : {}),
+          }
+        : delivery_address;
     
     // Start transaction
     const client = await db.pool.connect();
@@ -91,17 +105,36 @@ class Order {
     try {
       await client.query('BEGIN');
 
-      // 1. Validate restaurant is active and accepting orders
+      // 1. Validate restaurant is active, approved, open right now (manual toggle + opening_hours), and within delivery radius
       const restRes = await client.query(
-        `SELECT id, name, is_active, is_accepting_orders FROM restaurants WHERE id = $1`,
+        `SELECT id, name, is_active, is_accepting_orders, opening_hours, delivery_radius_km, approval_status,
+                ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng
+         FROM restaurants WHERE id = $1`,
         [restaurant_id]
       );
       if (restRes.rows.length === 0) {
         throw new Error('Restaurant not found');
       }
       const restaurant = restRes.rows[0];
-      if (restaurant.is_active === false || restaurant.is_accepting_orders === false) {
-        throw new Error('This restaurant is currently not accepting orders');
+      if (restaurant.approval_status && restaurant.approval_status !== 'approved') {
+        throw new Error('This restaurant is not currently approved for orders');
+      }
+
+      const availability = evaluateRestaurantAvailability(restaurant);
+      if (!availability.is_open_now) {
+        throw new Error(availability.status_message || 'This restaurant is currently closed');
+      }
+
+      const deliveryEval = evaluateDeliveryForOrder({
+        restaurantLat: restaurant.lat,
+        restaurantLng: restaurant.lng,
+        deliveryRadiusKm: restaurant.delivery_radius_km,
+        customerLat: resolvedCoords?.latitude,
+        customerLng: resolvedCoords?.longitude,
+        restaurantName: restaurant.name,
+      });
+      if (!deliveryEval.deliverable) {
+        throw new Error(deliveryEval.error);
       }
 
       // 2. Fetch authoritative menu item prices from DB
@@ -150,10 +183,7 @@ class Order {
       }
 
       verifiedSubtotal = +verifiedSubtotal.toFixed(2);
-      const verifiedDeliveryFee = Math.max(
-        0,
-        Number.isFinite(Number(clientDeliveryFee)) ? +Number(clientDeliveryFee).toFixed(2) : 3.99
-      );
+      const verifiedDeliveryFee = deliveryEval.delivery_fee;
       const computedTax = +(verifiedSubtotal * 0.08).toFixed(2);
       const verifiedTaxAmount = Math.max(
         computedTax,
@@ -194,7 +224,7 @@ class Order {
         restaurant_id,
         special_instructions,
         delivery_instructions,
-        JSON.stringify(delivery_address),
+        JSON.stringify(enrichedDeliveryAddress),
         payment_method,
         verifiedSubtotal,
         verifiedDeliveryFee,

@@ -4,6 +4,77 @@ const Driver = require('../models/Driver');
 const db = require('../config/database');
 const { sanitizeOrderForDriver, sanitizeOrderItemsForDriver } = require('../utils/driverOrderSanitizer');
 const { emitManagerEvent, emitUserEvent } = require('../socket');
+const { evaluateRestaurantAvailability } = require('../utils/restaurantHours');
+const { resolveAddressCoordinates, evaluateDeliveryForOrder } = require('../utils/deliveryPricing');
+
+// Quote delivery fee, radial distance, radius eligibility, and restaurant open/closed status
+exports.getDeliveryQuote = async (req, res) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const restaurantId = body.restaurant_id || req.query.restaurant_id;
+    if (!restaurantId) {
+      return res.status(400).json({ success: false, error: 'restaurant_id is required' });
+    }
+
+    const restRes = await db.query(
+      `SELECT id, name, is_active, is_accepting_orders, opening_hours, delivery_radius_km, approval_status,
+              ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng
+       FROM restaurants WHERE id = $1`,
+      [restaurantId]
+    );
+    if (restRes.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Restaurant not found' });
+    }
+
+    const restaurant = restRes.rows[0];
+    const avail = evaluateRestaurantAvailability(restaurant);
+    const addrInput = body.delivery_address || {
+      street: body.street || req.query.street || '',
+      city: body.city || req.query.city || '',
+      zip: body.zip || body.postal_code || req.query.zip || '',
+      latitude: body.latitude ?? req.query.latitude ?? req.query.lat,
+      longitude: body.longitude ?? req.query.longitude ?? req.query.lng,
+    };
+
+    const resolvedCoords = await resolveAddressCoordinates(addrInput);
+    const deliveryEval = evaluateDeliveryForOrder({
+      restaurantLat: restaurant.lat,
+      restaurantLng: restaurant.lng,
+      deliveryRadiusKm: restaurant.delivery_radius_km,
+      customerLat: resolvedCoords?.latitude,
+      customerLng: resolvedCoords?.longitude,
+      restaurantName: restaurant.name,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        restaurant_id: restaurant.id,
+        restaurant_name: restaurant.name,
+        is_open_now: avail.is_open_now,
+        is_within_hours: avail.is_within_hours,
+        opening_hours_display: avail.opening_hours_display,
+        closed_reason: avail.is_open_now ? null : avail.status_message,
+        deliverable: deliveryEval.deliverable,
+        distance_km: deliveryEval.distance_km,
+        max_radius_km: deliveryEval.max_radius_km,
+        delivery_fee: deliveryEval.delivery_fee,
+        tier_label: deliveryEval.tier_label,
+        error: deliveryEval.error,
+        resolved_coordinates: resolvedCoords
+          ? {
+              latitude: resolvedCoords.latitude,
+              longitude: resolvedCoords.longitude,
+              source: resolvedCoords.source,
+            }
+          : null,
+      },
+    });
+  } catch (error) {
+    console.error('Delivery quote error:', error);
+    res.status(500).json({ success: false, error: 'Failed to calculate delivery quote' });
+  }
+};
 
 // Create order
 exports.createOrder = async (req, res) => {
@@ -30,9 +101,11 @@ exports.createOrder = async (req, res) => {
     res.status(201).json({ success: true, data: newOrder });
   } catch (error) {
     console.error('Create order error:', error);
-    res.status(500).json({
+    const msg = String(error.message || 'Could not create order');
+    const isClientValidationError = /closed|paused|unavailable|within|coordinates|required|found|belong|delivery address|approved/i.test(msg);
+    res.status(isClientValidationError ? 400 : 500).json({
       success: false,
-      error: error.message
+      error: msg
     });
   }
 };
