@@ -1,0 +1,330 @@
+/* Shared Kitchen Prep & Comprehensive Order Detail Styles
+   Used by both /restaurant/* (Partner Portal) and /manager/orders (Happy Admin) */
+
+.prep-items-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 320px;
+}
+.prep-preview-line {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: hsl(var(--foreground));
+}
+.prep-preview-qty {
+  display: inline-block;
+  font-weight: 800;
+  color: hsl(var(--primary));
+  margin-right: 0.25rem;
+}
+.prep-preview-opts {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.74rem;
+}
+.prep-preview-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+}
+.prep-flag-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.prep-flag-note {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+.prep-flag-allergy {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.prep-chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+.prep-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  background: #f1f5f9;
+  color: #0f172a;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  line-height: 1.35;
+}
+.prep-chip strong {
+  color: #475569;
+  font-weight: 700;
+}
+
+.prep-alert {
+  margin-top: 0.45rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 7px;
+  font-size: 0.79rem;
+  line-height: 1.4;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+.prep-alert-note {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+.prep-alert-allergy {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  font-weight: 600;
+}
+.prep-order-banner {
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-left: 4px solid #d97706;
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.83rem;
+  color: #78350f;
+}
+
+.od-item-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.od-item-row:last-child {
+  border-bottom: none;
+}
+.od-item-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  border: 1px solid hsl(var(--border));
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+.od-item-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.od-qty-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.85rem;
+  height: 1.6rem;
+  padding: 0 0.4rem;
+  border-radius: 6px;
+  background: #0f172a;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.82rem;
+  margin-right: 0.45rem;
+}
+.od-item-title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  font-weight: 700;
+  font-size: 0.94rem;
+  color: hsl(var(--foreground));
+}
+.od-item-unit {
+  font-size: 0.77rem;
+  color: hsl(var(--muted-foreground));
+  font-weight: 500;
+  margin-left: 0.25rem;
+}
+.od-item-total {
+  margin-left: auto;
+  font-weight: 800;
+  color: hsl(var(--primary));
+  white-space: nowrap;
+  font-size: 0.92rem;
+}
+
+.od-section-label {
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: hsl(var(--muted-foreground));
+  margin: 0.85rem 0 0.4rem;
+}
+.od-box {
+  background: #f8fafc;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  font-size: 0.85rem;
+}
+.od-driver-card {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+@media (max-width: 640px) {
+  .od-driver-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+.od-timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  position: relative;
+}
+.od-timeline::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: hsl(var(--border));
+}
+.od-timeline li {
+  position: relative;
+  padding: 0.35rem 0 0.35rem 1.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.83rem;
+}
+.od-tl-dot {
+  position: absolute;
+  left: 3px;
+  top: 0.6rem;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+}
+.od-tl-dot.done { background: #16a34a; box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.22); }
+.od-tl-dot.current { background: #2563eb; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25); }
+.od-tl-dot.future { background: #cbd5e1; }
+
+/* ─── Kitchen Prep Board (KDS Cards) ─── */
+.kitchen-filter-bar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.kitchen-pill {
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid hsl(var(--border));
+  background: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.15s;
+}
+.kitchen-pill:hover { background: #f8fafc; }
+.kitchen-pill.active {
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
+}
+
+.kitchen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 1.15rem;
+}
+@media (max-width: 480px) {
+  .kitchen-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kitchen-ticket {
+  background: #fff;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+.kitchen-ticket.kt-pending { border-top: 4px solid #f59e0b; }
+.kitchen-ticket.kt-unpaid { border-top: 4px solid #94a3b8; }
+.kitchen-ticket.kt-cook { border-top: 4px solid #16a34a; border-color: #86efac; box-shadow: 0 4px 14px rgba(22, 163, 74, 0.1); }
+.kitchen-ticket.kt-driver { border-top: 4px solid #7c3aed; }
+.kitchen-ticket.kt-ready { border-top: 4px solid #0ea5e9; }
+
+.kitchen-ticket-head {
+  padding: 0.9rem 1.05rem;
+  border-bottom: 1px solid hsl(var(--border));
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: #f8fafc;
+}
+.kitchen-ticket-banner {
+  padding: 0.55rem 1.05rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.kt-banner-pending { background: #fef3c7; color: #92400e; }
+.kt-banner-unpaid { background: #f1f5f9; color: #475569; }
+.kt-banner-cook { background: #dcfce7; color: #166534; }
+.kt-banner-ready { background: #e0f2fe; color: #075985; }
+
+.kitchen-ticket-body {
+  padding: 0.85rem 1.05rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.kitchen-ticket-footer {
+  padding: 0.8rem 1.05rem;
+  border-top: 1px solid hsl(var(--border));
+  background: #f8fafc;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: space-between;
+  align-items: center;
+}

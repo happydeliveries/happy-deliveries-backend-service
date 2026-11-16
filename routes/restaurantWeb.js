@@ -373,6 +373,7 @@ function renderPortalSection(section) {
 }
 
 router.get('/dashboard', isPartnerLoggedIn, renderPortalSection('overview'));
+router.get('/kitchen', isPartnerLoggedIn, renderPortalSection('kitchen'));
 router.get('/orders', isPartnerLoggedIn, renderPortalSection('orders'));
 router.get('/menus', isPartnerLoggedIn, renderPortalSection('menus'));
 router.get('/settings', isPartnerLoggedIn, renderPortalSection('settings'));
@@ -408,6 +409,9 @@ router.get('/api/portal/summary', isPartnerApiLoggedIn, async (req, res) => {
           COUNT(*)::int AS total_orders,
           COUNT(*) FILTER (WHERE status = 'pending')::int AS pending_orders,
           COUNT(*) FILTER (
+            WHERE status IN ('pending','ordering_at_restaurant','accepted_by_driver','order_ready')
+          )::int AS kitchen_orders,
+          COUNT(*) FILTER (
             WHERE status IN ('pending','accepted_by_driver','ordering_at_restaurant','order_ready','picked_up','on_the_way')
           )::int AS active_orders,
           COUNT(*) FILTER (
@@ -438,6 +442,7 @@ router.get('/api/portal/summary', isPartnerApiLoggedIn, async (req, res) => {
       stats: {
         total_orders: s.total_orders || 0,
         pending_orders: s.pending_orders || 0,
+        kitchen_orders: s.kitchen_orders || 0,
         active_orders: s.active_orders || 0,
         today_orders: s.today_orders || 0,
         today_revenue: parseFloat(s.today_revenue || 0).toFixed(2),

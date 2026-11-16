@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/css/main.css">
   <link rel="stylesheet" href="/css/menu-editor.css">
+  <link rel="stylesheet" href="/css/order-details.css">
   <style>
     :root {
       --background: 0 0% 100%;
@@ -172,7 +173,7 @@
     }
     .modal-backdrop.open { display: flex; }
     .modal-box {
-      background: #fff; border-radius: 12px; width: 100%; max-width: 760px; max-height: 90vh;
+      background: #fff; border-radius: 12px; width: 100%; max-width: 820px; max-height: 90vh;
       display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px rgba(0,0,0,0.25);
     }
     .modal-header { padding: 1.15rem 1.35rem; border-bottom: 1px solid hsl(var(--border)); display: flex; justify-content: space-between; align-items: center; }
@@ -218,6 +219,15 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
               <span>Dashboard</span>
             </span>
+          </button>
+        </li>
+        <li>
+          <button class="sidebar-menu-item <%= activeSection === 'kitchen' ? 'active' : '' %>" data-nav="kitchen" onclick="switchSection('kitchen', '/restaurant/kitchen')">
+            <span class="sidebar-menu-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/><line x1="6" x2="18" y1="17" y2="17"/></svg>
+              <span>Kitchen Prep</span>
+            </span>
+            <span class="badge badge-green" id="sidebarKitchenBadge" style="display:none;">0</span>
           </button>
         </li>
         <li>
@@ -343,6 +353,7 @@
                 <tr>
                   <th>Order #</th>
                   <th>Customer</th>
+                  <th>Items to Prepare</th>
                   <th>Total & Payment</th>
                   <th>Driver Assigned</th>
                   <th>Status</th>
@@ -350,10 +361,36 @@
                 </tr>
               </thead>
               <tbody id="ovRecentOrdersBody">
-                <tr><td colspan="6" style="text-align:center;padding:2rem;">Loading orders...</td></tr>
+                <tr><td colspan="7" style="text-align:center;padding:2rem;">Loading orders...</td></tr>
               </tbody>
             </table>
           </div>
+        </div>
+      </section>
+
+      <!-- ════════════ SECTION 1B: KITCHEN PREP TICKET BOARD ════════════ -->
+      <section class="section-panel <%= activeSection === 'kitchen' ? 'active' : '' %>" id="sec-kitchen">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h1 style="font-size:1.65rem;font-weight:800;">Kitchen Prep Board</h1>
+            <p style="font-size:0.86rem;color:hsl(var(--muted-foreground));">Live open prep tickets with full dish quantities, size/spice/add-on selections, special notes, and allergy alerts.</p>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <button class="btn btn-outline" onclick="switchSection('orders', '/restaurant/orders')">Order History Table</button>
+            <button class="btn btn-primary" onclick="loadKitchenOrders()">Refresh Queue</button>
+          </div>
+        </div>
+
+        <div class="kitchen-filter-bar" id="kitchenFilterBar">
+          <button type="button" class="kitchen-pill active" data-kfilter="all" onclick="setKitchenFilter('all', this)">All Active (<span id="kcAll">0</span>)</button>
+          <button type="button" class="kitchen-pill" data-kfilter="pending" onclick="setKitchenFilter('pending', this)">Needs Approval (<span id="kcPending">0</span>)</button>
+          <button type="button" class="kitchen-pill" data-kfilter="cook" onclick="setKitchenFilter('cook', this)">Paid · Prepare Now (<span id="kcCook">0</span>)</button>
+          <button type="button" class="kitchen-pill" data-kfilter="unpaid" onclick="setKitchenFilter('unpaid', this)">Awaiting Payment (<span id="kcUnpaid">0</span>)</button>
+          <button type="button" class="kitchen-pill" data-kfilter="ready" onclick="setKitchenFilter('ready', this)">Ready for Pickup (<span id="kcReady">0</span>)</button>
+        </div>
+
+        <div id="kitchenTicketsGrid" class="kitchen-grid">
+          <div class="card card-body" style="text-align:center;color:hsl(var(--muted-foreground));">Loading active kitchen orders...</div>
         </div>
       </section>
 
@@ -364,7 +401,10 @@
             <h1 style="font-size:1.65rem;font-weight:800;">Live Orders & Driver Tracking</h1>
             <p style="font-size:0.86rem;color:hsl(var(--muted-foreground));">Accept/reject incoming orders, mark food ready for pickup, and inspect the driver assigned to each delivery.</p>
           </div>
-          <button class="btn btn-primary" onclick="loadOrders(1)">Refresh Orders</button>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <button class="btn btn-outline" onclick="switchSection('kitchen', '/restaurant/kitchen')">Kitchen Prep Board →</button>
+            <button class="btn btn-primary" onclick="loadOrders(1)">Refresh Orders</button>
+          </div>
         </div>
 
         <div class="card" style="padding:1rem 1.25rem;display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;">
@@ -588,12 +628,15 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="/js/menu-editor.js"></script>
+<script src="/js/order-details.js"></script>
 <script>
   const RESTAURANT_ID = "<%= restaurant.id %>";
   const MANAGER_ID = "<%= manager.id %>";
   const RESTAURANT_IDS = <%- JSON.stringify(restaurants.map(r => r.id)) %>;
   let currentOrderIdOpen = null;
   let currentOrderPage = 1;
+  let currentKitchenFilter = 'all';
+  let kitchenOrdersCache = [];
 
   const STATUS_BADGE_MAP = {
     pending: 'badge-yellow',
@@ -688,6 +731,7 @@
     if (urlPath && window.history?.pushState) {
       window.history.pushState({}, '', `${urlPath}?restaurantId=${encodeURIComponent(RESTAURANT_ID)}`);
     }
+    if (section === 'kitchen') loadKitchenOrders();
     if (section === 'orders') loadOrders(currentOrderPage);
     if (section === 'menus') loadMenus();
     if (section === 'settings') updateStoreMap();
@@ -722,6 +766,146 @@
     return `<div style="display:inline-flex;gap:0.35rem;flex-wrap:wrap;justify-content:flex-end;">${btns.join('')}</div>`;
   }
 
+  function setKitchenFilter(filter, btn) {
+    currentKitchenFilter = filter || 'all';
+    document.querySelectorAll('#kitchenFilterBar .kitchen-pill').forEach((p) => {
+      p.classList.toggle('active', p.dataset.kfilter === currentKitchenFilter);
+    });
+    renderKitchenTickets();
+  }
+
+  function getKitchenCategory(o) {
+    if (o.status === 'pending') return 'pending';
+    if (o.status === 'order_ready') return 'ready';
+    if (o.payment_status === 'completed') return 'cook';
+    return 'unpaid';
+  }
+
+  async function loadKitchenOrders() {
+    try {
+      const params = new URLSearchParams({
+        restaurantId: RESTAURANT_ID,
+        status: 'kitchen_active',
+        limit: 50,
+      });
+      const res = await fetch('/restaurant/api/orders?' + params.toString());
+      const data = await res.json();
+      kitchenOrdersCache = Array.isArray(data.orders) ? data.orders : [];
+      OrderDetails.rememberOrders(kitchenOrdersCache);
+      renderKitchenTickets();
+    } catch (err) {
+      console.error('[loadKitchenOrders]', err);
+    }
+  }
+
+  function renderKitchenTickets() {
+    const counts = { all: kitchenOrdersCache.length, pending: 0, cook: 0, unpaid: 0, ready: 0 };
+    kitchenOrdersCache.forEach((o) => {
+      const cat = getKitchenCategory(o);
+      if (counts[cat] !== undefined) counts[cat]++;
+    });
+
+    document.getElementById('kcAll').textContent = counts.all;
+    document.getElementById('kcPending').textContent = counts.pending;
+    document.getElementById('kcCook').textContent = counts.cook;
+    document.getElementById('kcUnpaid').textContent = counts.unpaid;
+    document.getElementById('kcReady').textContent = counts.ready;
+
+    const grid = document.getElementById('kitchenTicketsGrid');
+    const filtered = currentKitchenFilter === 'all'
+      ? kitchenOrdersCache
+      : kitchenOrdersCache.filter((o) => getKitchenCategory(o) === currentKitchenFilter);
+
+    if (!filtered.length) {
+      grid.innerHTML = `<div class="card card-body" style="grid-column:1/-1;text-align:center;padding:2.5rem;color:hsl(var(--muted-foreground));">No active kitchen tickets in this queue right now.</div>`;
+      return;
+    }
+
+    grid.innerHTML = filtered.map((o) => {
+      const cat = getKitchenCategory(o);
+      let ticketClass = 'kt-cook';
+      let bannerClass = 'kt-banner-cook';
+      let bannerLabel = '✅ PAID · PREPARE NOW';
+
+      if (cat === 'pending') {
+        ticketClass = 'kt-pending';
+        bannerClass = 'kt-banner-pending';
+        bannerLabel = '⏳ NEEDS RESTAURANT APPROVAL';
+      } else if (cat === 'unpaid') {
+        ticketClass = 'kt-unpaid';
+        bannerClass = 'kt-banner-unpaid';
+        bannerLabel = '💳 ACCEPTED · WAITING CUSTOMER PAYMENT (HOLD PREP)';
+      } else if (o.status === 'accepted_by_driver') {
+        ticketClass = 'kt-driver';
+        bannerClass = 'kt-banner-cook';
+        bannerLabel = '🚗 PAID · DRIVER ASSIGNED — FINISH PREP';
+      } else if (cat === 'ready') {
+        ticketClass = 'kt-ready';
+        bannerClass = 'kt-banner-ready';
+        bannerLabel = '📦 READY FOR PICKUP';
+      }
+
+      const itemsHtml = OrderDetails.renderOrderItemsList(o.items || [], { kitchenMode: true });
+      const oid = OrderDetails.safeId(o.id);
+
+      return `
+        <div class="kitchen-ticket ${ticketClass}">
+          <div class="kitchen-ticket-head">
+            <div>
+              <div style="font-size:1.05rem;font-weight:800;">#${esc(o.order_number || oid.slice(0, 8).toUpperCase())}</div>
+              <div style="font-size:0.78rem;color:hsl(var(--muted-foreground));">
+                ${esc(o.customer_name || 'Customer')} ${o.customer_phone ? `· ${esc(o.customer_phone)}` : ''}
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-weight:800;font-size:0.86rem;color:hsl(var(--primary));">${esc(OrderDetails.relativeTime(o.placed_at))}</div>
+              <div style="font-size:0.73rem;color:hsl(var(--muted-foreground));">${fmtDateTime(o.placed_at)}</div>
+            </div>
+          </div>
+
+          <div class="kitchen-ticket-banner ${bannerClass}">
+            <span>${bannerLabel}</span>
+            <span>R${fmtMoney(o.total_amount)}</span>
+          </div>
+
+          <div class="kitchen-ticket-body">
+            ${o.special_instructions ? `
+              <div class="prep-order-banner">
+                <strong>🍳 Order Note:</strong> ${esc(o.special_instructions)}
+              </div>
+            ` : ''}
+
+            <div>
+              ${itemsHtml}
+            </div>
+
+            ${o.driver_name ? `
+              <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:0.55rem 0.75rem;font-size:0.79rem;">
+                <strong>🚗 Driver:</strong> ${esc(o.driver_name)} ${o.driver_vehicle_plate ? `(${esc(o.driver_vehicle_plate)})` : ''}
+                ${o.driver_phone ? ` · <a href="tel:${esc(o.driver_phone)}" style="color:#1d4ed8;font-weight:700;">${esc(o.driver_phone)}</a>` : ''}
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="kitchen-ticket-footer">
+            <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="OrderDetails.printKitchenTicketById('${oid}', '/restaurant/api')">🖨 Ticket</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="openOrderModal('${oid}')">Details</button>
+            </div>
+            <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
+              ${o.status === 'pending' ? `
+                <button type="button" class="btn btn-danger btn-sm" onclick="rejectOrder('${oid}', this)">Reject</button>
+                <button type="button" class="btn btn-success btn-sm" onclick="acceptOrder('${oid}', this)">Accept Order</button>
+              ` : ((o.status === 'ordering_at_restaurant' || o.status === 'accepted_by_driver') && o.payment_status === 'completed') ? `
+                <button type="button" class="btn btn-primary btn-sm" onclick="updateOrderStatus('${oid}', 'order_ready', this)">Mark Ready</button>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
   async function refreshPortal() {
     try {
       const res = await fetch(`/restaurant/api/portal/summary?restaurantId=${encodeURIComponent(RESTAURANT_ID)}`);
@@ -744,15 +928,27 @@
         badge.style.display = 'none';
       }
 
+      const kitchenBadge = document.getElementById('sidebarKitchenBadge');
+      if (kitchenBadge) {
+        if ((s.kitchen_orders || 0) > 0) {
+          kitchenBadge.style.display = 'inline-flex';
+          kitchenBadge.textContent = s.kitchen_orders;
+        } else {
+          kitchenBadge.style.display = 'none';
+        }
+      }
+
       const orders = data.recentOrders || [];
+      OrderDetails.rememberOrders(orders);
       const tbody = document.getElementById('ovRecentOrdersBody');
       if (!orders.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:hsl(var(--muted-foreground));">No orders yet for this restaurant.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:hsl(var(--muted-foreground));">No orders yet for this restaurant.</td></tr>';
       } else {
         tbody.innerHTML = orders.map((o) => `
           <tr>
             <td><strong>#${esc(o.order_number || o.id.slice(0,8).toUpperCase())}</strong><div style="font-size:0.74rem;color:hsl(var(--muted-foreground));">${fmtDateTime(o.placed_at)}</div></td>
             <td>${esc(o.customer_name)}</td>
+            <td>${OrderDetails.renderCompactItemsPreview(o.items, o.item_count)}</td>
             <td><strong>R${fmtMoney(o.total_amount)}</strong><div style="font-size:0.74rem;color:hsl(var(--muted-foreground));">${esc(o.payment_status)}</div></td>
             <td>${renderDriverSummaryCell(o)}</td>
             <td><span class="badge ${STATUS_BADGE_MAP[o.status] || 'badge-gray'}">${esc(fmtStatus(o.status, o.payment_status))}</span></td>
@@ -778,6 +974,7 @@
       const data = await res.json();
       const tbody = document.getElementById('ordersTableBody');
       const orders = data.orders || [];
+      OrderDetails.rememberOrders(orders);
 
       if (!orders.length) {
         tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:hsl(var(--muted-foreground));">No orders match these filters.</td></tr>';
@@ -786,7 +983,7 @@
           <tr>
             <td><strong>#${esc(o.order_number || o.id.slice(0,8).toUpperCase())}</strong></td>
             <td>${esc(o.customer_name)}</td>
-            <td>${o.item_count || 0} items</td>
+            <td>${OrderDetails.renderCompactItemsPreview(o.items, o.item_count)}</td>
             <td><strong>R${fmtMoney(o.total_amount)}</strong><div style="font-size:0.73rem;color:hsl(var(--muted-foreground));">${esc(o.payment_status)}</div></td>
             <td>${renderDriverSummaryCell(o)}</td>
             <td><span class="badge ${STATUS_BADGE_MAP[o.status] || 'badge-gray'}">${esc(fmtStatus(o.status, o.payment_status))}</span></td>
@@ -827,58 +1024,17 @@
 
       const o = data.order;
       const items = data.items || [];
-      let addrStr = '—';
-      try {
-        const a = typeof o.delivery_address === 'string' ? JSON.parse(o.delivery_address) : o.delivery_address;
-        if (a) addrStr = [a.street, a.city, a.postal_code, a.instructions].filter(Boolean).join(', ') || a.formatted || JSON.stringify(a);
-      } catch (_) {
-        addrStr = String(o.delivery_address || '—');
-      }
-
       document.getElementById('orderModalTitle').textContent = `Order #${o.order_number || o.id.slice(0,8).toUpperCase()}`;
-      document.getElementById('orderModalBody').innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-          <span class="badge ${STATUS_BADGE_MAP[o.status] || 'badge-gray'}" style="font-size:0.84rem;padding:0.35rem 0.75rem;">${esc(fmtStatus(o.status, o.payment_status))}</span>
-          <span class="badge badge-gray">Payment: ${esc(o.payment_status)} · ${esc(o.payment_method || 'card')}</span>
-        </div>
 
-        ${o.driver_name ? `
-          <div class="driver-card">
-            <div><div style="font-size:0.72rem;color:#1e3a8a;font-weight:700;">ASSIGNED DRIVER</div><div style="font-weight:800;font-size:0.95rem;">${esc(o.driver_name)}</div></div>
-            <div><div style="font-size:0.72rem;color:#1e3a8a;font-weight:700;">PHONE</div><div style="font-weight:700;"><a href="tel:${esc(o.driver_phone)}" style="color:#1d4ed8;">${esc(o.driver_phone || '—')}</a></div></div>
-            <div><div style="font-size:0.72rem;color:#1e3a8a;font-weight:700;">VEHICLE & PLATE</div><div style="font-weight:700;">${esc([o.driver_vehicle_color, o.driver_vehicle_model || o.driver_vehicle_type].filter(Boolean).join(' '))} ${o.driver_vehicle_plate ? '(' + esc(o.driver_vehicle_plate) + ')' : ''}</div></div>
-          </div>
-        ` : `<div style="background:#f8fafc;border:1px solid hsl(var(--border));padding:0.85rem;border-radius:8px;font-size:0.84rem;color:hsl(var(--muted-foreground));">Driver: ${o.status === 'pending' ? 'Accept this order first so the customer can pay and dispatch a driver.' : o.payment_status !== 'completed' ? 'Awaiting customer payment completion before dispatching to nearby drivers.' : 'Waiting for an available nearby driver to accept...'}</div>`}
-
-        <div>
-          <h4 style="font-size:0.8rem;text-transform:uppercase;color:hsl(var(--muted-foreground));margin-bottom:0.5rem;">Order Items</h4>
-          ${items.map((it) => `
-            <div style="display:flex;justify-content:space-between;padding:0.55rem 0;border-bottom:1px solid hsl(var(--border));gap:1rem;">
-              <div>
-                <div style="font-weight:600;">${esc(it.item_name)} × ${it.quantity}</div>
-                ${it.special_instructions ? `<div style="font-size:0.78rem;color:#b45309;">Note: ${esc(it.special_instructions)}</div>` : ''}
-              </div>
-              <div style="font-weight:700;">R${fmtMoney(it.total_price ?? (it.unit_price * it.quantity))}</div>
-            </div>
-          `).join('')}
-        </div>
-
-        <div class="grid-2" style="background:#f8fafc;padding:0.9rem;border-radius:8px;">
-          <div>
-            <div style="font-size:0.75rem;font-weight:700;color:hsl(var(--muted-foreground));">CUSTOMER</div>
-            <div style="font-weight:600;margin-top:2px;">${esc(o.customer_name)}</div>
-            <div style="font-size:0.82rem;">${esc(o.customer_phone || '—')}</div>
-            <div style="font-size:0.8rem;color:hsl(var(--muted-foreground));margin-top:4px;">${esc(addrStr)}</div>
-          </div>
-          <div style="text-align:right;">
-            <div>Subtotal: <strong>R${fmtMoney(o.subtotal)}</strong></div>
-            <div>Delivery: <strong>R${fmtMoney(o.delivery_fee)}</strong></div>
-            <div>Tax: <strong>R${fmtMoney(o.tax_amount)}</strong></div>
-            ${parseFloat(o.tip_amount || 0) > 0 ? `<div>Tip: <strong>R${fmtMoney(o.tip_amount)}</strong></div>` : ''}
-            <div style="font-size:1.05rem;font-weight:800;margin-top:4px;color:hsl(var(--primary));">Total: R${fmtMoney(o.total_amount)}</div>
-          </div>
-        </div>
-      `;
+      document.getElementById('orderModalBody').innerHTML = OrderDetails.renderOrderDetailContent(o, items, {
+        apiBase: '/restaurant/api',
+        showRestaurant: false,
+        statusText: fmtStatus(o.status, o.payment_status),
+        statusBadgeClass: STATUS_BADGE_MAP[o.status] || 'badge-gray',
+        paymentText: o.payment_status === 'completed' ? 'Paid' : (o.payment_status || 'Pending'),
+        paymentBadgeClass: o.payment_status === 'completed' ? 'badge-green' : 'badge-yellow',
+        paymentMethodText: o.payment_method || 'card',
+      });
 
       document.getElementById('orderModalFooter').innerHTML = `
         ${o.status === 'pending' ? `
@@ -902,6 +1058,7 @@
       if (!data.success) throw new Error(data.error || 'Failed to accept');
       showToast('Order Accepted', data.message);
       refreshPortal();
+      loadKitchenOrders();
       loadOrders(currentOrderPage);
       if (currentOrderIdOpen === id) openOrderModal(id);
     } catch (err) {
@@ -919,6 +1076,7 @@
       if (!data.success) throw new Error(data.error || 'Failed to reject');
       showToast('Order Rejected', data.message);
       refreshPortal();
+      loadKitchenOrders();
       loadOrders(currentOrderPage);
       if (currentOrderIdOpen === id) openOrderModal(id);
     } catch (err) {
@@ -939,6 +1097,7 @@
       if (!data.success) throw new Error(data.error || 'Status update failed');
       showToast('Order Updated', `Order marked as ${status.replace(/_/g, ' ')}.`);
       refreshPortal();
+      loadKitchenOrders();
       loadOrders(currentOrderPage);
       if (currentOrderIdOpen === id) openOrderModal(id);
     } catch (err) {
@@ -1053,6 +1212,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     if (window.innerWidth <= 820) document.getElementById('mobileMenuBtn').style.display = 'inline-flex';
     refreshPortal();
+    if ("<%= activeSection %>" === 'kitchen') loadKitchenOrders();
     if ("<%= activeSection %>" === 'orders') loadOrders(1);
     if ("<%= activeSection %>" === 'menus') loadMenus();
     if ("<%= activeSection %>" === 'settings') updateStoreMap();
@@ -1067,16 +1227,19 @@
         playAlertTone();
         showToast('🔔 New Incoming Order!', `Order #${payload?.order_number || ''} requires your acceptance.`);
         refreshPortal();
+        loadKitchenOrders();
         loadOrders(currentOrderPage);
       });
       socket.on('driver_assigned', (payload) => {
         showToast('🚗 Driver Accepted Order', `A driver accepted Order #${payload?.order_number || ''}!`);
         refreshPortal();
+        loadKitchenOrders();
         loadOrders(currentOrderPage);
         if (currentOrderIdOpen && currentOrderIdOpen === payload?.order_id) openOrderModal(currentOrderIdOpen);
       });
       socket.on('order_updated', (payload) => {
         refreshPortal();
+        loadKitchenOrders();
         loadOrders(currentOrderPage);
         if (currentOrderIdOpen && (currentOrderIdOpen === payload?.orderId || currentOrderIdOpen === payload?.order?.id)) {
           openOrderModal(currentOrderIdOpen);

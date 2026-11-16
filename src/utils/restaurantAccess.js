@@ -112,8 +112,20 @@ async function fetchPaginatedOrders(restaurantIds, { status, date, page = 1, lim
   let pIdx = 2;
 
   if (status && status !== 'all') {
-    where += ` AND o.status = $${pIdx++}`;
-    params.push(status);
+    if (status === 'kitchen_active') {
+      where += ` AND o.status IN ('pending', 'ordering_at_restaurant', 'accepted_by_driver', 'order_ready')`;
+    } else if (status === 'kitchen_preparing') {
+      where += ` AND o.status IN ('ordering_at_restaurant', 'accepted_by_driver') AND o.payment_status = 'completed'`;
+    } else if (String(status).includes(',')) {
+      const statusList = String(status).split(',').map((s) => s.trim()).filter(Boolean);
+      if (statusList.length) {
+        where += ` AND o.status = ANY($${pIdx++}::text[])`;
+        params.push(statusList);
+      }
+    } else {
+      where += ` AND o.status = $${pIdx++}`;
+      params.push(status);
+    }
   }
   if (date) {
     where += ` AND DATE(o.placed_at) = $${pIdx++}`;
@@ -129,12 +141,29 @@ async function fetchPaginatedOrders(restaurantIds, { status, date, page = 1, lim
 
   params.push(safeLimit, offset);
 
+  const orderClause =
+    status === 'kitchen_active' || status === 'kitchen_preparing'
+      ? `ORDER BY
+           CASE
+             WHEN o.status = 'pending' THEN 0
+             WHEN o.payment_status = 'completed' AND o.status <> 'order_ready' THEN 1
+             WHEN o.status = 'ordering_at_restaurant' THEN 2
+             ELSE 3
+           END ASC,
+           o.placed_at ASC`
+      : 'ORDER BY o.placed_at DESC';
+
   const { rows } = await db.query(`
     SELECT
-      o.id, o.order_number, o.status, o.total_amount, o.payment_status,
-      o.placed_at, o.accepted_at, o.delivery_address, o.restaurant_id, o.driver_id,
+      o.id, o.order_number, o.status, o.subtotal, o.delivery_fee, o.tax_amount,
+      o.tip_amount, o.total_amount, o.payment_status, o.payment_method,
+      o.special_instructions, o.delivery_instructions,
+      o.placed_at, o.restaurant_notified_at, o.accepted_at, o.ready_for_pickup_at,
+      o.picked_up_at, o.delivered_at, o.cancelled_at,
+      o.delivery_address, o.restaurant_id, o.driver_id,
       r.name AS restaurant_name,
       COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), 'Unknown Customer') AS customer_name,
+      u.phone_number AS customer_phone,
       NULLIF(TRIM(COALESCE(du.first_name, '') || ' ' || COALESCE(du.last_name, '')), '') AS driver_name,
       du.phone_number AS driver_phone,
       d.vehicle_type AS driver_vehicle_type,
@@ -150,9 +179,32 @@ async function fetchPaginatedOrders(restaurantIds, { status, date, page = 1, lim
     LEFT JOIN drivers d ON o.driver_id = d.id
     LEFT JOIN users du ON d.user_id = du.id
     ${where}
-    ORDER BY o.placed_at DESC
+    ${orderClause}
     LIMIT $${pIdx} OFFSET $${pIdx + 1}
   `, params);
+
+  if (rows.length > 0) {
+    const orderIds = rows.map((row) => row.id);
+    const { rows: itemRows } = await db.query(`
+      SELECT
+        oi.id, oi.order_id, oi.quantity, oi.unit_price, oi.total_price,
+        oi.special_instructions, oi.selected_options, oi.allergen_notes,
+        mi.name AS item_name, mi.image_url
+      FROM order_items oi
+      JOIN menu_items mi ON oi.menu_item_id = mi.id
+      WHERE oi.order_id = ANY($1::uuid[])
+      ORDER BY oi.created_at ASC
+    `, [orderIds]);
+
+    const itemsByOrder = new Map();
+    for (const item of itemRows) {
+      if (!itemsByOrder.has(item.order_id)) itemsByOrder.set(item.order_id, []);
+      itemsByOrder.get(item.order_id).push(item);
+    }
+    rows.forEach((row) => {
+      row.items = itemsByOrder.get(row.id) || [];
+    });
+  }
 
   return { orders: rows, total, currentPage: safePage, totalPages };
 }
@@ -197,6 +249,10 @@ async function fetchOrderDetail(orderId, managerProfile) {
   `, params);
 
   if (!order) return null;
+
+  delete order.verification_code;
+  delete order.code_expires_at;
+  delete order.code_used_at;
 
   const { rows: items } = await db.query(`
     SELECT

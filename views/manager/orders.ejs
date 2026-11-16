@@ -6,6 +6,7 @@
   <title>Orders - Restaurant Manager</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/order-details.css">
   <style>
     .topbar {
       display: flex;
@@ -661,6 +662,7 @@
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/socket.io/socket.io.js"></script>
+<script src="/js/order-details.js"></script>
 <script src="/js/manager.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════
@@ -821,6 +823,8 @@ function renderOrders(orders) {
     return;
   }
 
+  OrderDetails.rememberOrders(orders);
+
   tbody.innerHTML = orders.map(o => {
     const timeAgo = relativeTime(o.placed_at);
     const timeStr = fmtTime(o.placed_at);
@@ -847,9 +851,7 @@ function renderOrders(orders) {
         }
       </td>
       <td>
-        <span style="color:hsl(var(--muted-foreground));font-size:0.85rem">
-          ${o.item_count != null ? `${o.item_count} item${o.item_count !== 1 ? 's' : ''}` : '—'}
-        </span>
+        ${OrderDetails.renderCompactItemsPreview(o.items, o.item_count)}
       </td>
       <td>
         <strong>R${fmtMoney(o.total_amount)}</strong>
@@ -947,201 +949,35 @@ async function openOrder(orderId) {
   }
 }
 
-function formatSelectedOptionsHtml(rawOptions) {
-  if (!rawOptions) return '';
-  let parsed = rawOptions;
-  if (typeof rawOptions === 'string') {
-    try { parsed = JSON.parse(rawOptions); } catch { return ''; }
-  }
-  if (!parsed || typeof parsed !== 'object') return '';
-
-  const chips = [];
-  Object.entries(parsed).forEach(([groupName, val]) => {
-    if (val == null || val === '') return;
-    if (Array.isArray(val)) {
-      const formattedList = val.map(v => {
-        if (typeof v === 'object' && v !== null) {
-          const price = Number(v.price ?? v.priceDelta ?? 0);
-          return `${escHtml(v.name || v.label || '')}${price > 0 ? ` (+R${fmtMoney(price)})` : ''}`;
-        }
-        return escHtml(String(v));
-      }).filter(Boolean).join(', ');
-      if (formattedList) chips.push(`<strong>${escHtml(groupName)}:</strong> ${formattedList}`);
-    } else if (typeof val === 'object') {
-      const price = Number(val.price ?? val.priceDelta ?? 0);
-      const label = `${escHtml(val.name || val.label || '')}${price > 0 ? ` (+R${fmtMoney(price)})` : ''}`;
-      if (label) chips.push(`<strong>${escHtml(groupName)}:</strong> ${label}`);
-    } else {
-      chips.push(`<strong>${escHtml(groupName)}:</strong> ${escHtml(String(val))}`);
-    }
-  });
-
-  if (!chips.length) return '';
-  return `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">
-    ${chips.map(c => `<span style="font-size:0.75rem;background:hsl(var(--muted));color:hsl(var(--foreground));padding:2px 8px;border-radius:999px;border:1px solid hsl(var(--border));">${c}</span>`).join('')}
-  </div>`;
-}
-
 function renderOrderModal(order, items) {
   document.getElementById('orderModalLabel').textContent =
     `Order #${escHtml(order.order_number || order.id.slice(0,8).toUpperCase())}`;
 
-  const addr = parseAddress(order.delivery_address);
   const statusClass = STATUS_BADGES[order.status] || 'badge-gray';
   const payClass    = PAY_BADGES[order.payment_status] || 'badge-yellow';
-
-  // Items
-  const itemsHtml = items.length
-    ? items.map(it => `
-        <div class="order-item-row">
-          <div class="order-item-img">
-            ${it.image_url
-              ? `<img src="${escHtml(it.image_url)}" alt="${escHtml(it.item_name)}" onerror="this.parentElement.innerHTML='<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'20\\' height=\\'20\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'currentColor\\' stroke-width=\\'2\\'><path d=\\'M17 18a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2\\'/><rect width=\\'18\\' height=\\'18\\' x=\\'3\\' y=\\'4\\' rx=\\'2\\'/><circle cx=\\'12\\' cy=\\'10\\' r=\\'2\\'/><line x1=\\'8\\' x2=\\'8\\' y1=\\'2\\' y2=\\'4\\'/><line x1=\\'16\\' x2=\\'16\\' y1=\\'2\\' y2=\\'4\\'/></svg>'">`
-              : `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 18a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2"/><rect width="18" height="18" x="3" y="4" rx="2"/><circle cx="12" cy="10" r="2"/><line x1="8" x2="8" y1="2" y2="4"/><line x1="16" x2="16" y1="2" y2="4"/></svg>`
-            }
-          </div>
-          <div style="flex:1">
-            <div class="order-item-name">${escHtml(it.item_name)}</div>
-            <div class="order-item-qty">× ${it.quantity} @ R${fmtMoney(it.unit_price)}</div>
-            ${formatSelectedOptionsHtml(it.selected_options)}
-            ${it.special_instructions
-              ? `<div style="font-size:0.78rem;color:#b45309;margin-top:4px"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M12 2H2v20h20V10Z"/><path d="m12 12 4 4"/><path d="m16 12-4 4"/></svg><strong>Note:</strong> ${escHtml(it.special_instructions)}</div>`
-              : ''}
-          </div>
-          <div class="order-item-price">R${fmtMoney(it.total_price ?? it.unit_price * it.quantity)}</div>
-        </div>`).join('')
-    : `<div class="empty-state" style="padding:30px"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><p>No item details available</p></div>`;
-
-  // Totals
-  const subtotal = parseFloat(order.subtotal     || 0);
-  const delivery = parseFloat(order.delivery_fee || 0);
-  const tax      = parseFloat(order.tax_amount   || 0);
-  const tip      = parseFloat(order.tip_amount   || 0);
-  const total    = parseFloat(order.total_amount || 0);
-
-  // Timeline
-  const STATUS_STEPS = [
-    { key: 'pending',                label: 'Order Placed (Pending Approval)', field: 'placed_at'              },
-    { key: 'ordering_at_restaurant', label: order.payment_status === 'completed' ? 'Accepted & Paid (Finding Driver)' : 'Accepted by Restaurant (Awaiting Payment)', field: 'restaurant_notified_at' },
-    { key: 'accepted_by_driver',     label: 'Accepted by Driver',              field: 'accepted_at'            },
-    { key: 'order_ready',            label: 'Order Ready',                     field: 'ready_for_pickup_at'    },
-    { key: 'picked_up',              label: 'Picked Up',                       field: 'picked_up_at'           },
-    { key: 'on_the_way',             label: 'On the Way',                      field: null                     },
-    { key: 'arrived',                label: 'Arrived at Customer',             field: null                     },
-    { key: 'delivered',              label: 'Delivered',                       field: 'delivered_at'           },
-  ];
-  const currentStatusIdx = STATUS_STEPS.findIndex(s => s.key === order.status);
-  const isCancelled    = order.status === 'cancelled' || order.status === 'no_drivers_available';
-
-  const timelineHtml = isCancelled
-    ? `<div class="alert-danger">
-         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>
-         Order ${order.status === 'cancelled' ? 'rejected / cancelled' : 'could not find a driver'}
-         ${order.cancelled_at ? `at ${fmtDateTime(order.cancelled_at)}` : ''}
+  const pendingBanner = order.status === 'pending'
+    ? `<div style="display:flex; align-items:center; justify-content:space-between; background:hsl(var(--muted)); padding:1rem; border-radius:var(--radius); border:1px solid hsl(var(--border)); gap:0.75rem; flex-wrap:wrap;">
+         <div>
+           <div style="font-weight:600; font-size:0.9rem;">Action Required: Approve or Reject Order</div>
+           <div style="font-size:0.8rem; color:hsl(var(--muted-foreground));">Accepting allows the customer to pay. Once paid, active drivers will be notified.</div>
+         </div>
+         <div style="display:flex; gap:0.5rem;">
+           <button class="btn btn-success btn-sm" onclick="acceptOrder('${order.id}', this)">Accept Order</button>
+           <button class="btn btn-danger btn-sm" onclick="rejectOrder('${order.id}', this)">Reject Order</button>
+         </div>
        </div>`
-    : `<ul class="timeline">
-        ${STATUS_STEPS.map((step, i) => {
-          const done    = i < currentStatusIdx || (i === currentStatusIdx && order.status === step.key);
-          const current = i === currentStatusIdx;
-          const dotClass = done ? 'done' : (current ? 'current' : 'future');
-          const timeVal  = step.field ? order[step.field] : null;
-          return `
-          <li>
-            <span class="timeline-dot ${dotClass}"></span>
-            <div>
-              <div class="timeline-label" style="color:${done ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))'}">${step.label}</div>
-              ${timeVal ? `<div class="timeline-time">${fmtDateTime(timeVal)}</div>` : ''}
-            </div>
-          </li>`;
-        }).join('')}
-       </ul>`;
+    : '';
 
-  document.getElementById('orderModalBody').innerHTML = `
-    <!-- Status -->
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem; flex-wrap:wrap; gap:0.5rem;">
-      <span class="badge ${statusClass}" style="font-size:0.88rem; padding:7px 15px;">${fmtStatus(order.status, order.payment_status)}</span>
-      <span class="badge ${payClass}">${fmtPayStatus(order.payment_status)} · ${fmtPayMethod(order.payment_method)}</span>
-    </div>
-
-    ${order.status === 'pending' ? `
-    <div style="display:flex; align-items:center; justify-content:space-between; background:hsl(var(--muted)); padding:1rem; border-radius:var(--radius); border:1px solid hsl(var(--border));">
-      <div>
-        <div style="font-weight:600; font-size:0.9rem;">Action Required: Approve or Reject Order</div>
-        <div style="font-size:0.8rem; color:hsl(var(--muted-foreground));">Accepting allows the customer to pay. Once paid, active drivers will be notified.</div>
-      </div>
-      <div style="display:flex; gap:0.5rem;">
-        <button class="btn btn-success btn-sm" onclick="acceptOrder('${order.id}', this)">Accept Order</button>
-        <button class="btn btn-danger btn-sm" onclick="rejectOrder('${order.id}', this)">Reject Order</button>
-      </div>
-    </div>
-    ` : ''}
-
-    <!-- Items -->
-    <div class="modal-section-title">Items Ordered</div>
-    <div>${itemsHtml}</div>
-
-    <!-- Summary -->
-    <div class="modal-section-title">Order Summary</div>
-    <table class="totals-table">
-      <tr><td>Subtotal</td><td>R${fmtMoney(subtotal)}</td></tr>
-      <tr><td>Delivery Fee</td><td>R${fmtMoney(delivery)}</td></tr>
-      <tr><td>Tax</td><td>R${fmtMoney(tax)}</td></tr>
-      ${tip > 0 ? `<tr><td>Tip</td><td>R${fmtMoney(tip)}</td></tr>` : ''}
-      <tr class="grand-total"><td>Total</td><td>R${fmtMoney(total)}</td></tr>
-    </table>
-
-    <!-- Customer & Restaurant -->
-    <div class="grid grid-2">
-      <div>
-        <div class="modal-section-title">Customer</div>
-        <div class="detail-row"><span class="detail-label">Name</span><span class="detail-value">${escHtml(order.customer_name || '—')}</span></div>
-        <div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${escHtml(order.customer_phone || '—')}</span></div>
-        ${order.restaurant_rating
-          ? `<div class="detail-row"><span class="detail-label">Rating</span><span class="detail-value">${'★'.repeat(order.restaurant_rating)}${'☆'.repeat(5-order.restaurant_rating)}</span></div>`
-          : ''}
-      </div>
-      <div>
-        <div class="modal-section-title">Restaurant</div>
-        <div class="detail-row"><span class="detail-label">Name</span><span class="detail-value">${escHtml(order.restaurant_name || '—')}</span></div>
-        <div class="detail-row"><span class="detail-label">Placed</span><span class="detail-value">${fmtDateTime(order.placed_at)}</span></div>
-        ${order.delivered_at
-          ? `<div class="detail-row"><span class="detail-label">Delivered</span><span class="detail-value">${fmtDateTime(order.delivered_at)}</span></div>`
-          : ''}
-      </div>
-    </div>
-
-    <!-- Assigned Driver -->
-    <div class="modal-section-title">Assigned Delivery Driver</div>
-    ${order.driver_name ? `
-      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;">
-        <div class="detail-row"><span class="detail-label">Driver Name</span><span class="detail-value">${escHtml(order.driver_name)}</span></div>
-        <div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${escHtml(order.driver_phone || '—')}</span></div>
-        <div class="detail-row"><span class="detail-label">Vehicle</span><span class="detail-value">${escHtml([order.driver_vehicle_color, order.driver_vehicle_model || order.driver_vehicle_type].filter(Boolean).join(' ') || '—')}</span></div>
-        <div class="detail-row"><span class="detail-label">Plate Registration</span><span class="detail-value">${escHtml(order.driver_vehicle_plate || '—')}</span></div>
-        ${order.accepted_at ? `<div class="detail-row"><span class="detail-label">Accepted At</span><span class="detail-value">${fmtDateTime(order.accepted_at)}</span></div>` : ''}
-      </div>
-    ` : `<div class="address-card" style="color:hsl(var(--muted-foreground));">No driver assigned yet.</div>`}
-
-    <!-- Address -->
-    <div class="modal-section-title">Delivery Address</div>
-    <div class="address-card">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;color:hsl(var(--destructive))"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-      ${addr}
-    </div>
-
-    ${order.special_instructions || order.delivery_instructions ? `
-    <div class="modal-section-title">Instructions</div>
-    <div class="address-card">
-      ${order.special_instructions
-        ? `<div><strong>Order:</strong> ${escHtml(order.special_instructions)}</div>` : ''}
-      ${order.delivery_instructions
-        ? `<div style="margin-top:6px"><strong>Delivery:</strong> ${escHtml(order.delivery_instructions)}</div>` : ''}
-    </div>` : ''}
-
-    <!-- Timeline -->
-    <div class="modal-section-title">Order Timeline</div>
-    ${timelineHtml}
-  `;
+  document.getElementById('orderModalBody').innerHTML = OrderDetails.renderOrderDetailContent(order, items || [], {
+    apiBase: API,
+    showRestaurant: true,
+    statusText: fmtStatus(order.status, order.payment_status),
+    statusBadgeClass: statusClass,
+    paymentText: fmtPayStatus(order.payment_status),
+    paymentBadgeClass: payClass,
+    paymentMethodText: fmtPayMethod(order.payment_method),
+    actionsBannerHtml: pendingBanner,
+  });
 }
 
 // ── Filters ───────────────────────────────────────────────────────────
