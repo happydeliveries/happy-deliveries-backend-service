@@ -223,6 +223,16 @@ function emitDriverLocation(orderId, payload) {
   }
 }
 
+function emitManagerEvent(restaurantId, eventName, data) {
+  if (ioInstance && eventName) {
+    if (restaurantId) {
+      ioInstance.to(`restaurant_${restaurantId}`).emit(eventName, data);
+    }
+    ioInstance.to('restaurant_managers').emit(eventName, data);
+  }
+}
+
 module.exports.emitOrderUpdate = emitOrderUpdate;
 module.exports.emitUserEvent = emitUserEvent;
 module.exports.emitDriverLocation = emitDriverLocation;
+module.exports.emitManagerEvent = emitManagerEvent;

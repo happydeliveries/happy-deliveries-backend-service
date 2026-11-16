@@ -1,7 +1,7 @@
 const db = require('../config/database');
 const crypto = require('crypto');
 const Payment = require('./Payment');
-const { emitOrderUpdate, emitUserEvent, emitDriverLocation } = require('../socket');
+const { emitOrderUpdate, emitUserEvent, emitDriverLocation, emitManagerEvent } = require('../socket');
 
 function normalizePointCoords(pt) {
   if (!pt) return null;
