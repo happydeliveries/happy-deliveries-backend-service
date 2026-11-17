@@ -1,6 +1,7 @@
 const Restaurant = require('../models/Restaurant');
 const Menu = require('../models/Menu');
 const RestaurantManager = require('../models/RestaurantManager');
+const { resolveAddressCoordinates } = require('../utils/deliveryPricing');
 
 // Create restaurant
 exports.createRestaurant = async (req, res) => {
@@ -365,5 +366,29 @@ exports.searchFood = async (req, res) => {
   } catch (error) {
     console.error('Search food error:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.geocodeAddress = async (req, res) => {
+  try {
+    const raw = req.body?.address || req.body || {};
+    const resolved = await resolveAddressCoordinates(raw);
+    if (!resolved) {
+      return res.status(404).json({
+        success: false,
+        error: 'Could not locate that address. Please include a street or town name in South Africa.'
+      });
+    }
+    res.json({
+      success: true,
+      data: {
+        latitude: resolved.latitude,
+        longitude: resolved.longitude,
+        source: resolved.source
+      }
+    });
+  } catch (error) {
+    console.error('Geocode address error:', error);
+    res.status(500).json({ success: false, error: 'Unable to locate address right now' });
   }
 };

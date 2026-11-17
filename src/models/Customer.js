@@ -111,6 +111,45 @@ class Customer {
     return result.rows[0];
   }
 
+  // Replace entire delivery_addresses list (e.g. coordinate backfill)
+  static async updateDeliveryAddresses(customerId, addresses) {
+    const result = await db.query(
+      `UPDATE customers
+       SET delivery_addresses = $2::jsonb,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING delivery_addresses`,
+      [customerId, JSON.stringify(Array.isArray(addresses) ? addresses : [])]
+    );
+    return result.rows[0];
+  }
+
+  // Mark one saved delivery address as default by id or array index
+  static async setDefaultDeliveryAddress(customerId, identifier) {
+    const existingRes = await db.query(
+      'SELECT COALESCE(delivery_addresses, \'[]\'::jsonb) AS delivery_addresses FROM customers WHERE id = $1',
+      [customerId]
+    );
+    const current = Array.isArray(existingRes.rows[0]?.delivery_addresses)
+      ? existingRes.rows[0].delivery_addresses
+      : [];
+
+    let matched = false;
+    const updated = current.map((addr, idx) => {
+      const isMatch =
+        (addr && addr.id && String(addr.id) === String(identifier)) ||
+        (/^\d+$/.test(String(identifier)) && idx === parseInt(identifier, 10));
+      if (isMatch) matched = true;
+      return { ...addr, is_default: isMatch };
+    });
+
+    if (!matched && updated.length > 0 && !updated.some((a) => a && a.is_default)) {
+      updated[0] = { ...updated[0], is_default: true };
+    }
+
+    return Customer.updateDeliveryAddresses(customerId, updated);
+  }
+
   // Update customer preferences
   static async updatePreferences(customerId, preferences) {
     const { dietary_preferences, default_payment_method } = preferences || {};

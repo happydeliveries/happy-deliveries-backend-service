@@ -18,7 +18,8 @@ const {
   updateRestaurant,
   getMenuItem,
   updateMenuItem,
-  searchFood
+  searchFood,
+  geocodeAddress
 } = require('../controllers/restaurantController');
 const { auth, authorize } = require('../middleware/auth');
 
@@ -26,6 +27,7 @@ const { auth, authorize } = require('../middleware/auth');
 router.get('/feed/home', getHomeFeed);
 router.get('/search', searchRestaurants);
 router.get('/search/food', searchFood);
+router.post('/geocode-address', geocodeAddress);
 router.get('/:restaurantId/menu-items/:itemId', getMenuItem); // Customer endpoint for menu item details
 
 router.get('/stats', auth, authorize('restaurant_manager'), getStats); 
