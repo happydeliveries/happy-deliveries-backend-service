@@ -454,6 +454,12 @@ exports.getOrderTracking = async (req, res) => {
         driver_vehicle_plate: order.driver_vehicle_plate,
         driver_location: order.driver_location,
         driver_last_location_update: order.driver_last_location_update,
+        rescue_courier: order.rescue_courier || null,
+        rescue_payout_mode: order.rescue_payout_mode || null,
+        failure_reason: order.failure_reason || null,
+        forfeited: Boolean(order.forfeited),
+        support_phone: order.support_phone || null,
+        support_name: order.support_name || 'Happy Deliveries Dispatch',
         restaurant_name: order.restaurant_name,
         restaurant_address: order.restaurant_address,
         restaurant_location: order.restaurant_location,
@@ -506,6 +512,35 @@ exports.rateOrder = async (req, res) => {
   } catch (error) {
     console.error('Rate order error:', error);
     res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Public / Authenticated dispatch support contact
+exports.getSupportContact = async (req, res) => {
+  try {
+    const contact = await Order.getSupportContact();
+    res.json({ success: true, data: contact });
+  } catch (error) {
+    console.error('Get support contact error:', error);
+    res.status(500).json({ success: false, error: 'Failed to load support contact' });
+  }
+};
+
+// Driver reports customer unreachable at drop-off & alerts Happy Dispatch
+exports.reportCustomerUnreachable = async (req, res) => {
+  try {
+    const driver = await Driver.findByUserId(req.user.id);
+    if (!driver) {
+      return res.status(404).json({ success: false, error: 'Driver profile not found' });
+    }
+    const result = await Order.reportCustomerUnreachable(req.params.id, driver.id, req.body || {});
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('Report customer unreachable error:', error);
+    res.status(error.statusCode || 400).json({
       success: false,
       error: error.message
     });

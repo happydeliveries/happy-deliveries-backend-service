@@ -20,6 +20,20 @@
     return String(val || '').replace(/[^a-zA-Z0-9_-]/g, '');
   }
 
+  function parseJsonObj(val) {
+    if (!val) return null;
+    if (typeof val === 'object') return val;
+    if (typeof val === 'string') {
+      try {
+        const parsed = JSON.parse(val);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
   function fmtMoney(n) {
     return parseFloat(n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
@@ -226,6 +240,19 @@
   }
 
   function buildOrderTimelineHtml(order) {
+    if (order.status === 'delivery_failed') {
+      return `
+        <div class="prep-alert prep-alert-allergy">
+          <span>⛔</span>
+          <div>
+            <strong>Delivery Failed — Customer Unreachable (Payment Forfeited)</strong>
+            ${order.failure_reason ? `<div style="margin-top:3px;font-weight:500;">${esc(order.failure_reason)}</div>` : ''}
+            ${order.cancelled_at ? `<div style="margin-top:2px;font-size:0.76rem;opacity:0.85;">Closed at ${esc(fmtDateTime(order.cancelled_at))} · Driver compensated; no customer refund.</div>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
     const isCancelled = order.status === 'cancelled' || order.status === 'no_drivers_available';
     if (isCancelled) {
       return `
@@ -234,6 +261,7 @@
           <div>
             Order ${order.status === 'cancelled' ? 'rejected / cancelled' : 'could not find an available driver'}
             ${order.cancelled_at ? ` at ${esc(fmtDateTime(order.cancelled_at))}` : ''}
+            ${order.failure_reason ? `<div style="margin-top:3px;font-weight:500;">Reason: ${esc(order.failure_reason)}</div>` : ''}
           </div>
         </div>
       `;
@@ -300,32 +328,83 @@
     const total = parseFloat(order.total_amount || 0);
     const oid = safeId(order.id);
     const cleanApiBase = String(apiBase || '/restaurant/api').replace(/'/g, '');
+    const rescue = parseJsonObj(order.rescue_courier);
+    const supportPhone = options.supportPhone || order.support_phone || '';
+    const incidents = Array.isArray(order.incidents) ? order.incidents : [];
 
-    const driverHtml = order.driver_name
-      ? `<div class="od-driver-card">
+    let driverHtml = '';
+    if (rescue && rescue.name) {
+      driverHtml = `<div class="od-rescue-card">
            <div>
-             <div style="font-size:0.7rem;color:#1e3a8a;font-weight:800;">ASSIGNED DRIVER</div>
+             <div style="font-size:0.7rem;color:#065f46;font-weight:800;">${esc((rescue.courier_type_label || 'RESCUE COURIER').toUpperCase())}</div>
+             <div style="font-weight:800;font-size:0.94rem;color:#064e3b;">🛡️ ${esc(rescue.name)}</div>
+             ${rescue.assigned_at ? `<div style="font-size:0.72rem;color:#047857;">Dispatched ${esc(relativeTime(rescue.assigned_at))} · Happy Paid/Direct</div>` : ''}
+           </div>
+           <div>
+             <div style="font-size:0.7rem;color:#065f46;font-weight:800;">PHONE</div>
+             <div style="font-weight:700;">${rescue.phone ? `<a href="tel:${esc(rescue.phone)}" style="color:#047857;">📞 ${esc(rescue.phone)}</a>` : '—'}</div>
+           </div>
+           <div>
+             <div style="font-size:0.7rem;color:#065f46;font-weight:800;">VEHICLE & DETAILS</div>
+             <div style="font-weight:700;">${esc(rescue.vehicle || 'Dispatch Rescue')} ${rescue.plate ? `(${esc(rescue.plate)})` : ''}</div>
+             ${rescue.notes ? `<div style="font-size:0.74rem;color:#065f46;margin-top:2px;">${esc(rescue.notes)}</div>` : ''}
+           </div>
+         </div>`;
+    } else if (order.driver_name) {
+      driverHtml = `<div class="od-driver-card">
+           <div>
+             <div style="font-size:0.7rem;color:#1e3a8a;font-weight:800;">ASSIGNED DRIVER ${order.reassigned_at ? '· REASSIGNED' : ''}</div>
              <div style="font-weight:800;font-size:0.94rem;">${esc(order.driver_name)}</div>
              ${order.accepted_at ? `<div style="font-size:0.72rem;color:#3b82f6;">Accepted ${esc(relativeTime(order.accepted_at))}</div>` : ''}
            </div>
            <div>
              <div style="font-size:0.7rem;color:#1e3a8a;font-weight:800;">PHONE</div>
-             <div style="font-weight:700;"><a href="tel:${esc(order.driver_phone || '')}" style="color:#1d4ed8;">${esc(order.driver_phone || '—')}</a></div>
+             <div style="font-weight:700;"><a href="tel:${esc(order.driver_phone || '')}" style="color:#1d4ed8;">📞 ${esc(order.driver_phone || '—')}</a></div>
            </div>
            <div>
              <div style="font-size:0.7rem;color:#1e3a8a;font-weight:800;">VEHICLE & PLATE</div>
              <div style="font-weight:700;">${esc([order.driver_vehicle_color, order.driver_vehicle_model || order.driver_vehicle_type].filter(Boolean).join(' ') || 'Vehicle')} ${order.driver_vehicle_plate ? `(${esc(order.driver_vehicle_plate)})` : ''}</div>
            </div>
-         </div>`
-      : `<div class="od-box" style="color:hsl(var(--muted-foreground));">
+         </div>`;
+    } else {
+      driverHtml = `<div class="od-box" style="color:hsl(var(--muted-foreground));">
            ${order.status === 'pending'
              ? 'Accept this order first so the customer can complete payment and dispatch a driver.'
-             : order.payment_status !== 'completed' && !['cancelled', 'no_drivers_available'].includes(order.status)
+             : order.payment_status !== 'completed' && !['cancelled', 'no_drivers_available', 'delivery_failed'].includes(order.status)
                ? 'Awaiting customer payment completion before dispatching to nearby drivers.'
-               : ['cancelled', 'no_drivers_available'].includes(order.status)
-                 ? 'No driver assigned.'
-                 : 'Searching for an available nearby driver...'}
+               : ['cancelled', 'no_drivers_available', 'delivery_failed'].includes(order.status)
+                 ? 'No active driver assigned.'
+                 : order.reassigned_at
+                   ? 'Driver was unassigned by Dispatch — waiting for next available driver to accept...'
+                   : 'Searching for an available nearby driver...'}
          </div>`;
+    }
+
+    const supportBarHtml = (supportPhone && options.showSupportCall !== false)
+      ? `<div class="od-call-strip" style="margin-top:0.45rem;">
+           ${(order.driver_phone || rescue?.phone) ? `<a class="od-call-pill primary" href="tel:${esc(rescue?.phone || order.driver_phone)}">📞 Call ${rescue ? 'Courier' : 'Driver'} (${esc(rescue?.phone || order.driver_phone)})</a>` : ''}
+           <a class="od-call-pill support" href="tel:${esc(supportPhone)}">🛡️ Call Happy Dispatch (${esc(supportPhone)})</a>
+         </div>`
+      : '';
+
+    const incidentsHtml = incidents.length > 0
+      ? `<div>
+           <div class="od-section-label">Dispatch & Incident Log (${incidents.length})</div>
+           <div class="od-box">
+             <ul class="od-incident-list">
+               ${incidents.map((inc) => `
+                 <li class="od-incident-item">
+                   <div>
+                     <strong style="color:#0f172a;">${esc(String(inc.incident_type || '').replace(/_/g, ' ').toUpperCase())}</strong>
+                     <div style="color:#475569;margin-top:2px;">${esc(inc.summary || '')}</div>
+                   </div>
+                   <span style="font-size:0.73rem;color:hsl(var(--muted-foreground));white-space:nowrap;">${esc(fmtDateTime(inc.created_at))}</span>
+                 </li>
+               `).join('')}
+             </ul>
+           </div>
+         </div>`
+      : '';
 
     const orderInstructionsHtml =
       order.special_instructions || order.delivery_instructions
@@ -357,8 +436,9 @@
       </div>
 
       <div>
-        <div class="od-section-label">Assigned Driver</div>
+        <div class="od-section-label">Assigned Courier / Driver</div>
         ${driverHtml}
+        ${supportBarHtml}
       </div>
 
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0.85rem;">
@@ -366,7 +446,7 @@
           <div style="font-size:0.72rem;font-weight:800;color:hsl(var(--muted-foreground));text-transform:uppercase;">Customer & Delivery Address</div>
           <div style="font-weight:700;margin-top:4px;">${esc(order.customer_name || 'Unknown Customer')}</div>
           <div style="font-size:0.82rem;margin-top:2px;">${order.customer_phone ? `<a href="tel:${esc(order.customer_phone)}" style="color:hsl(var(--primary));font-weight:600;">${esc(order.customer_phone)}</a>` : '—'}</div>
-          ${showRestaurant && order.restaurant_name ? `<div style="font-size:0.8rem;margin-top:4px;"><strong>Restaurant:</strong> ${esc(order.restaurant_name)}</div>` : ''}
+          ${showRestaurant && order.restaurant_name ? `<div style="font-size:0.8rem;margin-top:4px;"><strong>Restaurant:</strong> ${esc(order.restaurant_name)} ${order.restaurant_phone ? `· <a href="tel:${esc(order.restaurant_phone)}" style="color:hsl(var(--primary));font-weight:600;">${esc(order.restaurant_phone)}</a>` : ''}</div>` : ''}
           <div style="font-size:0.8rem;color:hsl(var(--muted-foreground));margin-top:6px;">📍 ${esc(addrStr)}</div>
         </div>
         <div class="od-box" style="display:flex;flex-direction:column;gap:4px;">
@@ -387,6 +467,8 @@
           ${buildOrderTimelineHtml(order)}
         </div>
       </div>
+
+      ${incidentsHtml}
     `;
   }
 
@@ -441,7 +523,7 @@
     <div><strong>Placed:</strong> ${esc(fmtDateTime(order.placed_at))}</div>
     <div><strong>Customer:</strong> ${esc(order.customer_name || 'Guest')} (${esc(order.customer_phone || 'No phone')})</div>
     <div><strong>Payment:</strong> ${esc(String(order.payment_status || 'pending').toUpperCase())}</div>
-    ${order.driver_name ? `<div><strong>Driver:</strong> ${esc(order.driver_name)} ${order.driver_vehicle_plate ? '(' + esc(order.driver_vehicle_plate) + ')' : ''}</div>` : ''}
+    ${order.driver_name ? `<div><strong>Driver:</strong> ${esc(order.driver_name)} ${order.driver_vehicle_plate ? '(' + esc(order.driver_vehicle_plate) + ')' : ''}</div>` : (parseJsonObj(order.rescue_courier)?.name ? `<div><strong>Rescue Courier:</strong> ${esc(parseJsonObj(order.rescue_courier).name)}</div>` : '')}
   </div>
   ${order.special_instructions ? `<div class="banner">ORDER NOTE: ${esc(order.special_instructions)}</div>` : ''}
   ${order.delivery_instructions ? `<div class="banner">DELIVERY NOTE: ${esc(order.delivery_instructions)}</div>` : ''}

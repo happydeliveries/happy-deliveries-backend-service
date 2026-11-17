@@ -571,6 +571,7 @@
             <option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option>
             <option value="no_drivers_available">No Drivers</option>
+            <option value="delivery_failed">Failed (Customer Forfeited)</option>
           </select>
         </div>
         <div class="filter-group">
@@ -659,6 +660,8 @@
 <script>
   window.managerId = "<%= manager.id || '' %>" || null;
   window.restaurantIds = <%- JSON.stringify((restaurants || []).map(r => r.id)) %>;
+  window.SUPPORT_PHONE = <%- JSON.stringify((supportContact && supportContact.support_phone) || '') %>;
+  window.SUPPORT_NAME = <%- JSON.stringify((supportContact && supportContact.support_name) || 'Happy Deliveries Dispatch') %>;
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/socket.io/socket.io.js"></script>
@@ -689,6 +692,7 @@ const STATUS_BADGES = {
   delivered:              'badge-green',
   cancelled:              'badge-red',
   no_drivers_available:   'badge-red',
+  delivery_failed:        'badge-red',
 };
 const PAY_BADGES = {
   pending:    'badge-yellow',
@@ -831,6 +835,9 @@ function renderOrders(orders) {
     const statusClass = STATUS_BADGES[o.status] || 'badge-gray';
     const payClass    = PAY_BADGES[o.payment_status] || 'badge-yellow';
     const driverVeh   = [o.driver_vehicle_color, o.driver_vehicle_model || o.driver_vehicle_type].filter(Boolean).join(' ');
+    const rescueInfo  = typeof o.rescue_courier === 'string'
+      ? (() => { try { return JSON.parse(o.rescue_courier); } catch { return null; } })()
+      : o.rescue_courier;
 
     return `
     <tr>
@@ -844,10 +851,13 @@ function renderOrders(orders) {
         <div style="font-size:0.85rem;color:hsl(var(--muted-foreground))">${escHtml(o.restaurant_name || '—')}</div>
       </td>
       <td>
-        ${o.driver_name
-          ? `<div style="font-weight:600;font-size:0.84rem;color:#1e40af">${escHtml(o.driver_name)}</div>
-             <div style="font-size:0.74rem;color:hsl(var(--muted-foreground))">${escHtml(driverVeh)}${o.driver_vehicle_plate ? ` · ${escHtml(o.driver_vehicle_plate)}` : ''}</div>`
-          : `<span style="font-size:0.78rem;color:hsl(var(--muted-foreground))">Unassigned</span>`
+        ${rescueInfo?.name
+          ? `<div style="font-weight:600;font-size:0.84rem;color:#047857">🛡️ ${escHtml(rescueInfo.name)}</div>
+             <div style="font-size:0.74rem;color:#065f46">${escHtml(rescueInfo.courier_type_label || 'Happy Rescue')}</div>`
+          : o.driver_name
+            ? `<div style="font-weight:600;font-size:0.84rem;color:#1e40af">${escHtml(o.driver_name)}</div>
+               <div style="font-size:0.74rem;color:hsl(var(--muted-foreground))">${escHtml(driverVeh)}${o.driver_vehicle_plate ? ` · ${escHtml(o.driver_vehicle_plate)}` : ''}</div>`
+            : `<span style="font-size:0.78rem;color:hsl(var(--muted-foreground))">${o.reassigned_at && !['cancelled','delivered','delivery_failed'].includes(o.status) ? '🔄 Reassigning…' : 'Unassigned'}</span>`
         }
       </td>
       <td>
@@ -924,13 +934,26 @@ function renderPagination() {
 }
 
 // ── Order detail modal ────────────────────────────────────────────────
-async function openOrder(orderId) {
-  document.getElementById('orderModalBody').innerHTML = `
-    <div class="text-center" style="padding:3rem 0; color:hsl(var(--muted-foreground));">
-      <div class="spinner" style="margin-bottom:1rem;"></div>
-      <div style="font-size:0.85rem;">Loading order details…</div>
-    </div>`;
-  openModal('orderModal');
+window.currentOpenOrderId = null;
+window.reloadOpenOrderModal = (targetOrderId) => {
+  if (!window.currentOpenOrderId) return;
+  if (targetOrderId && String(targetOrderId) !== String(window.currentOpenOrderId)) return;
+  const modal = document.getElementById('orderModal');
+  if (modal && modal.classList.contains('active')) {
+    openOrder(window.currentOpenOrderId, true);
+  }
+};
+
+async function openOrder(orderId, silent = false) {
+  window.currentOpenOrderId = orderId;
+  if (!silent) {
+    document.getElementById('orderModalBody').innerHTML = `
+      <div class="text-center" style="padding:3rem 0; color:hsl(var(--muted-foreground));">
+        <div class="spinner" style="margin-bottom:1rem;"></div>
+        <div style="font-size:0.85rem;">Loading order details…</div>
+      </div>`;
+    openModal('orderModal');
+  }
 
   try {
     const res  = await apiFetch(`${API}/orders/${orderId}`);
@@ -947,6 +970,297 @@ async function openOrder(orderId) {
         <p>${escHtml(err.message)}</p>
       </div>`;
   }
+}
+
+async function loadReassignCandidates(selectId, excludeDriverId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Loading available drivers…</option>';
+  try {
+    const res = await apiFetch(`${API}/drivers/reassign-candidates`);
+    const data = await res.json();
+    const list = (data.drivers || []).filter((d) => String(d.id) !== String(excludeDriverId || ''));
+    if (!list.length) {
+      sel.innerHTML = '<option value="">No other approved active drivers found</option>';
+      return;
+    }
+    sel.innerHTML = '<option value="">— Select specific driver —</option>' + list.map((d) => {
+      const avail = d.is_available && d.current_status === 'available' && Number(d.active_orders_count || 0) === 0;
+      const busy = Number(d.active_orders_count || 0) > 0;
+      const tag = avail ? '🟢 Available' : (busy ? '🔴 Busy (On delivery)' : `⚪ ${d.current_status || 'Offline'}`);
+      const veh = d.vehicle_registration ? ` · ${d.vehicle_registration}` : '';
+      return `<option value="${escHtml(d.id)}" ${busy ? 'disabled' : ''}>${escHtml(`${d.first_name || ''} ${d.last_name || ''}`.trim())} (${tag}${veh})</option>`;
+    }).join('');
+  } catch (err) {
+    sel.innerHTML = `<option value="">Failed to load drivers</option>`;
+  }
+}
+
+async function adminReassignToQueue(orderId, btn) {
+  const reason = document.getElementById('dispatchReassignReason')?.value?.trim() || '';
+  const offline = Boolean(document.getElementById('dispatchOldDriverOffline')?.checked);
+  if (!confirm('Unassign the current driver and return this order to available online drivers? The restaurant and customer will be updated live.')) return;
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/orders/${orderId}/reassign-driver`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ mode: 'queue', reason, old_driver_action: offline ? 'offline' : 'available' }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to reassign');
+    showToast('Reassigned to Queue', data.message, 'success');
+    loadOrders(currentPage, true);
+    loadStats();
+    openOrder(orderId, true);
+  } catch (err) {
+    showToast('Reassign Blocked', err.message, 'danger');
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function adminReassignDirect(orderId, btn) {
+  const newDriverId = document.getElementById('dispatchDirectDriverSelect')?.value || '';
+  const reason = document.getElementById('dispatchReassignReason')?.value?.trim() || '';
+  const offline = Boolean(document.getElementById('dispatchOldDriverOffline')?.checked);
+  if (!newDriverId) {
+    showToast('Select Driver', 'Please choose an available driver to direct-assign.', 'warning');
+    return;
+  }
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/orders/${orderId}/reassign-driver`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ mode: 'direct', new_driver_id: newDriverId, reason, old_driver_action: offline ? 'offline' : 'available' }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to direct-assign');
+    showToast('Driver Reassigned', data.message, 'success');
+    loadOrders(currentPage, true);
+    loadStats();
+    openOrder(orderId, true);
+  } catch (err) {
+    showToast('Reassign Error', err.message, 'danger');
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function adminDispatchRescue(orderId, rescueMode, btn) {
+  const notes = document.getElementById('rescueNotes')?.value?.trim() || '';
+  const offline = Boolean(document.getElementById('rescueOldDriverOffline')?.checked ?? true);
+  const payload = {
+    rescue_mode: rescueMode,
+    notes,
+    old_driver_action: offline ? 'offline' : 'available',
+  };
+  if (rescueMode === 'special_driver') {
+    payload.courier_name = document.getElementById('rescueCourierName')?.value?.trim() || '';
+    payload.courier_phone = document.getElementById('rescueCourierPhone')?.value?.trim() || '';
+    payload.courier_vehicle = document.getElementById('rescueCourierVehicle')?.value?.trim() || '';
+    payload.courier_plate = document.getElementById('rescueCourierPlate')?.value?.trim() || '';
+    if (!payload.courier_name || !payload.courier_phone) {
+      showToast('Missing Courier Info', 'Please enter name and phone number for the special driver.', 'warning');
+      return;
+    }
+  }
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/orders/${orderId}/rescue-dispatch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to assign rescue courier');
+    showToast('Rescue Dispatched', data.message, 'success');
+    loadOrders(currentPage, true);
+    openOrder(orderId, true);
+  } catch (err) {
+    showToast('Rescue Error', err.message, 'danger');
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function adminCompleteRescue(orderId, bypassCode, btn) {
+  const verificationCode = document.getElementById('rescueVerifyCode')?.value?.trim() || '';
+  if (!bypassCode && !verificationCode) {
+    showToast('Code Needed', 'Enter customer verification code or click Confirm Delivered (Override).', 'warning');
+    return;
+  }
+  if (bypassCode && !confirm('Confirm this rescued order has been handed to the customer? Original driver will NOT be credited.')) return;
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/orders/${orderId}/rescue-complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ verification_code: verificationCode, bypass_code: Boolean(bypassCode) }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to complete delivery');
+    showToast('Delivered', data.message, 'success');
+    loadOrders(currentPage, true);
+    loadStats();
+    openOrder(orderId, true);
+  } catch (err) {
+    showToast('Verification Error', err.message, 'danger');
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function adminCancelAndRefund(orderId, btn) {
+  const reason = document.getElementById('adminCancelReason')?.value?.trim() || '';
+  if (!reason) {
+    showToast('Reason Required', 'Please enter why this order is being cancelled and refunded.', 'warning');
+    return;
+  }
+  if (!confirm(`Cancel this order AND issue a refund to the customer?\nReason: ${reason}`)) return;
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/orders/${orderId}/cancel-refund`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ reason }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to cancel & refund');
+    showToast('Cancelled & Refunded', data.message, data.refundError ? 'warning' : 'success');
+    loadOrders(currentPage, true);
+    loadStats();
+    openOrder(orderId, true);
+  } catch (err) {
+    showToast('Cancel/Refund Error', err.message, 'danger');
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function adminFailCustomerForfeit(orderId, btn) {
+  const reason = document.getElementById('failForfeitReason')?.value?.trim() || 'Customer unreachable after driver arrived — order failed and payment forfeited';
+  if (!confirm(`FAIL ORDER (CUSTOMER FORFEITS MONEY)?\n\n• Customer will NOT be refunded.\n• Driver WILL be paid and freed.\n• Order status becomes Delivery Failed.\n\nReason: ${reason}`)) return;
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/orders/${orderId}/fail-forfeit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ reason }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to mark delivery failed');
+    showToast('Order Failed (Forfeited)', data.message, 'warning');
+    loadOrders(currentPage, true);
+    loadStats();
+    openOrder(orderId, true);
+  } catch (err) {
+    showToast('Fail Order Error', err.message, 'danger');
+    if (btn) btn.disabled = false;
+  }
+}
+
+function buildHappyDispatchHtml(order) {
+  const terminal = ['delivered', 'cancelled', 'no_drivers_available', 'delivery_failed'].includes(order.status);
+  const rescue = typeof order.rescue_courier === 'string'
+    ? (() => { try { return JSON.parse(order.rescue_courier); } catch { return null; } })()
+    : order.rescue_courier;
+
+  const callPills = [
+    order.customer_phone ? `<a class="od-call-pill primary" href="tel:${escHtml(order.customer_phone)}">📞 Call Customer (${escHtml(order.customer_phone)})</a>` : '',
+    (rescue?.phone || order.driver_phone) ? `<a class="od-call-pill primary" href="tel:${escHtml(rescue?.phone || order.driver_phone)}">📞 Call ${rescue ? 'Rescue Courier' : 'Driver'} (${escHtml(rescue?.phone || order.driver_phone)})</a>` : '',
+    order.restaurant_phone ? `<a class="od-call-pill" href="tel:${escHtml(order.restaurant_phone)}">📞 Call Restaurant (${escHtml(order.restaurant_phone)})</a>` : '',
+  ].filter(Boolean).join('');
+
+  if (terminal) {
+    return callPills
+      ? `<div class="od-dispatch-panel"><div class="od-dispatch-header"><strong>📞 Quick Contacts</strong></div><div class="od-call-strip">${callPills}</div></div>`
+      : '';
+  }
+
+  const canPrePickupReassign = ['accepted_by_driver', 'order_ready'].includes(order.status) && !order.picked_up_at && Boolean(order.driver_id);
+  const isPostPickup = ['picked_up', 'on_the_way', 'arrived'].includes(order.status);
+
+  let bodyHtml = '';
+
+  if (canPrePickupReassign) {
+    bodyHtml += `
+      <div class="od-dispatch-section">
+        <div style="font-weight:700;font-size:0.86rem;color:#1e40af;">🔄 Reassign Driver (Allowed Before Pickup Only)</div>
+        <div style="font-size:0.78rem;color:hsl(var(--muted-foreground));">Driver has not collected the food yet. Reassigning immediately updates the restaurant and customer with the new driver details.</div>
+        <input type="text" id="dispatchReassignReason" placeholder="Reason (e.g. Driver bike breakdown / running late)" style="padding:0.45rem 0.65rem;border:1px solid hsl(var(--border));border-radius:6px;font-size:0.82rem;">
+        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;cursor:pointer;">
+          <input type="checkbox" id="dispatchOldDriverOffline"> Set previous driver offline (emergency / unable to work)
+        </label>
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
+          <button class="btn btn-outline btn-sm" onclick="adminReassignToQueue('${order.id}', this)">Re-open to Available Drivers Queue</button>
+          <select id="dispatchDirectDriverSelect" style="flex:1;min-width:210px;padding:0.42rem 0.6rem;border:1px solid hsl(var(--border));border-radius:6px;font-size:0.82rem;">
+            <option value="">Loading available drivers…</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="adminReassignDirect('${order.id}', this)">Assign Selected Driver</button>
+        </div>
+      </div>`;
+  }
+
+  if (isPostPickup) {
+    bodyHtml += `
+      <div class="od-dispatch-section" style="border-color:#a7f3d0;background:#f0fdf4;">
+        <div style="font-weight:700;font-size:0.86rem;color:#065f46;">🛡️ Post-Pickup Rescue Delivery (Order Already Collected — Public Queue Reassign Locked)</div>
+        <div style="font-size:0.78rem;color:#047857;">If the driver had an accident or cannot finish delivering after pickup, Happy can take over personally OR call a trusted special driver (Happy pays them directly; failed app driver is NOT paid).</div>
+        <input type="text" id="rescueNotes" placeholder="Emergency / handoff note (visible in audit trail)" style="padding:0.45rem 0.65rem;border:1px solid #a7f3d0;border-radius:6px;font-size:0.82rem;">
+        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;cursor:pointer;">
+          <input type="checkbox" id="rescueOldDriverOffline" checked> Take incapacitated driver offline
+        </label>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+          <button class="btn btn-success btn-sm" onclick="adminDispatchRescue('${order.id}', 'admin_self', this)">🚗 Happy Will Fetch &amp; Deliver Himself</button>
+        </div>
+        <div style="border-top:1px dashed #a7f3d0;padding-top:0.55rem;margin-top:0.15rem;">
+          <div style="font-size:0.78rem;font-weight:700;color:#065f46;margin-bottom:0.35rem;">Or Dispatch Trusted Special Driver (Paid by Happy Himself):</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.4rem;margin-bottom:0.45rem;">
+            <input type="text" id="rescueCourierName" value="${escHtml(rescue?.mode === 'special_driver' ? rescue.name : '')}" placeholder="Special driver name *" style="padding:0.4rem 0.55rem;border:1px solid #a7f3d0;border-radius:6px;font-size:0.8rem;">
+            <input type="tel" id="rescueCourierPhone" value="${escHtml(rescue?.mode === 'special_driver' ? rescue.phone : '')}" placeholder="Phone number *" style="padding:0.4rem 0.55rem;border:1px solid #a7f3d0;border-radius:6px;font-size:0.8rem;">
+            <input type="text" id="rescueCourierVehicle" value="${escHtml(rescue?.mode === 'special_driver' ? (rescue.vehicle || '') : '')}" placeholder="Vehicle (optional)" style="padding:0.4rem 0.55rem;border:1px solid #a7f3d0;border-radius:6px;font-size:0.8rem;">
+            <input type="text" id="rescueCourierPlate" value="${escHtml(rescue?.mode === 'special_driver' ? (rescue.plate || '') : '')}" placeholder="Reg / plate (optional)" style="padding:0.4rem 0.55rem;border:1px solid #a7f3d0;border-radius:6px;font-size:0.8rem;">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="adminDispatchRescue('${order.id}', 'special_driver', this)">Assign Trusted Special Driver</button>
+        </div>
+        ${rescue ? `
+          <div style="border-top:1px solid #6ee7b7;padding-top:0.55rem;margin-top:0.2rem;display:flex;flex-wrap:wrap;gap:0.45rem;align-items:center;">
+            <input type="text" id="rescueVerifyCode" placeholder="Customer 6-char code" style="width:165px;padding:0.4rem 0.55rem;border:1px solid #6ee7b7;border-radius:6px;font-size:0.82rem;text-transform:uppercase;">
+            <button class="btn btn-success btn-sm" onclick="adminCompleteRescue('${order.id}', false, this)">Verify Code &amp; Complete</button>
+            <button class="btn btn-outline btn-sm" onclick="adminCompleteRescue('${order.id}', true, this)">Confirm Delivered (Admin Override)</button>
+          </div>` : ''}
+      </div>
+
+      <div class="od-dispatch-section" style="border-color:#fecaca;background:#fef2f2;">
+        <div style="font-weight:700;font-size:0.86rem;color:#991b1b;">⛔ Customer Unreachable After Arrival — Fail Order (Customer Forfeits Money)</div>
+        <div style="font-size:0.78rem;color:#b91c1c;">Use this if the driver arrived and neither the driver nor Happy can reach the customer. <strong>No refund</strong> is sent to customer, and the driver IS credited for delivering.</div>
+        <div style="display:flex;gap:0.45rem;flex-wrap:wrap;align-items:center;">
+          <input type="text" id="failForfeitReason" value="Customer did not answer calls/door after arrival — payment forfeited" style="flex:1;min-width:200px;padding:0.42rem 0.6rem;border:1px solid #fca5a5;border-radius:6px;font-size:0.8rem;">
+          <button class="btn btn-danger btn-sm" onclick="adminFailCustomerForfeit('${order.id}', this)">Fail Order &amp; Forfeit Customer Payment</button>
+        </div>
+      </div>`;
+  }
+
+  bodyHtml += `
+    <div class="od-dispatch-section">
+      <div style="font-weight:700;font-size:0.84rem;color:#475569;">💸 Cancel Whole Order &amp; Refund Customer</div>
+      <div style="display:flex;gap:0.45rem;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="adminCancelReason" placeholder="Reason for cancelling & refunding customer…" style="flex:1;min-width:200px;padding:0.42rem 0.6rem;border:1px solid hsl(var(--border));border-radius:6px;font-size:0.8rem;">
+        <button class="btn btn-outline btn-sm" style="color:#dc2626;border-color:#fca5a5;" onclick="adminCancelAndRefund('${order.id}', this)">Cancel Order &amp; Refund Customer</button>
+      </div>
+    </div>`;
+
+  return `
+    <div class="od-dispatch-panel">
+      <div class="od-dispatch-header">
+        <strong style="font-size:0.88rem;">🛡️ Happy Dispatch Controls</strong>
+        <div class="od-call-strip">${callPills}</div>
+      </div>
+      ${bodyHtml}
+    </div>`;
 }
 
 function renderOrderModal(order, items) {
@@ -968,16 +1282,25 @@ function renderOrderModal(order, items) {
        </div>`
     : '';
 
+  const dispatchBanner = buildHappyDispatchHtml(order);
+  const combinedBanner = [pendingBanner, dispatchBanner].filter(Boolean).join('');
+
   document.getElementById('orderModalBody').innerHTML = OrderDetails.renderOrderDetailContent(order, items || [], {
     apiBase: API,
     showRestaurant: true,
+    showSupportCall: false,
+    supportPhone: window.SUPPORT_PHONE || '',
     statusText: fmtStatus(order.status, order.payment_status),
     statusBadgeClass: statusClass,
     paymentText: fmtPayStatus(order.payment_status),
     paymentBadgeClass: payClass,
     paymentMethodText: fmtPayMethod(order.payment_method),
-    actionsBannerHtml: pendingBanner,
+    actionsBannerHtml: combinedBanner,
   });
+
+  if (document.getElementById('dispatchDirectDriverSelect')) {
+    loadReassignCandidates('dispatchDirectDriverSelect', order.driver_id);
+  }
 }
 
 // ── Filters ───────────────────────────────────────────────────────────
@@ -1011,6 +1334,7 @@ function openModal(id) {
 function closeModal(id) {
   document.getElementById(id).classList.remove('active');
   document.body.style.overflow = '';
+  if (id === 'orderModal') window.currentOpenOrderId = null;
 }
 
 function showToast(title, description, type = 'info') {
@@ -1098,6 +1422,7 @@ const STATUS_LABELS = {
   delivered:              'Delivered',
   cancelled:              'Rejected / Cancelled',
   no_drivers_available:   'No Drivers',
+  delivery_failed:        'Failed (Forfeited)',
 };
 function fmtStatus(s, paymentStatus) {
   if (s === 'ordering_at_restaurant') {

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   getDeliveryQuote,
+  getSupportContact,
   createOrder,
   getOrder,
   getMyOrders,
@@ -9,14 +10,16 @@ const {
   declineOrder,
   updateOrderStatus,
   verifyDeliveryCode,
+  reportCustomerUnreachable,
   getOrderTracking,
   cancelOrder,
   rateOrder
 } = require('../controllers/orderController');
 const { auth, authorize } = require('../middleware/auth');
 
-// Public/customer delivery distance, radial fee & store hours quote
+// Public/customer delivery distance, radial fee & store hours quote + dispatch support phone
 router.post('/delivery-quote', getDeliveryQuote);
+router.get('/support-contact', getSupportContact);
 
 // Customer routes
 router.post('/', auth, authorize('customer'), createOrder);
@@ -29,6 +32,7 @@ router.get('/my', auth, authorize('customer', 'restaurant_manager', 'driver'), g
 // Driver routes
 router.post('/:id/accept', auth, authorize('driver'), acceptOrder);
 router.post('/:id/decline', auth, authorize('driver'), declineOrder);
+router.post('/:id/report-customer-unreachable', auth, authorize('driver'), reportCustomerUnreachable);
 
 // Status update - accessible by drivers and managers
 router.patch('/:id/status', auth, authorize('driver', 'restaurant_manager'), updateOrderStatus);

@@ -300,6 +300,11 @@
           <span class="dot-green"></span>
           <span id="socketStateText">Live Updates Active</span>
         </span>
+        <% if (supportContact && supportContact.support_phone) { %>
+          <a href="tel:<%= supportContact.support_phone %>" class="btn btn-outline btn-sm" style="background:#fffbeb;border-color:#fcd34d;color:#92400e;font-weight:700;" title="Call Happy Dispatch Support if driver is delayed">
+            🛡️ Happy Dispatch: <%= supportContact.support_phone %>
+          </a>
+        <% } %>
       </div>
       <div class="topbar-right">
         <a href="/restaurant/logout" class="btn btn-outline btn-sm">Log out</a>
@@ -425,6 +430,7 @@
               <option value="arrived">Arrived at Customer</option>
               <option value="delivered">Delivered</option>
               <option value="cancelled">Cancelled</option>
+              <option value="delivery_failed">Failed (Customer Forfeited)</option>
             </select>
           </div>
           <div style="flex:1;min-width:160px;">
@@ -637,6 +643,8 @@
   const RESTAURANT_ID = "<%= restaurant.id %>";
   const MANAGER_ID = "<%= manager.id %>";
   const RESTAURANT_IDS = <%- JSON.stringify(restaurants.map(r => r.id)) %>;
+  const SUPPORT_PHONE = <%- JSON.stringify((supportContact && supportContact.support_phone) || '') %>;
+  const SUPPORT_NAME = <%- JSON.stringify((supportContact && supportContact.support_name) || 'Happy Deliveries Dispatch') %>;
   let currentOrderIdOpen = null;
   let currentOrderPage = 1;
   let currentKitchenFilter = 'all';
@@ -653,6 +661,7 @@
     delivered: 'badge-green',
     cancelled: 'badge-red',
     no_drivers_available: 'badge-red',
+    delivery_failed: 'badge-red',
   };
 
   function esc(val) {
@@ -680,6 +689,7 @@
       delivered: 'Delivered',
       cancelled: 'Cancelled',
       no_drivers_available: 'No Drivers Available',
+      delivery_failed: 'Delivery Failed (Forfeited)',
     };
     return labels[st] || st;
   }
@@ -742,20 +752,33 @@
   }
 
   function renderDriverSummaryCell(o) {
+    const rescueInfo = typeof o.rescue_courier === 'string'
+      ? (() => { try { return JSON.parse(o.rescue_courier); } catch { return null; } })()
+      : o.rescue_courier;
+    if (rescueInfo?.name) {
+      return `
+        <div>
+          <div style="font-weight:600;color:#047857;">🛡️ ${esc(rescueInfo.name)}</div>
+          <div style="font-size:0.74rem;color:#065f46;">${esc(rescueInfo.courier_type_label || 'Happy Dispatch Rescue')}</div>
+          ${rescueInfo.phone ? `<div style="font-size:0.75rem;"><a href="tel:${esc(rescueInfo.phone)}" style="color:#047857;font-weight:600;">📞 ${esc(rescueInfo.phone)}</a></div>` : ''}
+        </div>
+      `;
+    }
     if (o.driver_name) {
       const veh = [o.driver_vehicle_color, o.driver_vehicle_model || o.driver_vehicle_type].filter(Boolean).join(' ');
       return `
         <div>
           <div style="font-weight:600;color:#1e40af;">🚗 ${esc(o.driver_name)}</div>
-          <div style="font-size:0.75rem;color:hsl(var(--muted-foreground));">${esc(o.driver_phone || '')}</div>
+          ${o.reassigned_at ? `<div style="font-size:0.7rem;color:#2563eb;font-weight:700;">REASSIGNED DRIVER</div>` : ''}
+          <div style="font-size:0.75rem;color:hsl(var(--muted-foreground));">${o.driver_phone ? `<a href="tel:${esc(o.driver_phone)}" style="color:#1d4ed8;">📞 ${esc(o.driver_phone)}</a>` : ''}</div>
           ${veh || o.driver_vehicle_plate ? `<div style="font-size:0.74rem;color:#475569;">${esc(veh)} ${o.driver_vehicle_plate ? '· <strong>' + esc(o.driver_vehicle_plate) + '</strong>' : ''}</div>` : ''}
         </div>
       `;
     }
     if (o.status === 'pending') return '<span style="font-size:0.76rem;color:hsl(var(--muted-foreground));">Approve order first</span>';
     if (o.payment_status !== 'completed' && o.status === 'ordering_at_restaurant') return '<span style="font-size:0.76rem;color:hsl(var(--muted-foreground));">Waiting customer payment</span>';
-    if (o.status === 'cancelled' || o.status === 'no_drivers_available') return '<span style="font-size:0.76rem;color:#991b1b;">Unassigned</span>';
-    return '<span class="badge badge-gray">Searching for driver...</span>';
+    if (['cancelled', 'no_drivers_available', 'delivery_failed'].includes(o.status)) return '<span style="font-size:0.76rem;color:#991b1b;">Unassigned</span>';
+    return `<span class="badge badge-gray">${o.reassigned_at ? '🔄 Finding new driver…' : 'Searching for driver...'}</span>${SUPPORT_PHONE ? `<div style="margin-top:4px;"><a href="tel:${esc(SUPPORT_PHONE)}" style="font-size:0.72rem;color:#92400e;font-weight:600;">📞 Call Happy</a></div>` : ''}`;
   }
 
   function renderOrderActionButtons(o) {
@@ -883,12 +906,34 @@
               ${itemsHtml}
             </div>
 
-            ${o.driver_name ? `
-              <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:0.55rem 0.75rem;font-size:0.79rem;">
-                <strong>🚗 Driver:</strong> ${esc(o.driver_name)} ${o.driver_vehicle_plate ? `(${esc(o.driver_vehicle_plate)})` : ''}
-                ${o.driver_phone ? ` · <a href="tel:${esc(o.driver_phone)}" style="color:#1d4ed8;font-weight:700;">${esc(o.driver_phone)}</a>` : ''}
-              </div>
-            ` : ''}
+            ${(() => {
+              const rescue = typeof o.rescue_courier === 'string'
+                ? (() => { try { return JSON.parse(o.rescue_courier); } catch { return null; } })()
+                : o.rescue_courier;
+              if (rescue?.name) {
+                return `
+                  <div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:0.55rem 0.75rem;font-size:0.79rem;">
+                    <strong>🛡️ Rescue Courier:</strong> ${esc(rescue.name)} ${rescue.plate ? `(${esc(rescue.plate)})` : ''}
+                    ${rescue.phone ? ` · <a href="tel:${esc(rescue.phone)}" style="color:#047857;font-weight:700;">📞 ${esc(rescue.phone)}</a>` : ''}
+                  </div>`;
+              }
+              if (o.driver_name) {
+                return `
+                  <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:0.55rem 0.75rem;font-size:0.79rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:0.35rem;align-items:center;">
+                    <span>
+                      <strong>🚗 Driver:</strong> ${esc(o.driver_name)} ${o.driver_vehicle_plate ? `(${esc(o.driver_vehicle_plate)})` : ''}
+                      ${o.driver_phone ? ` · <a href="tel:${esc(o.driver_phone)}" style="color:#1d4ed8;font-weight:700;">📞 ${esc(o.driver_phone)}</a>` : ''}
+                    </span>
+                    ${SUPPORT_PHONE ? `<a href="tel:${esc(SUPPORT_PHONE)}" style="color:#92400e;font-weight:700;font-size:0.75rem;">🛡️ Call Happy</a>` : ''}
+                  </div>`;
+              }
+              return SUPPORT_PHONE && o.payment_status === 'completed'
+                ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:0.45rem 0.75rem;font-size:0.77rem;display:flex;justify-content:space-between;align-items:center;">
+                     <span style="color:#92400e;">${o.reassigned_at ? '🔄 Dispatch reassigning driver…' : 'Searching for driver…'}</span>
+                     <a href="tel:${esc(SUPPORT_PHONE)}" style="color:#92400e;font-weight:700;">📞 Call Happy</a>
+                   </div>`
+                : '';
+            })()}
           </div>
 
           <div class="kitchen-ticket-footer">
@@ -1033,6 +1078,7 @@
       document.getElementById('orderModalBody').innerHTML = OrderDetails.renderOrderDetailContent(o, items, {
         apiBase: '/restaurant/api',
         showRestaurant: false,
+        supportPhone: SUPPORT_PHONE || o.support_phone || '',
         statusText: fmtStatus(o.status, o.payment_status),
         statusBadgeClass: STATUS_BADGE_MAP[o.status] || 'badge-gray',
         paymentText: o.payment_status === 'completed' ? 'Paid' : (o.payment_status || 'Pending'),
@@ -1236,6 +1282,13 @@
       });
       socket.on('driver_assigned', (payload) => {
         showToast('🚗 Driver Accepted Order', `A driver accepted Order #${payload?.order_number || ''}!`);
+        refreshPortal();
+        loadKitchenOrders();
+        loadOrders(currentOrderPage);
+        if (currentOrderIdOpen && currentOrderIdOpen === payload?.order_id) openOrderModal(currentOrderIdOpen);
+      });
+      socket.on('driver_reassigned', (payload) => {
+        showToast('🔄 Driver Updated', `Dispatch updated driver assignment on Order #${payload?.order_number || ''}.`);
         refreshPortal();
         loadKitchenOrders();
         loadOrders(currentOrderPage);

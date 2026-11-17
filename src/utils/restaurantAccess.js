@@ -2,6 +2,7 @@
 
 const db = require('../config/database');
 const Restaurant = require('../models/Restaurant');
+const Order = require('../models/Order');
 
 /**
  * Shared ownership & query helpers for Happy Platform Admin and Restaurant Partner portals.
@@ -102,6 +103,7 @@ async function fetchPaginatedOrders(restaurantIds, { status, date, page = 1, lim
   if (!Array.isArray(restaurantIds) || restaurantIds.length === 0) {
     return { orders: [], total: 0, currentPage: 1, totalPages: 0 };
   }
+  await Order.ensureInterventionSchema();
 
   const safePage = Math.max(parseInt(page, 10) || 1, 1);
   const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 15, 1), 100);
@@ -160,6 +162,8 @@ async function fetchPaginatedOrders(restaurantIds, { status, date, page = 1, lim
       o.special_instructions, o.delivery_instructions,
       o.placed_at, o.restaurant_notified_at, o.accepted_at, o.ready_for_pickup_at,
       o.picked_up_at, o.delivered_at, o.cancelled_at,
+      o.original_driver_id, o.reassigned_at, o.rescue_courier, o.rescue_payout_mode,
+      o.failure_reason, o.forfeited, o.intervention_notes, o.intervention_updated_at,
       o.delivery_address, o.restaurant_id, o.driver_id,
       r.name AS restaurant_name,
       COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), 'Unknown Customer') AS customer_name,
@@ -212,6 +216,7 @@ async function fetchPaginatedOrders(restaurantIds, { status, date, page = 1, lim
 async function fetchOrderDetail(orderId, managerProfile) {
   if (!orderId || !managerProfile) return null;
   await Restaurant.ensureApplicationColumns();
+  await Order.ensureInterventionSchema();
 
   const isAdmin = Restaurant.isPlatformAdmin(managerProfile);
   const params = [orderId];
@@ -237,7 +242,27 @@ async function fetchOrderDetail(orderId, managerProfile) {
       d.vehicle_model AS driver_vehicle_model,
       d.vehicle_color AS driver_vehicle_color,
       d.vehicle_registration AS driver_vehicle_plate,
-      d.average_rating AS driver_rating
+      d.average_rating AS driver_rating,
+      COALESCE(
+        (SELECT json_agg(row_to_json(inc) ORDER BY inc.created_at DESC)
+         FROM (
+           SELECT
+             oi.id,
+             oi.incident_type,
+             oi.summary,
+             oi.metadata,
+             oi.created_at,
+             oi.previous_driver_id,
+             oi.new_driver_id,
+             CONCAT_WS(' ', au.first_name, au.last_name) AS actor_name
+           FROM order_incidents oi
+           LEFT JOIN users au ON oi.actor_user_id = au.id
+           WHERE oi.order_id = o.id
+           ORDER BY oi.created_at DESC
+           LIMIT 25
+         ) inc),
+        '[]'::json
+      ) AS incidents
     FROM orders o
     JOIN restaurants r ON o.restaurant_id = r.id
     LEFT JOIN customers c ON o.customer_id = c.id
@@ -253,6 +278,15 @@ async function fetchOrderDetail(orderId, managerProfile) {
   delete order.verification_code;
   delete order.code_expires_at;
   delete order.code_used_at;
+
+  try {
+    const support = await Order.getSupportContact();
+    order.support_phone = support.support_phone;
+    order.support_name = support.support_name;
+  } catch {
+    order.support_phone = process.env.SUPPORT_PHONE || null;
+    order.support_name = 'Happy Deliveries Dispatch';
+  }
 
   const { rows: items } = await db.query(`
     SELECT

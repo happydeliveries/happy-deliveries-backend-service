@@ -114,11 +114,27 @@ class ManagerDashboard {
                 : (order.status || payload?.status || 'updated');
             this.showNotification(`Order #${order.order_number || order.orderId || order.id || ''} is now ${String(statusLabel).replace(/_/g, ' ')}`, 'info');
             this.debouncedLiveRefresh();
+            if (typeof window.reloadOpenOrderModal === 'function') window.reloadOpenOrderModal(order?.id || payload?.orderId);
         });
 
         this.socket.on('driver_assigned', (payload) => {
             this.showNotification(`Driver assigned to order #${payload?.order_number || payload?.order_id || ''}`, 'info');
             this.debouncedLiveRefresh();
+            if (typeof window.reloadOpenOrderModal === 'function') window.reloadOpenOrderModal(payload?.order_id);
+        });
+
+        this.socket.on('driver_reassigned', (payload) => {
+            this.showNotification(`Driver updated on order #${payload?.order_number || payload?.order_id || ''}`, 'info');
+            this.debouncedLiveRefresh();
+            if (typeof window.reloadOpenOrderModal === 'function') window.reloadOpenOrderModal(payload?.order_id);
+        });
+
+        this.socket.on('customer_unreachable_alert', (payload) => {
+            const ord = payload?.order_number || payload?.order_id || '';
+            const msg = `🚨 URGENT: Driver ${payload?.driver_name || ''} cannot reach customer ${payload?.customer_name || ''} (${payload?.customer_phone || 'No phone'}) for Order #${ord}!`;
+            this.showNotification(msg, 'warning');
+            this.debouncedLiveRefresh();
+            if (typeof window.reloadOpenOrderModal === 'function') window.reloadOpenOrderModal(payload?.order_id);
         });
 
         this.socket.on('order_expired', (payload) => {

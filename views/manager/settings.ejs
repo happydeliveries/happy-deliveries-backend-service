@@ -379,6 +379,10 @@
                 <label class="form-label">Email</label>
                 <input type="email" id="email" value="<%= manager.email || '' %>" required>
               </div>
+              <div class="form-group" style="margin-bottom: 1rem;">
+                <label class="form-label">Personal Phone Number</label>
+                <input type="tel" id="phoneNumber" value="<%= manager.phone_number || '' %>" placeholder="e.g. +27 82 123 4567">
+              </div>
               <div class="form-group" style="margin-bottom: 1.5rem;">
                 <label class="form-label">Role</label>
                 <input type="text" value="Restaurant Manager" disabled style="opacity:0.6; cursor:not-allowed;">
@@ -390,6 +394,28 @@
       </div>
 
       <!-- Security Section -->
+      <div class="card" style="margin-top: 1.5rem;">
+        <div class="card-header">
+          <h3 class="card-title">Happy Dispatch Hotline (Customer, Driver &amp; Restaurant Escalation)</h3>
+          <p class="card-description">Shown in the Customer App, Driver App, and Restaurant Partner Portal so anyone can call Happy directly during late orders, emergencies, or unreachable customers.</p>
+        </div>
+        <div class="card-content">
+          <form id="supportForm" onsubmit="saveDispatchSupport(event)">
+            <div class="form-row" style="margin-bottom: 1rem;">
+              <div class="form-group">
+                <label class="form-label">Dispatch Support Phone *</label>
+                <input type="tel" id="supportPhone" value="<%= (supportContact && supportContact.support_phone) || '' %>" placeholder="e.g. +27 82 123 4567" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Display Name</label>
+                <input type="text" id="supportName" value="<%= (supportContact && supportContact.support_name) || 'Happy Deliveries Dispatch' %>" placeholder="Happy Deliveries Dispatch">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary" id="supportBtn">Save Dispatch Hotline</button>
+          </form>
+        </div>
+      </div>
+
       <div class="settings-section" id="settings-security">
         <div class="card" style="margin-bottom: 1.5rem;">
           <div class="card-header">
@@ -592,7 +618,8 @@ async function saveProfile(e) {
   const payload = {
     first_name: document.getElementById('firstName').value.trim(),
     last_name:  document.getElementById('lastName').value.trim(),
-    email:      document.getElementById('email').value.trim().toLowerCase(),
+    email:        document.getElementById('email').value.trim().toLowerCase(),
+    phone_number: document.getElementById('phoneNumber')?.value.trim() || '',
   };
 
   try {
@@ -620,6 +647,33 @@ async function saveProfile(e) {
     showToast('Profile updated', 'Your profile has been saved successfully.', 'success');
   } catch (err) {
     console.error('[saveProfile]', err);
+    showToast('Error', err.message, 'danger');
+  } finally {
+    btn.classList.remove('btn-loading');
+  }
+}
+
+// ── Save Dispatch Hotline ───────────────────────────────────────────────
+async function saveDispatchSupport(e) {
+  e.preventDefault();
+  const btn = document.getElementById('supportBtn');
+  btn.classList.add('btn-loading');
+  const payload = {
+    support_phone: document.getElementById('supportPhone').value.trim(),
+    support_name:  document.getElementById('supportName').value.trim() || 'Happy Deliveries Dispatch',
+  };
+  try {
+    const res = await fetch(`${API}/settings/support`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to save dispatch hotline');
+    showToast('Hotline updated', 'Customer, Driver, and Restaurant apps will now show this number.', 'success');
+  } catch (err) {
+    console.error('[saveDispatchSupport]', err);
     showToast('Error', err.message, 'danger');
   } finally {
     btn.classList.remove('btn-loading');

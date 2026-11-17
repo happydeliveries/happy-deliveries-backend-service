@@ -356,6 +356,10 @@ function renderPortalSection(section) {
 
       const activeId = req.query.restaurantId;
       const selectedRestaurant = ctx.restaurants.find((r) => r.id === activeId) || ctx.restaurants[0];
+      const supportContact = await Order.getSupportContact().catch(() => ({
+        support_phone: process.env.SUPPORT_PHONE || null,
+        support_name: 'Happy Deliveries Dispatch',
+      }));
 
       res.render('restaurant/portal', {
         title: `${selectedRestaurant.name} · Restaurant Partner Portal`,
@@ -364,6 +368,7 @@ function renderPortalSection(section) {
         manager: ctx.manager,
         restaurants: ctx.restaurants,
         restaurant: selectedRestaurant,
+        supportContact,
       });
     } catch (err) {
       console.error(`[GET /restaurant/${section}]`, err);

@@ -659,9 +659,13 @@ router.get('/orders', isLoggedIn, async (req, res) => {
         if (!manager) { req.session.destroy(); return res.redirect('/manager/login'); }
 
         const restaurants = await fetchRestaurants(manager.id);
+        const supportContact = await getModel.Order().getSupportContact().catch(() => ({
+            support_phone: process.env.SUPPORT_PHONE || null,
+            support_name: 'Happy Deliveries Dispatch',
+        }));
         res.render('manager/orders', {
             title: 'Order Management', currentPage: 'orders',
-            manager: req.session.user, restaurants,
+            manager: req.session.user, restaurants, supportContact,
         });
     } catch (err) {
         console.error('[GET /manager/orders]', err);
@@ -694,9 +698,20 @@ router.get('/settings', isLoggedIn, async (req, res) => {
         const manager = await resolveManager(req);
         if (!manager) { req.session.destroy(); return res.redirect('/manager/login'); }
 
+        const User = getModel.User();
+        const fullUser = await User.findById(req.session.user.id).catch(() => null);
+        if (fullUser && req.session.user) {
+            req.session.user.phone_number = fullUser.phone_number || req.session.user.phone_number || '';
+        }
+        const supportContact = await getModel.Order().getSupportContact().catch(() => ({
+            support_phone: process.env.SUPPORT_PHONE || '',
+            support_name: 'Happy Deliveries Dispatch',
+        }));
+
         res.render('manager/settings', {
             title: 'Settings', currentPage: 'settings',
             manager: req.session.user,
+            supportContact,
         });
     } catch (err) {
         console.error('[GET /manager/settings]', err);
@@ -1732,6 +1747,159 @@ router.get('/api/orders/:id', isLoggedInApi, async (req, res) => {
     }
 });
 
+/** GET /manager/api/drivers/reassign-candidates — approved active drivers for Happy admin reassignment */
+router.get('/api/drivers/reassign-candidates', isLoggedInApi, async (req, res) => {
+    try {
+        const manager = await resolveManager(req);
+        if (!manager || !getModel.Restaurant().isPlatformAdmin(manager)) {
+            return res.status(403).json({ success: false, error: 'Platform admin access required' });
+        }
+        const drivers = await getModel.Order().getReassignDriverCandidates();
+        res.json({ success: true, drivers });
+    } catch (err) {
+        console.error('[API GET drivers/reassign-candidates]', err);
+        res.status(500).json({ success: false, error: 'Failed to load driver candidates' });
+    }
+});
+
+/** POST /manager/api/orders/:id/reassign-driver — reassign before pickup ONLY */
+router.post('/api/orders/:id/reassign-driver', isLoggedInApi, async (req, res) => {
+    try {
+        const manager = await resolveManager(req);
+        if (!manager || !getModel.Restaurant().isPlatformAdmin(manager)) {
+            return res.status(403).json({ success: false, error: 'Platform admin access required' });
+        }
+        const { mode, new_driver_id, reason, old_driver_action } = req.body || {};
+        const order = await getModel.Order().reassignBeforePickup(req.params.id, req.session.user.id, {
+            mode: mode || 'queue',
+            newDriverId: new_driver_id || null,
+            reason: reason || '',
+            oldDriverAction: old_driver_action || 'available',
+        });
+        res.json({
+            success: true,
+            message: mode === 'direct'
+                ? 'Order reassigned to the selected driver. Restaurant and customer updated.'
+                : 'Order returned to available drivers queue. Restaurant and customer updated.',
+            order,
+        });
+    } catch (err) {
+        console.error('[API POST orders/:id/reassign-driver]', err);
+        res.status(err.statusCode || 400).json({ success: false, error: err.message });
+    }
+});
+
+/** POST /manager/api/orders/:id/rescue-dispatch — assign special trusted driver or Happy self-delivery AFTER pickup */
+router.post('/api/orders/:id/rescue-dispatch', isLoggedInApi, async (req, res) => {
+    try {
+        const manager = await resolveManager(req);
+        if (!manager || !getModel.Restaurant().isPlatformAdmin(manager)) {
+            return res.status(403).json({ success: false, error: 'Platform admin access required' });
+        }
+        const {
+            rescue_mode,
+            courier_name,
+            courier_phone,
+            courier_vehicle,
+            courier_plate,
+            notes,
+            old_driver_action,
+        } = req.body || {};
+        const order = await getModel.Order().assignPostPickupRescue(req.params.id, req.session.user.id, {
+            rescueMode: rescue_mode || 'special_driver',
+            courierName: courier_name || '',
+            courierPhone: courier_phone || '',
+            courierVehicle: courier_vehicle || '',
+            courierPlate: courier_plate || '',
+            notes: notes || '',
+            oldDriverAction: old_driver_action || 'offline',
+        });
+        res.json({
+            success: true,
+            message: rescue_mode === 'admin_self'
+                ? 'Marked for Happy owner rescue delivery. Customer and restaurant notified.'
+                : 'Trusted special driver dispatched. Customer and restaurant updated.',
+            order,
+        });
+    } catch (err) {
+        console.error('[API POST orders/:id/rescue-dispatch]', err);
+        res.status(err.statusCode || 400).json({ success: false, error: err.message });
+    }
+});
+
+/** POST /manager/api/orders/:id/rescue-complete — complete rescue delivery without paying original driver */
+router.post('/api/orders/:id/rescue-complete', isLoggedInApi, async (req, res) => {
+    try {
+        const manager = await resolveManager(req);
+        if (!manager || !getModel.Restaurant().isPlatformAdmin(manager)) {
+            return res.status(403).json({ success: false, error: 'Platform admin access required' });
+        }
+        const { verification_code, bypass_code, notes } = req.body || {};
+        const order = await getModel.Order().completeRescueDelivery(req.params.id, req.session.user.id, {
+            verificationCode: verification_code || '',
+            bypassCode: Boolean(bypass_code),
+            notes: notes || '',
+        });
+        res.json({
+            success: true,
+            message: 'Rescue delivery marked completed!',
+            order,
+        });
+    } catch (err) {
+        console.error('[API POST orders/:id/rescue-complete]', err);
+        res.status(err.statusCode || 400).json({ success: false, error: err.message });
+    }
+});
+
+/** POST /manager/api/orders/:id/cancel-refund — admin cancel order (even post-pickup) & refund customer */
+router.post('/api/orders/:id/cancel-refund', isLoggedInApi, async (req, res) => {
+    try {
+        const manager = await resolveManager(req);
+        if (!manager || !getModel.Restaurant().isPlatformAdmin(manager)) {
+            return res.status(403).json({ success: false, error: 'Platform admin access required' });
+        }
+        const { reason, driver_action } = req.body || {};
+        const { order, refundError } = await getModel.Order().adminCancelAndRefund(req.params.id, req.session.user.id, {
+            reason: reason || '',
+            driverAction: driver_action || 'available',
+        });
+        res.json({
+            success: true,
+            message: refundError
+                ? `Order cancelled, but automatic refund reported an issue: ${refundError}`
+                : 'Order cancelled and customer payment refunded.',
+            refundError,
+            order,
+        });
+    } catch (err) {
+        console.error('[API POST orders/:id/cancel-refund]', err);
+        res.status(err.statusCode || 400).json({ success: false, error: err.message });
+    }
+});
+
+/** POST /manager/api/orders/:id/fail-forfeit — mark customer unreachable / failed delivery; customer forfeits money, driver paid */
+router.post('/api/orders/:id/fail-forfeit', isLoggedInApi, async (req, res) => {
+    try {
+        const manager = await resolveManager(req);
+        if (!manager || !getModel.Restaurant().isPlatformAdmin(manager)) {
+            return res.status(403).json({ success: false, error: 'Platform admin access required' });
+        }
+        const { reason, notes } = req.body || {};
+        const order = await getModel.Order().failOrderCustomerForfeit(req.params.id, req.session.user.id, {
+            reason: reason || '',
+            notes: notes || '',
+        });
+        res.json({
+            success: true,
+            message: 'Order marked Delivery Failed (Customer Forfeited Payment). Driver paid and freed for next order.',
+            order,
+        });
+    } catch (err) {
+        console.error('[API POST orders/:id/fail-forfeit]', err);
+        res.status(err.statusCode || 400).json({ success: false, error: err.message });
+    }
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  ANALYTICS API
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1797,16 +1965,17 @@ router.get('/api/analytics/top-items', isLoggedInApi, async (req, res) => {
 //  SETTINGS API
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** PUT /api/manager/settings/profile — update name/email */
+/** PUT /api/manager/settings/profile — update name/email/phone */
 router.put('/api/settings/profile', isLoggedInApi, async (req, res) => {
     try {
-        const { first_name, last_name, email } = req.body;
+        const { first_name, last_name, email, phone_number } = req.body;
         const User = getModel.User();
 
         const updates = {};
         if (first_name?.trim()) updates.first_name = first_name.trim();
         if (last_name?.trim()) updates.last_name = last_name.trim();
         if (email?.trim()) updates.email = email.trim().toLowerCase();
+        if (typeof phone_number === 'string' && phone_number.trim()) updates.phone_number = phone_number.trim();
 
         if (!Object.keys(updates).length) {
             return res.status(400).json({ success: false, error: 'No fields to update' });
@@ -1826,12 +1995,42 @@ router.put('/api/settings/profile', isLoggedInApi, async (req, res) => {
             first_name: updatedUser.first_name,
             last_name: updatedUser.last_name,
             email: updatedUser.email,
+            phone_number: updatedUser.phone_number,
         };
 
         res.json({ success: true, user: updatedUser });
     } catch (err) {
         console.error('[API settings/profile]', err);
         res.status(500).json({ success: false, error: 'Failed to update profile' });
+    }
+});
+
+/** GET / PUT /manager/api/settings/support — Happy Dispatch hotline visible to customers, drivers & restaurants */
+router.get('/api/settings/support', isLoggedInApi, async (req, res) => {
+    try {
+        const contact = await getModel.Order().getSupportContact();
+        res.json({ success: true, support: contact });
+    } catch (err) {
+        console.error('[API GET settings/support]', err);
+        res.status(500).json({ success: false, error: 'Failed to load dispatch support number' });
+    }
+});
+
+router.put('/api/settings/support', isLoggedInApi, async (req, res) => {
+    try {
+        const manager = await resolveManager(req);
+        if (!manager || !getModel.Restaurant().isPlatformAdmin(manager)) {
+            return res.status(403).json({ success: false, error: 'Platform admin access required' });
+        }
+        const { support_phone, support_name } = req.body || {};
+        const contact = await getModel.Order().updateSupportContact(req.session.user.id, {
+            support_phone,
+            support_name,
+        });
+        res.json({ success: true, support: contact });
+    } catch (err) {
+        console.error('[API PUT settings/support]', err);
+        res.status(500).json({ success: false, error: 'Failed to update dispatch support number' });
     }
 });
 

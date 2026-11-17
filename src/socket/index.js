@@ -299,6 +299,12 @@ function emitOrderUpdate(orderId, data) {
   if (safeData.order?.driver_id) {
     driverActiveOrdersCache.delete(String(safeData.order.driver_id));
   }
+  if (safeData.previousDriverId) {
+    driverActiveOrdersCache.delete(String(safeData.previousDriverId));
+  }
+  if (safeData.order?.original_driver_id) {
+    driverActiveOrdersCache.delete(String(safeData.order.original_driver_id));
+  }
 
   const directUserId =
     safeData.customerUserId ||
@@ -362,8 +368,15 @@ function emitDriversEvent(eventName, data) {
   }
 }
 
+function invalidateDriverCache(driverId) {
+  if (driverId) {
+    driverActiveOrdersCache.delete(String(driverId));
+  }
+}
+
 module.exports.emitOrderUpdate = emitOrderUpdate;
 module.exports.emitUserEvent = emitUserEvent;
 module.exports.emitDriverLocation = emitDriverLocation;
 module.exports.emitManagerEvent = emitManagerEvent;
 module.exports.emitDriversEvent = emitDriversEvent;
+module.exports.invalidateDriverCache = invalidateDriverCache;

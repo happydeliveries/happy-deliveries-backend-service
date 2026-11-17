@@ -1065,6 +1065,8 @@
           }
           else if (order.status === 'order_ready') { statusClass = 'badge-green'; statusText = 'Ready'; }
           else if (order.status === 'delivered') { statusClass = 'badge-green'; statusText = 'Delivered'; }
+          else if (order.status === 'delivery_failed') { statusClass = 'badge-red'; statusText = 'Failed (Forfeited)'; }
+          else if (order.status === 'no_drivers_available') { statusClass = 'badge-red'; statusText = 'No Drivers'; }
           else if (order.status === 'cancelled') { statusClass = 'badge-red'; statusText = 'Rejected / Cancelled'; }
           else if (order.status === 'on_the_way') { statusClass = 'badge-yellow'; statusText = 'On the Way'; }
           else if (order.status === 'pending') { statusClass = 'badge-orange'; statusText = 'Pending Approval'; }
@@ -1139,6 +1141,8 @@
           }
           else if (order.status === 'order_ready') { statusClass = 'badge-green'; statusText = 'Ready'; }
           else if (order.status === 'delivered') { statusClass = 'badge-green'; statusText = 'Delivered'; }
+          else if (order.status === 'delivery_failed') { statusClass = 'badge-red'; statusText = 'Failed (Forfeited)'; }
+          else if (order.status === 'no_drivers_available') { statusClass = 'badge-red'; statusText = 'No Drivers'; }
           else if (order.status === 'cancelled') { statusClass = 'badge-red'; statusText = 'Rejected / Cancelled'; }
           else if (order.status === 'on_the_way') { statusClass = 'badge-yellow'; statusText = 'On the Way'; }
           else if (order.status === 'pending') { statusClass = 'badge-orange'; statusText = 'Pending Approval'; }

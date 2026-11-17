@@ -25,7 +25,7 @@ function sanitizeOrderForDriver(order) {
   delete copy.code_expires_at;
   delete copy.code_used_at;
 
-  if (copy.status === 'delivered') {
+  if (copy.status === 'delivered' || copy.status === 'delivery_failed') {
     copy.pricing_hidden = false;
     copy.driver_earnings = computeDriverEarningsFromOrder(copy);
     return copy;
@@ -43,7 +43,7 @@ function sanitizeOrderForDriver(order) {
 
 function sanitizeOrderItemsForDriver(items, orderStatus) {
   if (!Array.isArray(items)) return [];
-  if (orderStatus === 'delivered') return items;
+  if (orderStatus === 'delivered' || orderStatus === 'delivery_failed') return items;
 
   return items.map((item) => {
     const cleanItem = { ...item };
