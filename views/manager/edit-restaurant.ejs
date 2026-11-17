@@ -735,7 +735,7 @@
                   </div>
                   <div class="form-group">
                     <label class="form-label">Phone Number <span style="color: hsl(var(--destructive)); font-size: 0.75rem;">* Required</span></label>
-                    <input type="tel" name="phone_number" pattern="[0-9]{10}" required value="<%= restaurant.phone_number || '' %>" placeholder="10 digits, e.g. 0831234567">
+                    <input type="tel" name="phone_number" required value="<%= restaurant.phone_number || '' %>" placeholder="e.g. +27 83 123 4567 or 0831234567">
                   </div>
                 </div>
 
@@ -826,7 +826,7 @@
                   </div>
                   <div class="form-group">
                     <label class="form-label">Delivery Radius (km)</label>
-                    <input type="number" name="delivery_radius" value="<%= restaurant.delivery_radius_km || 5 %>" min="1" max="20" step="0.5">
+                    <input type="number" name="delivery_radius" value="<%= restaurant.delivery_radius_km || 5 %>" min="1" max="50" step="0.5">
                     <span class="form-hint">Maximum distance for delivery orders</span>
                   </div>
                 </div>
@@ -906,7 +906,7 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                 Delete
               </button>
-              <button type="submit" class="btn btn-primary" onclick="showToast('Saving...', 'Your changes are being saved.')">
+              <button type="submit" class="btn btn-primary" id="saveRestaurantBtn">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                 Save Changes
               </button>
@@ -1056,6 +1056,23 @@
       if (this.value) { img.src = this.value; img.style.display = 'block'; }
       else { img.style.display = 'none'; }
     });
+
+    // Switch to hidden tab if HTML5 validation fails, otherwise show saving toast
+    const editFormEl = document.querySelector('form[action^="/manager/restaurants/edit/"]');
+    if (editFormEl) {
+      editFormEl.addEventListener('invalid', function(e) {
+        const sec = e.target && e.target.closest ? e.target.closest('.settings-section') : null;
+        if (sec && sec.id && sec.id.startsWith('settings-')) {
+          const tabKey = sec.id.replace('settings-', '');
+          document.querySelectorAll('.settings-tab').forEach(t => t.classList.toggle('active', t.dataset.settings === tabKey));
+          document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+          sec.classList.add('active');
+        }
+      }, true);
+      editFormEl.addEventListener('submit', function() {
+        showToast('Saving...', 'Your changes are being saved.');
+      });
+    }
   </script>
 </body>
 </html>

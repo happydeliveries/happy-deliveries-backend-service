@@ -1,7 +1,190 @@
 const db = require('../config/database');
 const { applyAvailabilityToRestaurant } = require('../utils/restaurantHours');
 
+let categoriesSchemaPromise = null;
+
 class Menu {
+  /**
+   * Ensures menu_items.categories (text[]) and its GIN index exist and backfills
+   * legacy single-string category rows idempotently once per process.
+   */
+  static async ensureCategoriesSchema() {
+    if (!categoriesSchemaPromise) {
+      categoriesSchemaPromise = (async () => {
+        try {
+          await db.query(`
+            ALTER TABLE menu_items
+            ADD COLUMN IF NOT EXISTS categories TEXT[] DEFAULT '{}'::text[]
+          `);
+          await db.query(`
+            CREATE INDEX IF NOT EXISTS idx_menu_items_categories
+            ON menu_items USING GIN (categories)
+          `);
+          await db.query(`
+            UPDATE menu_items
+            SET categories = CASE
+              WHEN NULLIF(TRIM(category), '') IS NOT NULL
+                THEN regexp_split_to_array(TRIM(category), '\\s*,\\s*')
+              ELSE ARRAY['General']::text[]
+            END
+            WHERE categories IS NULL OR cardinality(categories) = 0
+          `);
+        } catch (err) {
+          categoriesSchemaPromise = null;
+          throw err;
+        }
+      })();
+    }
+    return categoriesSchemaPromise;
+  }
+
+  /**
+   * Parses categories from array, JSON string, or comma-separated text and
+   * returns deduplicated { categories, category } with legacy primary fallback.
+   */
+  static normalizeCategoriesInput(categoriesInput, categoryInput, { defaultToGeneral = true } = {}) {
+    const parseRaw = (raw) => {
+      if (raw === undefined || raw === null) return [];
+      if (Array.isArray(raw)) return raw;
+      if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        if (!trimmed) return [];
+        if (trimmed.startsWith('[')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) return parsed;
+          } catch (_) {
+            // Fall through to comma split
+          }
+        }
+        return trimmed.split(',');
+      }
+      return [String(raw)];
+    };
+
+    const primaryList = parseRaw(categoriesInput);
+    const fallbackList = parseRaw(categoryInput);
+    const combined = primaryList.length > 0 ? primaryList : fallbackList;
+
+    const seen = new Set();
+    const categories = [];
+    for (const entry of combined) {
+      const clean = String(entry || '').trim();
+      if (!clean) continue;
+      const slug = clean.toLowerCase();
+      if (seen.has(slug)) continue;
+      seen.add(slug);
+      categories.push(clean);
+    }
+
+    if (categories.length === 0 && defaultToGeneral) {
+      categories.push('General');
+    }
+
+    return {
+      categories,
+      category: categories[0] || (defaultToGeneral ? 'General' : ''),
+    };
+  }
+
+  /**
+   * SQL expression yielding a non-empty text[] of categories for a menu_items row,
+   * falling back to splitting legacy menu_items.category if categories[] is empty.
+   */
+  static sqlCategoriesExpr(alias = 'mi', emptyFallback = "ARRAY['General']::text[]") {
+    const prefix = alias ? `${alias}.` : '';
+    return `
+      COALESCE(
+        NULLIF(${prefix}categories, '{}'::text[]),
+        CASE
+          WHEN NULLIF(TRIM(${prefix}category), '') IS NOT NULL
+            THEN regexp_split_to_array(TRIM(${prefix}category), '\\s*,\\s*')
+          ELSE ${emptyFallback}
+        END
+      )
+    `;
+  }
+
+  static formatMenuItem(item) {
+    if (!item) return item;
+    const { categories, category } = Menu.normalizeCategoriesInput(item.categories, item.category);
+    return {
+      ...item,
+      category,
+      categories,
+    };
+  }
+
+  /**
+   * Normalizes partial menu_item updates (jsonb fields, tags[], category/categories sync)
+   * and constructs parameterized SQL SET clauses for single and bulk updates.
+   */
+  static buildUpdateSetClause(rawUpdates, startParamIdx = 2) {
+    const ALLOWED_COLUMNS = new Set([
+      'name',
+      'description',
+      'price',
+      'discounted_price',
+      'image_url',
+      'category',
+      'categories',
+      'tags',
+      'is_available',
+      'is_popular',
+      'ingredients',
+      'customizations',
+      'calories',
+      'preparation_time_minutes',
+      'is_veg',
+    ]);
+
+    const normalized = {};
+    Object.keys(rawUpdates || {}).forEach((key) => {
+      if (ALLOWED_COLUMNS.has(key) && rawUpdates[key] !== undefined) {
+        normalized[key] = rawUpdates[key];
+      }
+    });
+
+    const hasCategories = Object.prototype.hasOwnProperty.call(rawUpdates || {}, 'categories') && rawUpdates.categories !== undefined;
+    const hasCategory = Object.prototype.hasOwnProperty.call(rawUpdates || {}, 'category') && rawUpdates.category !== undefined;
+
+    if (hasCategories || hasCategory) {
+      const { categories, category } = Menu.normalizeCategoriesInput(
+        hasCategories ? rawUpdates.categories : undefined,
+        hasCategory ? rawUpdates.category : undefined
+      );
+      normalized.categories = categories;
+      normalized.category = category;
+    }
+
+    const fields = Object.keys(normalized);
+    const values = Object.values(normalized);
+    const jsonFields = ['ingredients', 'customizations'];
+
+    fields.forEach((field, index) => {
+      if (jsonFields.includes(field)) {
+        if (typeof values[index] !== 'string') {
+          values[index] = JSON.stringify(values[index] ?? []);
+        }
+      } else if (field === 'tags' || field === 'categories') {
+        if (!Array.isArray(values[index])) {
+          values[index] = typeof values[index] === 'string' && values[index].trim()
+            ? values[index].split(',').map(t => t.trim()).filter(Boolean)
+            : [];
+        }
+      }
+    });
+
+    const setClause = fields.map((field, index) => {
+      const pIdx = index + startParamIdx;
+      if (jsonFields.includes(field)) {
+        return `${field} = $${pIdx}::jsonb`;
+      }
+      return `${field} = $${pIdx}`;
+    }).join(', ');
+
+    return { fields, values, setClause };
+  }
 
   // Create menu category 
   static async create(restaurantId, menuData) {
@@ -17,9 +200,11 @@ class Menu {
     return result.rows[0];
   }
 
-  // Get menus by restaurant with nested items (includes customizations, category, is_popular, etc.)
+  // Get menus by restaurant with nested items (includes customizations, category, categories, is_popular, etc.)
   static async findByRestaurant(restaurantId, options = {}) {
+    await Menu.ensureCategoriesSchema();
     const onlyActive = options.onlyActive === true;
+    const catExpr = Menu.sqlCategoriesExpr('mi');
     const query = `
       SELECT 
         m.id, m.restaurant_id, m.name, m.description, m.is_active, m.display_order,
@@ -34,7 +219,8 @@ class Menu {
               'price', mi.price,
               'discounted_price', mi.discounted_price,
               'image_url', mi.image_url,
-              'category', COALESCE(mi.category, 'General'),
+              'category', COALESCE(NULLIF(TRIM(mi.category), ''), (${catExpr})[1], 'General'),
+              'categories', ${catExpr},
               'is_available', mi.is_available,
               'is_veg', COALESCE(mi.is_veg, false),
               'is_popular', COALESCE(mi.is_popular, false),
@@ -59,14 +245,16 @@ class Menu {
     return result.rows;
   }
 
-  // Create menu item (Supports image_url, is_popular, customizations, ingredients, tags)
+  // Create menu item (Supports multi-categories, image_url, is_popular, customizations, ingredients, tags)
   static async createMenuItem(menuId, restaurantId, itemData) {
+    await Menu.ensureCategoriesSchema();
     const {
       name,
       description,
       price,
       discounted_price,
-      category = 'General',
+      category,
+      categories,
       tags = [],
       is_available = true,
       is_veg = false,
@@ -78,6 +266,7 @@ class Menu {
       image_url
     } = itemData;
 
+    const normalizedCat = Menu.normalizeCategoriesInput(categories, category);
     const normalizedIngredients = typeof ingredients === 'string'
       ? ingredients
       : JSON.stringify(Array.isArray(ingredients) ? ingredients : []);
@@ -91,10 +280,10 @@ class Menu {
     const query = `
       INSERT INTO menu_items (
         menu_id, restaurant_id, name, description, price, 
-        discounted_price, category, tags, is_available, 
+        discounted_price, category, categories, tags, is_available, 
         is_veg, is_popular, ingredients, customizations, calories, 
         preparation_time_minutes, image_url
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb, $14, $15, $16)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14::jsonb, $15, $16, $17)
       RETURNING *
     `;
     
@@ -105,7 +294,8 @@ class Menu {
       description || null,
       parseFloat(price),
       discounted_price != null && discounted_price !== '' ? parseFloat(discounted_price) : null,
-      category || 'General',
+      normalizedCat.category,
+      normalizedCat.categories,
       normalizedTags,
       Boolean(is_available),
       Boolean(is_veg),
@@ -117,86 +307,74 @@ class Menu {
       image_url || null
     ]);
     
-    return result.rows[0];
+    return Menu.formatMenuItem(result.rows[0]);
   }
 
   // Get menu items by menu (Standard list)
   static async getMenuItems(menuId, filters = {}) {
+    await Menu.ensureCategoriesSchema();
     const { category, min_price, max_price, tags, is_available = true } = filters;
+    const catExpr = Menu.sqlCategoriesExpr('mi');
     
     let query = `
-      SELECT * FROM menu_items 
-      WHERE menu_id = $1 
-        AND is_available = $2
+      SELECT mi.* FROM menu_items mi
+      WHERE mi.menu_id = $1 
+        AND mi.is_available = $2
     `;
     
     const params = [menuId, is_available];
     let paramIndex = 3;
     
     if (category) {
-      query += ` AND category = $${paramIndex}`;
+      query += `
+        AND EXISTS (
+          SELECT 1 FROM unnest(${catExpr}) AS cat
+          WHERE LOWER(TRIM(cat)) = LOWER(TRIM($${paramIndex}))
+        )
+      `;
       params.push(category);
       paramIndex++;
     }
     
     if (min_price) {
-      query += ` AND price >= $${paramIndex}`;
+      query += ` AND mi.price >= $${paramIndex}`;
       params.push(min_price);
       paramIndex++;
     }
     
     if (max_price) {
-      query += ` AND price <= $${paramIndex}`;
+      query += ` AND mi.price <= $${paramIndex}`;
       params.push(max_price);
       paramIndex++;
     }
     
     if (tags && tags.length > 0) {
-      query += ` AND tags && $${paramIndex}`;
+      query += ` AND mi.tags && $${paramIndex}`;
       params.push(tags);
       paramIndex++;
     }
     
     query += ` ORDER BY 
-      CASE WHEN is_popular = true THEN 0 ELSE 1 END,
-      category,
-      name`;
+      CASE WHEN mi.is_popular = true THEN 0 ELSE 1 END,
+      mi.category,
+      mi.name`;
     
     const result = await db.query(query, params);
-    return result.rows;
+    return result.rows.map(Menu.formatMenuItem);
   }
 
   // Update menu item details
   static async updateMenuItem(itemId, updateData) {
-    const fields = Object.keys(updateData);
-    const values = Object.values(updateData);
-    
-    // Ensure JSONB fields are stringified for PostgreSQL, while text[] (tags) remains a JS Array
-    const jsonFields = ['ingredients', 'customizations'];
-    fields.forEach((field, index) => {
-      if (jsonFields.includes(field)) {
-        if (typeof values[index] !== 'string') {
-          values[index] = JSON.stringify(values[index] ?? []);
-        }
-      } else if (field === 'tags') {
-        if (!Array.isArray(values[index])) {
-          values[index] = typeof values[index] === 'string' && values[index].trim()
-            ? values[index].split(',').map(t => t.trim()).filter(Boolean)
-            : [];
-        }
-      }
-    });
-    
-    const setClause = fields.map((field, index) => {
-      if (jsonFields.includes(field)) {
-        return `${field} = $${index + 2}::jsonb`;
-      }
-      return `${field} = $${index + 2}`;
-    }).join(', ');
+    await Menu.ensureCategoriesSchema();
+    const { fields, values, setClause } = Menu.buildUpdateSetClause(updateData, 2);
+    if (fields.length === 0) {
+      return Menu.getMenuItemById(itemId);
+    }
+
     const query = `UPDATE menu_items SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`;
     
     const result = await db.query(query, [itemId, ...values]);
-    return result.rows[0];
+    return Menu.formatMenuItem(result.rows[0]);
   }
 
   // Update specific menu item image
@@ -214,6 +392,7 @@ class Menu {
 
   // Search menu items (PostGIS distance enabled)
   static async searchItems(searchTerm, lat, lng, optionsOrRadius = 20) {
+    await Menu.ensureCategoriesSchema();
     const opts = typeof optionsOrRadius === 'object' && optionsOrRadius !== null
       ? optionsOrRadius
       : { radiusKm: optionsOrRadius };
@@ -223,6 +402,7 @@ class Menu {
     const popularOnly = opts.popularOnly === true;
     const hasCoords = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
     const term = typeof searchTerm === 'string' ? searchTerm.trim() : '';
+    const catExpr = Menu.sqlCategoriesExpr('mi', "ARRAY[]::text[]");
 
     const values = [];
     let paramIdx = 1;
@@ -255,6 +435,10 @@ class Menu {
           mi.name ILIKE $${paramIdx}
           OR COALESCE(mi.description, '') ILIKE $${paramIdx}
           OR COALESCE(mi.category, '') ILIKE $${paramIdx}
+          OR EXISTS (
+            SELECT 1 FROM unnest(${catExpr}) AS cat
+            WHERE cat ILIKE $${paramIdx}
+          )
           OR r.name ILIKE $${paramIdx}
         )
       `;
@@ -296,14 +480,15 @@ class Menu {
     `;
 
     const result = await db.query(query, values);
-    return result.rows.map(applyAvailabilityToRestaurant);
+    return result.rows.map((row) => Menu.formatMenuItem(applyAvailabilityToRestaurant(row)));
   }
 
   // Get single menu item by ID (For editing)
   static async getMenuItemById(itemId) {
+    await Menu.ensureCategoriesSchema();
     const query = 'SELECT * FROM menu_items WHERE id = $1';
     const result = await db.query(query, [itemId]);
-    return result.rows[0];
+    return Menu.formatMenuItem(result.rows[0]);
   }
 
   // Get menu by ID
@@ -315,54 +500,36 @@ class Menu {
 
   // Get multiple menu items by IDs
   static async getMenuItemsByIds(itemIds) {
+    await Menu.ensureCategoriesSchema();
     if (!Array.isArray(itemIds) || itemIds.length === 0) {
       return [];
     }
 
     const query = 'SELECT * FROM menu_items WHERE id = ANY($1)';
     const result = await db.query(query, [itemIds]);
-    return result.rows;
+    return result.rows.map(Menu.formatMenuItem);
   }
 
   // Update multiple menu items
   static async updateMenuItems(itemIds, updates) {
+    await Menu.ensureCategoriesSchema();
     if (!Array.isArray(itemIds) || itemIds.length === 0 || typeof updates !== 'object') {
       return [];
     }
 
-    const fields = Object.keys(updates);
-    const values = Object.values(updates);
-
-    // Ensure JSONB fields are stringified for PostgreSQL, while text[] (tags) remains a JS Array
-    const jsonFields = ['ingredients', 'customizations'];
-    fields.forEach((field, index) => {
-      if (jsonFields.includes(field)) {
-        if (typeof values[index] !== 'string') {
-          values[index] = JSON.stringify(values[index] ?? []);
-        }
-      } else if (field === 'tags') {
-        if (!Array.isArray(values[index])) {
-          values[index] = typeof values[index] === 'string' && values[index].trim()
-            ? values[index].split(',').map(t => t.trim()).filter(Boolean)
-            : [];
-        }
-      }
-    });
-
-    const setClause = fields.map((field, index) => {
-      if (jsonFields.includes(field)) {
-        return `${field} = $${index + 2}::jsonb`;
-      }
-      return `${field} = $${index + 2}`;
-    }).join(', ');
+    const { fields, values, setClause } = Menu.buildUpdateSetClause(updates, 2);
+    if (fields.length === 0) {
+      return Menu.getMenuItemsByIds(itemIds);
+    }
     const query = `UPDATE menu_items SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ANY($1) RETURNING *`;
 
     const result = await db.query(query, [itemIds, ...values]);
-    return result.rows;
+    return result.rows.map(Menu.formatMenuItem);
   }
 
   // Get popular items (strictly items marked popular)
   static async getPopularItems(lat, lng, filters = {}) {
+    await Menu.ensureCategoriesSchema();
     const { radiusKm = 20, limit = 20 } = filters;
     const hasCoords = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
     const values = hasCoords ? [Number(lng), Number(lat), Number(radiusKm) || 20, limit] : [limit];
@@ -422,7 +589,7 @@ class Menu {
       `;
 
     const result = await db.query(query, values);
-    return result.rows.map(applyAvailabilityToRestaurant);
+    return result.rows.map((row) => Menu.formatMenuItem(applyAvailabilityToRestaurant(row)));
   }
 
   // static async getDiscoveryMenus(limit = 10) {
@@ -456,9 +623,11 @@ class Menu {
   //   return result.rows;
   // }
 
-  // Get items by category
+  // Get items by category (matches any element of multi-category list or legacy category)
   static async getItemsByCategory(category, lat, lng, filters = {}) {
+    await Menu.ensureCategoriesSchema();
     const { radiusKm = 10, limit = 20 } = filters;
+    const catExpr = Menu.sqlCategoriesExpr('mi', "ARRAY[]::text[]");
     
     const query = `
       SELECT 
@@ -478,7 +647,10 @@ class Menu {
         AND r.is_active = true
         AND COALESCE(r.approval_status, 'approved') = 'approved'
         AND r.is_accepting_orders = true
-        AND mi.category ILIKE $4
+        AND EXISTS (
+          SELECT 1 FROM unnest(${catExpr}) AS cat
+          WHERE TRIM(cat) ILIKE $4
+        )
         AND ST_DWithin(
           r.location::geography,
           ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
@@ -488,8 +660,10 @@ class Menu {
       LIMIT $5
     `;
     
-    const result = await db.query(query, [lng, lat, radiusKm, `%${category}%`, limit]);
-    return result.rows.map(applyAvailabilityToRestaurant).filter((row) => row.is_open_now);
+    const result = await db.query(query, [lng, lat, radiusKm, `%${String(category || '').trim()}%`, limit]);
+    return result.rows
+      .map((row) => Menu.formatMenuItem(applyAvailabilityToRestaurant(row)))
+      .filter((row) => row.is_open_now);
   }
 
   static async getDiscoveryMenus(limit = 8) {
@@ -513,9 +687,11 @@ class Menu {
   }
 
   static async getFoodCategories(lat = null, lng = null, maxDistance = 90) {
+    await Menu.ensureCategoriesSchema();
     const hasCoords = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
     const radiusMeters = (Number(maxDistance) || 90) * 1000;
     const values = hasCoords ? [Number(lng), Number(lat), radiusMeters] : [];
+    const catExpr = Menu.sqlCategoriesExpr('mi', "ARRAY[]::text[]");
 
     const distanceCondition = hasCoords
       ? `
@@ -528,25 +704,27 @@ class Menu {
 
     const query = `
       WITH normalized AS (
-        SELECT
-          LOWER(TRIM(mi.category)) AS slug,
-          TRIM(mi.category) AS display_name,
+        SELECT DISTINCT
+          mi.id AS item_id,
+          LOWER(TRIM(raw_cat)) AS slug,
+          TRIM(raw_cat) AS display_name,
           r.id AS restaurant_id,
           NULLIF(TRIM(mi.image_url), '') AS item_image,
           NULLIF(TRIM(r.cover_image_url), '') AS restaurant_cover
         FROM menu_items mi
         JOIN restaurants r ON mi.restaurant_id = r.id
+        CROSS JOIN LATERAL unnest(${catExpr}) AS raw_cat
         WHERE mi.is_available = true
           AND r.is_active = true
           AND COALESCE(r.approval_status, 'approved') = 'approved'
-          AND mi.category IS NOT NULL
-          AND TRIM(mi.category) <> ''
+          AND raw_cat IS NOT NULL
+          AND TRIM(raw_cat) <> ''
           ${distanceCondition}
       )
       SELECT
         MAX(display_name) AS name,
         slug,
-        COUNT(*)::int AS item_count,
+        COUNT(DISTINCT item_id)::int AS item_count,
         COUNT(DISTINCT restaurant_id)::int AS restaurant_count,
         ARRAY_AGG(DISTINCT restaurant_id) AS restaurant_ids,
         COALESCE(MAX(item_image), MAX(restaurant_cover)) AS image_url
@@ -560,9 +738,11 @@ class Menu {
   }
 
   static async getAllDiscoveryItems(limit = 20, lat = null, lng = null, maxDistance = 90) {
+    await Menu.ensureCategoriesSchema();
     const hasCoords = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
     const radiusMeters = (Number(maxDistance) || 90) * 1000;
     const values = hasCoords ? [Number(lng), Number(lat), radiusMeters, limit] : [limit];
+    const catExpr = Menu.sqlCategoriesExpr('mi');
 
     const distanceSelect = hasCoords
       ? `
@@ -587,7 +767,7 @@ class Menu {
     const query = `
       SELECT 
         mi.id, mi.menu_id, mi.name, mi.description, mi.price, mi.discounted_price, mi.image_url,
-        mi.category, mi.is_veg, mi.is_popular, mi.calories, mi.preparation_time_minutes,
+        mi.category, ${catExpr} AS categories, mi.is_veg, mi.is_popular, mi.calories, mi.preparation_time_minutes,
         mi.ingredients, mi.customizations, mi.tags,
         ${distanceSelect}
         r.id as restaurant_id,
@@ -608,7 +788,7 @@ class Menu {
       LIMIT ${limitParam}
     `;
     const result = await db.query(query, values);
-    return result.rows.map(applyAvailabilityToRestaurant);
+    return result.rows.map((row) => Menu.formatMenuItem(applyAvailabilityToRestaurant(row)));
   }
 }
 

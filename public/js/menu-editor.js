@@ -29,6 +29,40 @@
     return div.innerHTML;
   }
 
+  function getItemCategories(item) {
+    if (!item) return ['General'];
+    const parseList = (raw) => {
+      if (!raw) return [];
+      if (Array.isArray(raw)) return raw;
+      if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        if (!trimmed) return [];
+        if (trimmed.startsWith('[')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) return parsed;
+          } catch (_) {}
+        }
+        return trimmed.split(',');
+      }
+      return [String(raw)];
+    };
+
+    const rawList = parseList(item.categories);
+    const source = rawList.length ? rawList : parseList(item.category);
+    const seen = new Set();
+    const result = [];
+    source.forEach((entry) => {
+      const clean = String(entry || '').trim();
+      if (!clean) return;
+      const slug = clean.toLowerCase();
+      if (seen.has(slug)) return;
+      seen.add(slug);
+      result.push(clean);
+    });
+    return result.length ? result : ['General'];
+  }
+
   function openModalEl(id) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -99,7 +133,7 @@
         allCategories = new Set();
         menus.forEach((m) => {
           (m.items || []).forEach((i) => {
-            if (i.category) allCategories.add(i.category);
+            getItemCategories(i).forEach((cat) => allCategories.add(cat));
           });
         });
         renderMenus();
@@ -172,7 +206,10 @@
   function renderMenuItems(items, menuId) {
     let filtered = items;
     if (activeCategory !== 'all') {
-      filtered = items.filter((i) => i.category === activeCategory);
+      const target = String(activeCategory).trim().toLowerCase();
+      filtered = items.filter((i) =>
+        getItemCategories(i).some((cat) => cat.toLowerCase() === target)
+      );
     }
 
     if (!filtered.length) {
@@ -190,7 +227,8 @@
     }
 
     return filtered.map((item) => {
-      if (item.category) allCategories.add(item.category);
+      const itemCats = getItemCategories(item);
+      itemCats.forEach((cat) => allCategories.add(cat));
       const hasDiscount = item.discounted_price && Number(item.discounted_price) < Number(item.price);
       const customGroups = Array.isArray(item.customizations)
         ? item.customizations
@@ -213,7 +251,9 @@
               ${item.is_popular ? '<span class="badge-popular"><i class="fas fa-fire"></i> Popular</span>' : ''}
             </div>
           </div>
-          <div class="item-category">${escapeHtml(item.category || 'General')}</div>
+          <div class="item-category">
+            ${itemCats.map((cat) => `<span class="item-category-chip">${escapeHtml(cat)}</span>`).join('')}
+          </div>
           <div class="item-description">${escapeHtml(item.description || '')}</div>
           <div class="item-meta">
             ${item.calories ? `<span><i class="fas fa-fire-alt"></i> ${item.calories} kcal</span>` : ''}
@@ -256,10 +296,12 @@
   function renderCategories() {
     const container = document.getElementById('categoryFilter');
     const datalist = document.getElementById('categoryList');
+    const sortedCategories = Array.from(allCategories).sort((a, b) => a.localeCompare(b));
     if (container) {
       let html = `<div class="category-pill ${activeCategory === 'all' ? 'active' : ''}" data-category="all">All Items</div>`;
-      Array.from(allCategories).sort().forEach((cat) => {
-        html += `<div class="category-pill ${activeCategory === cat ? 'active' : ''}" data-category="${escapeHtml(cat)}">${escapeHtml(cat)}</div>`;
+      sortedCategories.forEach((cat) => {
+        const isActive = activeCategory.toLowerCase() === cat.toLowerCase();
+        html += `<div class="category-pill ${isActive ? 'active' : ''}" data-category="${escapeHtml(cat)}">${escapeHtml(cat)}</div>`;
       });
       container.innerHTML = html;
 
@@ -271,10 +313,54 @@
       });
     }
     if (datalist) {
-      datalist.innerHTML = Array.from(allCategories).sort()
+      datalist.innerHTML = sortedCategories
         .map((cat) => `<option value="${escapeHtml(cat)}">`)
         .join('');
     }
+    renderCategoryQuickPills();
+  }
+
+  function renderCategoryQuickPills() {
+    const quickWrap = document.getElementById('categoryQuickPills');
+    if (!quickWrap) return;
+    const sortedCategories = Array.from(allCategories).sort((a, b) => a.localeCompare(b));
+    if (!sortedCategories.length) {
+      quickWrap.innerHTML = '';
+      return;
+    }
+    const selectedSet = new Set(getTags('categoriesContainer').map((c) => c.toLowerCase()));
+    quickWrap.innerHTML = `<span style="font-size:0.75rem;color:hsl(var(--muted-foreground));align-self:center;">Quick pick:</span>` +
+      sortedCategories.map((cat) => {
+        const selected = selectedSet.has(cat.toLowerCase());
+        return `<button type="button" class="category-quick-pill ${selected ? 'selected' : ''}" data-cat="${escapeHtml(cat)}">${selected ? '✓ ' : '+ '}${escapeHtml(cat)}</button>`;
+      }).join('');
+
+    quickWrap.querySelectorAll('.category-quick-pill').forEach((btn) => {
+      btn.addEventListener('click', () => toggleItemCategoryQuickPick(btn.dataset.cat));
+    });
+  }
+
+  function toggleItemCategoryQuickPick(categoryName) {
+    const container = document.getElementById('categoriesContainer');
+    if (!container || !categoryName) return;
+    const clean = categoryName.trim();
+    const existingChip = Array.from(container.querySelectorAll('.tag-chip')).find(
+      (chip) => getChipValue(chip).toLowerCase() === clean.toLowerCase()
+    );
+    if (existingChip) {
+      existingChip.remove();
+    } else {
+      addTagChip(container, clean, { dedupe: true, onChange: renderCategoryQuickPills });
+    }
+    renderCategoryQuickPills();
+  }
+
+  function addCategoryChipFromInput() {
+    commitPendingTag('categoriesContainer', 'itemCategoryInput', {
+      dedupe: true,
+      onChange: renderCategoryQuickPills,
+    });
+    renderCategoryQuickPills();
   }
 
   // ── Menu CRUD ───────────────────────────────────────────────────────────────
@@ -648,10 +734,15 @@
     document.getElementById('itemModalTitle').textContent = 'Add Menu Item';
     document.getElementById('itemIsAvailable').checked = true;
     const descEl = document.getElementById('itemModal')?.querySelector('.modal-description');
-    if (descEl) descEl.textContent = 'Add a new item to this menu.';
+    if (descEl) descEl.textContent = 'Add a new item and assign one or more categories.';
 
-    document.getElementById('ingredientsContainer').querySelectorAll('.tag-chip').forEach((c) => c.remove());
-    document.getElementById('tagsContainer').querySelectorAll('.tag-chip').forEach((c) => c.remove());
+    setTags('categoriesContainer', activeCategory !== 'all' ? [activeCategory] : [], {
+      dedupe: true,
+      onChange: renderCategoryQuickPills,
+    });
+    setTags('ingredientsContainer', []);
+    setTags('tagsContainer', []);
+    renderCategoryQuickPills();
 
     currentCustomizationGroups = [];
     renderCustomizationGroups();
@@ -669,7 +760,6 @@
         document.getElementById('itemId').value = item.id;
         document.getElementById('itemMenuId').value = item.menu_id;
         document.getElementById('itemName').value = item.name;
-        document.getElementById('itemCategory').value = item.category || '';
         document.getElementById('itemDescription').value = item.description || '';
         document.getElementById('itemPrice').value = item.price;
         document.getElementById('itemDiscountedPrice').value = item.discounted_price || '';
@@ -681,15 +771,20 @@
         document.getElementById('itemIsPopular').checked = item.is_popular === true;
         document.getElementById('itemModalTitle').textContent = 'Edit Menu Item';
         const descEl = document.getElementById('itemModal')?.querySelector('.modal-description');
-        if (descEl) descEl.textContent = 'Update item details and customization options.';
+        if (descEl) descEl.textContent = 'Update item details, categories, and customization options.';
 
         const parsedIng = Array.isArray(item.ingredients)
           ? item.ingredients
           : (() => { try { return JSON.parse(item.ingredients || '[]'); } catch { return []; } })();
         const parsedTags = Array.isArray(item.tags) ? item.tags : [];
 
+        setTags('categoriesContainer', getItemCategories(item), {
+          dedupe: true,
+          onChange: renderCategoryQuickPills,
+        });
         setTags('ingredientsContainer', parsedIng);
         setTags('tagsContainer', parsedTags);
+        renderCategoryQuickPills();
 
         const rawCustomizations = Array.isArray(item.customizations)
           ? item.customizations
@@ -711,18 +806,24 @@
   }
 
   async function saveItem() {
+    commitPendingTag('categoriesContainer', 'itemCategoryInput', {
+      dedupe: true,
+      onChange: renderCategoryQuickPills,
+    });
     commitPendingTag('ingredientsContainer', 'ingredientsInput');
     commitPendingTag('tagsContainer', 'tagsInput');
 
     const itemId = document.getElementById('itemId').value;
     const menuId = document.getElementById('itemMenuId').value;
     const customizations = getValidatedCustomizations();
+    const categories = getTags('categoriesContainer');
 
     const body = {
       menuId,
       restaurantId: cfg.getRestaurantId(),
       name: document.getElementById('itemName').value.trim(),
-      category: document.getElementById('itemCategory').value.trim(),
+      category: categories[0] || '',
+      categories,
       description: document.getElementById('itemDescription').value.trim(),
       price: parseFloat(document.getElementById('itemPrice').value),
       discounted_price: parseFloat(document.getElementById('itemDiscountedPrice').value) || null,
@@ -737,8 +838,8 @@
       customizations,
     };
 
-    if (!body.name || !body.category || isNaN(body.price)) {
-      cfg.notify('Validation', 'Name, category, and price are required', 'warning');
+    if (!body.name || categories.length === 0 || isNaN(body.price)) {
+      cfg.notify('Validation', 'Name, at least one category, and price are required', 'warning');
       return;
     }
 
@@ -876,11 +977,21 @@
     renderCategoriesList();
   }
 
-  // ── Tag Chips ───────────────────────────────────────────────────────────────
+  // ── Tag & Category Chips ────────────────────────────────────────────────────
+  function getChipValue(chip) {
+    return (chip?.dataset?.value || chip?.textContent?.replace('×', '') || '').trim();
+  }
+
   function setupTagInputs() {
-    ['ingredients', 'tags'].forEach((type) => {
-      const container = document.getElementById(type + 'Container');
-      const input = document.getElementById(type + 'Input');
+    const configs = [
+      { containerId: 'categoriesContainer', inputId: 'itemCategoryInput', dedupe: true, onChange: renderCategoryQuickPills },
+      { containerId: 'ingredientsContainer', inputId: 'ingredientsInput', dedupe: false },
+      { containerId: 'tagsContainer', inputId: 'tagsInput', dedupe: false },
+    ];
+
+    configs.forEach(({ containerId, inputId, dedupe, onChange }) => {
+      const container = document.getElementById(containerId);
+      const input = document.getElementById(inputId);
       if (!container || !input) return;
 
       input.addEventListener('keydown', (e) => {
@@ -888,46 +999,76 @@
           e.preventDefault();
           const val = input.value.replace(/,/g, '').trim();
           if (val) {
-            addTagChip(container, val);
+            addTagChip(container, val, { dedupe, onChange });
             input.value = '';
           }
         }
         if (e.key === 'Backspace' && !input.value) {
           const chips = container.querySelectorAll('.tag-chip');
-          if (chips.length) chips[chips.length - 1].remove();
+          if (chips.length) {
+            chips[chips.length - 1].remove();
+            if (typeof onChange === 'function') onChange();
+          }
         }
       });
+
+      // Automatically turn datalist selections into chips too
+      if (inputId === 'itemCategoryInput') {
+        input.addEventListener('change', () => {
+          const val = input.value.trim();
+          if (val && Array.from(allCategories).some((c) => c.toLowerCase() === val.toLowerCase())) {
+            addTagChip(container, val, { dedupe: true, onChange });
+            input.value = '';
+          }
+        });
+      }
     });
   }
 
-  function commitPendingTag(containerId, inputId) {
+  function commitPendingTag(containerId, inputId, options = {}) {
     const container = document.getElementById(containerId);
     const input = document.getElementById(inputId);
     if (!container || !input) return;
     const raw = input.value.trim();
     if (!raw) return;
-    raw.split(',').map((s) => s.trim()).filter(Boolean).forEach((part) => addTagChip(container, part));
+    raw.split(',').map((s) => s.trim()).filter(Boolean).forEach((part) => addTagChip(container, part, options));
     input.value = '';
   }
 
-  function addTagChip(container, text) {
+  function addTagChip(container, text, options = {}) {
+    const clean = String(text || '').trim();
+    if (!clean) return;
+    if (options.dedupe) {
+      const exists = Array.from(container.querySelectorAll('.tag-chip')).some(
+        (c) => getChipValue(c).toLowerCase() === clean.toLowerCase()
+      );
+      if (exists) return;
+    }
+
     const chip = document.createElement('div');
     chip.className = 'tag-chip';
-    chip.innerHTML = `${escapeHtml(text)} <button type="button" onclick="this.parentElement.remove()">&times;</button>`;
+    chip.dataset.value = clean;
+    chip.innerHTML = `${escapeHtml(clean)} <button type="button" aria-label="Remove">&times;</button>`;
+    chip.querySelector('button').addEventListener('click', () => {
+      chip.remove();
+      if (typeof options.onChange === 'function') options.onChange();
+    });
     container.insertBefore(chip, container.querySelector('.tag-input'));
+    if (typeof options.onChange === 'function') options.onChange();
   }
 
   function getTags(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return [];
-    return Array.from(container.querySelectorAll('.tag-chip')).map((c) => c.textContent.replace('×', '').trim());
+    return Array.from(container.querySelectorAll('.tag-chip')).map(getChipValue).filter(Boolean);
   }
 
-  function setTags(containerId, tags) {
+  function setTags(containerId, tags, options = {}) {
     const container = document.getElementById(containerId);
     if (!container) return;
     container.querySelectorAll('.tag-chip').forEach((c) => c.remove());
-    (tags || []).forEach((t) => addTagChip(container, t));
+    (tags || []).forEach((t) => addTagChip(container, t, { ...options, onChange: undefined }));
+    if (typeof options.onChange === 'function') options.onChange();
   }
 
   global.MenuEditor = {
@@ -952,6 +1093,7 @@
   global.openCategoryModal = openCategoryModal;
   global.addCategory = addCategory;
   global.removeCategory = removeCategory;
+  global.addCategoryChipFromInput = addCategoryChipFromInput;
   global.addCustomizationGroup = addCustomizationGroup;
   global.addPresetGroup = addPresetGroup;
   global.onGroupTypeChange = onGroupTypeChange;

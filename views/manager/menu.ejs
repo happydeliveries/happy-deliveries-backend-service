@@ -146,8 +146,8 @@
                             <input type="text" class="form-control" name="name" required>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label class="form-label">Category</label>
-                            <input type="text" class="form-control" name="category" placeholder="e.g., Main Course">
+                            <label class="form-label">Categories (comma separated)</label>
+                            <input type="text" class="form-control" name="category" placeholder="e.g., Breakfast, Burgers">
                         </div>
                     </div>
                     
@@ -352,7 +352,7 @@
                     <strong>₹${item.price}</strong>
                     ${item.discounted_price ? `<br><del class="text-muted">₹${item.discounted_price}</del>` : ''}
                 </td>
-                <td>${item.category || '-'}</td>
+                <td>${Array.isArray(item.categories) && item.categories.length ? item.categories.join(', ') : (item.category || '-')}</td>
                 <td>
                     <span class="badge ${item.is_available ? 'bg-success' : 'bg-danger'}">
                         ${item.is_available ? 'Available' : 'Unavailable'}
@@ -460,7 +460,9 @@
                     // Populate form
                     form.name.value = item.name;
                     form.description.value = item.description || '';
-                    form.category.value = item.category || '';
+                    form.category.value = Array.isArray(item.categories) && item.categories.length
+                        ? item.categories.join(', ')
+                        : (item.category || '');
                     form.price.value = item.price;
                     form.discounted_price.value = item.discounted_price || '';
                     form.preparation_time_minutes.value = item.preparation_time_minutes || 15;

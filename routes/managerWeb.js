@@ -1212,6 +1212,7 @@ router.get('/api/menus', isLoggedInApi, async (req, res) => {
             menus = await getModel.Menu().findByRestaurant(restaurantId, { onlyActive: false });
         } catch (e) {
             // Raw SQL fallback
+            const catExpr = getModel.Menu().sqlCategoriesExpr('mi');
             const { rows } = await db.query(
                 `SELECT m.id, m.restaurant_id, m.name, m.description, m.is_active, m.display_order,
                         COALESCE(
@@ -1229,6 +1230,7 @@ router.get('/api/menus', isLoggedInApi, async (req, res) => {
                               'is_veg',                   COALESCE(mi.is_veg, false),
                               'is_popular',               COALESCE(mi.is_popular, false),
                               'category',                 COALESCE(mi.category, 'General'),
+                              'categories',               ${catExpr},
                               'calories',                 mi.calories,
                               'preparation_time_minutes', mi.preparation_time_minutes,
                               'ingredients',              COALESCE(mi.ingredients, '[]'::jsonb),
@@ -1386,25 +1388,27 @@ router.post('/api/menu-items', isLoggedInApi, async (req, res) => {
             item = await getModel.Menu().createMenuItem(menuId, restaurantId, req.body);
         } catch (e) {
             const {
-                description, discounted_price, category = 'General',
+                description, discounted_price, category = 'General', categories,
                 is_available = true, is_veg = false, is_popular = false,
                 calories = 0, preparation_time_minutes = 15,
                 image_url = null, ingredients = [], customizations = [], tags = [],
             } = req.body;
+            const normalizedCat = getModel.Menu().normalizeCategoriesInput(categories, category);
 
             const { rows } = await db.query(`
                 INSERT INTO menu_items (
                     menu_id, restaurant_id, name, description, price, discounted_price,
-                    category, is_available, is_veg, is_popular, calories, preparation_time_minutes,
+                    category, categories, is_available, is_veg, is_popular, calories, preparation_time_minutes,
                     image_url, ingredients, customizations, tags
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15::jsonb,$16)
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,$16::jsonb,$17)
                 RETURNING *`,
                 [
                     menuId, restaurantId, name,
                     description || null,
                     parseFloat(price),
                     discounted_price ? parseFloat(discounted_price) : null,
-                    category,
+                    normalizedCat.category,
+                    normalizedCat.categories,
                     parseBool(is_available, true),
                     parseBool(is_veg, false),
                     parseBool(is_popular, false),
@@ -1416,7 +1420,7 @@ router.post('/api/menu-items', isLoggedInApi, async (req, res) => {
                     Array.isArray(tags) ? tags : [],
                 ]
             );
-            item = rows[0];
+            item = getModel.Menu().formatMenuItem(rows[0]);
         }
 
         res.status(201).json({ success: true, item });
@@ -1437,7 +1441,7 @@ router.put('/api/menu-items/:id', isLoggedInApi, async (req, res) => {
 
         // ----- build safe update from allowed fields -----
         const allowed = [
-            'name', 'description', 'price', 'discounted_price', 'category',
+            'name', 'description', 'price', 'discounted_price', 'category', 'categories',
             'is_available', 'is_veg', 'calories', 'preparation_time_minutes',
             'image_url', 'ingredients', 'customizations', 'tags', 'is_popular',
         ];
@@ -1454,27 +1458,12 @@ router.put('/api/menu-items/:id', isLoggedInApi, async (req, res) => {
             item = await getModel.Menu().updateMenuItem(req.params.id, updates);
         } catch (modelErr) {
             // ---- fallback: build a manual UPDATE (only if the helper failed) ----
-            const jsonbCols = ['ingredients', 'customizations'];
-            const keys = Object.keys(updates);
-            const vals = Object.values(updates).map((v, i) => {
-                if (jsonbCols.includes(keys[i])) {
-                    return typeof v === 'string' ? v : JSON.stringify(v ?? []);
-                }
-                if (keys[i] === 'tags') {
-                    return Array.isArray(v) ? v : [];
-                }
-                if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
-                    return JSON.stringify(v);
-                }
-                return v;
-            });
-
-            const setCl = keys.map((k, i) => (jsonbCols.includes(k) ? `${k} = $${i + 2}::jsonb` : `${k} = $${i + 2}`)).join(', ');
+            const { setClause, values } = getModel.Menu().buildUpdateSetClause(updates, 2);
             const { rows } = await db.query(
-                `UPDATE menu_items SET ${setCl}, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`,
-                [req.params.id, ...vals]
+                `UPDATE menu_items SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`,
+                [req.params.id, ...values]
             );
-            item = rows[0];
+            item = getModel.Menu().formatMenuItem(rows[0]);
         }
 
         res.json({ success: true, item });

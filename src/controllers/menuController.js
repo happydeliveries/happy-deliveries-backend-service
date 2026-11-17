@@ -136,6 +136,7 @@ exports.updateMenuItem = async (req, res) => {
       description,
       price,
       category,
+      categories,
       discounted_price,
       image_url,
       is_available,
@@ -154,7 +155,11 @@ exports.updateMenuItem = async (req, res) => {
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (price !== undefined) updateData.price = parseFloat(price);
-    if (category !== undefined) updateData.category = category;
+    if (categories !== undefined || category !== undefined) {
+      const normalizedCat = Menu.normalizeCategoriesInput(categories, category);
+      updateData.categories = normalizedCat.categories;
+      updateData.category = normalizedCat.category;
+    }
     if (discounted_price !== undefined) updateData.discounted_price = discounted_price ? parseFloat(discounted_price) : null;
     if (image_url !== undefined) updateData.image_url = image_url;
     if (is_available !== undefined) updateData.is_available = is_available === 'true' || is_available === true;
@@ -363,6 +368,7 @@ exports.createMenuItem = async (req, res) => {
       description,
       price,
       category,
+      categories,
       discounted_price,
       image_url,
       is_available,
@@ -426,12 +432,15 @@ exports.createMenuItem = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Menu does not belong to this restaurant' });
     }
 
+    const normalizedCat = Menu.normalizeCategoriesInput(categories, category);
+
     const item = await Menu.createMenuItem(parsedMenuId, parsedRestaurantId, {
       name,
       description,
       price: parsedPrice,
       discounted_price: parsedDiscountedPrice,
-      category,
+      category: normalizedCat.category,
+      categories: normalizedCat.categories,
       image_url,
       is_available: parsedIsAvailable,
       is_veg: parsedIsVeg,

@@ -729,7 +729,7 @@ router.put('/api/menu-items/:id', isPartnerApiLoggedIn, async (req, res) => {
     if (!owns) return res.status(403).json({ success: false, error: 'Access denied' });
 
     const allowed = [
-      'name', 'description', 'price', 'discounted_price', 'category',
+      'name', 'description', 'price', 'discounted_price', 'category', 'categories',
       'is_available', 'is_veg', 'calories', 'preparation_time_minutes',
       'image_url', 'ingredients', 'customizations', 'tags', 'is_popular',
     ];

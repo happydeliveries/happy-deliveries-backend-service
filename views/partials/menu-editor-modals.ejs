@@ -62,16 +62,23 @@
         <input type="hidden" id="itemId">
         <input type="hidden" id="itemMenuId">
 
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Item Name *</label>
-            <input type="text" class="form-input" id="itemName" required placeholder="e.g., Double Cheese Burger">
+        <div class="form-group">
+          <label class="form-label">Item Name *</label>
+          <input type="text" class="form-input" id="itemName" required placeholder="e.g., Double Cheese Burger">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Categories * <span style="font-weight:400;color:hsl(var(--muted-foreground));font-size:0.78rem;">(Assign one or more, e.g. Breakfast &amp; Burgers)</span></label>
+          <div style="display:flex;gap:0.5rem;align-items:flex-start;">
+            <div class="tag-input-container" id="categoriesContainer" style="flex:1;">
+              <input type="text" class="tag-input" id="itemCategoryInput" list="categoryList" placeholder="Type category and press Enter or comma...">
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" style="height:2.75rem;white-space:nowrap;" onclick="addCategoryChipFromInput()">
+              <i class="fas fa-plus"></i> Add
+            </button>
           </div>
-          <div class="form-group">
-            <label class="form-label">Category *</label>
-            <input type="text" class="form-input" id="itemCategory" required list="categoryList" placeholder="e.g., Burgers, Starters, Drinks">
-            <datalist id="categoryList"></datalist>
-          </div>
+          <datalist id="categoryList"></datalist>
+          <div id="categoryQuickPills" class="category-quick-picks"></div>
         </div>
 
         <div class="form-group">

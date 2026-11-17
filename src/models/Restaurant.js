@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const bcrypt = require('bcryptjs');
+const Menu = require('./Menu');
 const { evaluateRestaurantAvailability, applyAvailabilityToRestaurant } = require('../utils/restaurantHours');
 const { calculateRadialDeliveryFee } = require('../utils/deliveryPricing');
 
@@ -708,6 +709,7 @@ class Restaurant {
 
   static async search(lat, lng, filters = {}) {
   try {
+    await Menu.ensureCategoriesSchema();
     const {
       cuisine,
       category,
@@ -719,6 +721,7 @@ class Restaurant {
 
     // Standardize radius to meters (90km = 90000 meters)
     const radiusMeters = (Number(maxDistance) || 90) * 1000;
+    const catExpr = Menu.sqlCategoriesExpr('mi', "ARRAY[]::text[]");
 
     let query = `
       SELECT 
@@ -728,12 +731,13 @@ class Restaurant {
         r.delivery_radius_km,
         COALESCE(
           (
-            SELECT ARRAY_AGG(DISTINCT TRIM(mi.category))
+            SELECT ARRAY_AGG(DISTINCT TRIM(cat))
             FROM menu_items mi
+            CROSS JOIN LATERAL unnest(${catExpr}) AS cat
             WHERE mi.restaurant_id = r.id
               AND mi.is_available = true
-              AND mi.category IS NOT NULL
-              AND TRIM(mi.category) <> ''
+              AND cat IS NOT NULL
+              AND TRIM(cat) <> ''
           ),
           ARRAY[]::text[]
         ) as food_categories,
@@ -769,7 +773,10 @@ class Restaurant {
             SELECT 1 FROM menu_items mi
             WHERE mi.restaurant_id = r.id
               AND mi.is_available = true
-              AND (LOWER(TRIM(mi.category)) = LOWER(TRIM(${pExact})) OR mi.category ILIKE ${pLike})
+              AND EXISTS (
+                SELECT 1 FROM unnest(${catExpr}) AS cat
+                WHERE LOWER(TRIM(cat)) = LOWER(TRIM(${pExact})) OR cat ILIKE ${pLike}
+              )
           )
           OR COALESCE(r.cuisine_type::text, '') ILIKE ${pLike}
         )
@@ -791,7 +798,10 @@ class Restaurant {
             SELECT 1 FROM menu_items mi
             WHERE mi.restaurant_id = r.id
               AND mi.is_available = true
-              AND mi.category ILIKE ${pLike}
+              AND EXISTS (
+                SELECT 1 FROM unnest(${catExpr}) AS cat
+                WHERE cat ILIKE ${pLike}
+              )
           )
         )`;
       });
@@ -809,7 +819,14 @@ class Restaurant {
             SELECT 1 FROM menu_items mi
             WHERE mi.restaurant_id = r.id
               AND mi.is_available = true
-              AND (mi.name ILIKE ${pSearch} OR COALESCE(mi.category, '') ILIKE ${pSearch})
+              AND (
+                mi.name ILIKE ${pSearch}
+                OR COALESCE(mi.category, '') ILIKE ${pSearch}
+                OR EXISTS (
+                  SELECT 1 FROM unnest(${catExpr}) AS cat
+                  WHERE cat ILIKE ${pSearch}
+                )
+              )
           )
         )
       `;
@@ -859,32 +876,98 @@ class Restaurant {
   }
 }
   // Update restaurant details
-  static async update(id, updateData) {
-    const fields = Object.keys(updateData);
-    const values = Object.values(updateData);
-    
-    // Handle location specially if present
-    const locationIndex = fields.findIndex(field => field === 'location');
-    if (locationIndex !== -1) {
-      const [lng, lat] = updateData.location;
-      fields[locationIndex] = `POINT($${fields.length + 1}, $${fields.length + 2})`;
-      values.splice(locationIndex, 1, lng, lat);
+  static async update(id, updateData = {}) {
+    await this.ensureApplicationColumns();
+
+    const allowedCols = [
+      'name',
+      'description',
+      'cuisine_type',
+      'phone_number',
+      'email',
+      'address',
+      'delivery_radius_km',
+      'logo_url',
+      'cover_image_url',
+      'opening_hours',
+      'preparation_time_minutes',
+      'is_active',
+      'is_accepting_orders',
+    ];
+
+    const setParts = [];
+    const values = [id];
+    let pIdx = 2;
+
+    for (const key of allowedCols) {
+      if (updateData[key] === undefined) continue;
+      let val = updateData[key];
+
+      if (key === 'opening_hours') {
+        if (val && typeof val === 'object') {
+          val = JSON.stringify(val);
+        } else if (typeof val === 'string') {
+          const trimmed = val.trim();
+          if (!trimmed) continue;
+          try {
+            const parsed = JSON.parse(trimmed);
+            val = JSON.stringify(typeof parsed === 'object' ? parsed : { display: trimmed });
+          } catch {
+            val = JSON.stringify({ display: trimmed });
+          }
+        }
+      } else if (key === 'cuisine_type' && Array.isArray(val)) {
+        val = val.map((item) => String(item).trim()).filter(Boolean).join(', ');
+      } else if (key === 'delivery_radius_km') {
+        const parsed = parseFloat(val);
+        if (!Number.isFinite(parsed)) continue;
+        val = parsed;
+      } else if (key === 'preparation_time_minutes') {
+        const parsed = parseInt(val, 10);
+        if (!Number.isFinite(parsed)) continue;
+        val = parsed;
+      } else if (key === 'is_active' || key === 'is_accepting_orders') {
+        val = Boolean(val === true || val === 'true' || val === 'on' || val === 1 || val === '1');
+      }
+
+      setParts.push(`${key} = $${pIdx++}`);
+      values.push(val);
     }
-    
-    const setClause = fields.map((field, index) => {
-      if (field.startsWith('POINT')) return `location = ${field}`;
-      return `${field} = $${index + 2}`;
-    }).join(', ');
-    
+
+    // Handle coordinate updates via lat/lng or [lng, lat] array using PostGIS geometry
+    const rawLat = updateData.latitude ?? updateData.lat;
+    const rawLng = updateData.longitude ?? updateData.lng;
+    if (Array.isArray(updateData.location) && updateData.location.length >= 2) {
+      const lng = parseFloat(updateData.location[0]);
+      const lat = parseFloat(updateData.location[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        setParts.push(`location = ST_SetSRID(ST_MakePoint($${pIdx}, $${pIdx + 1}), 4326)`);
+        values.push(lng, lat);
+        pIdx += 2;
+      }
+    } else if (rawLat !== undefined && rawLng !== undefined && rawLat !== '' && rawLng !== '') {
+      const lat = parseFloat(rawLat);
+      const lng = parseFloat(rawLng);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        setParts.push(`location = ST_SetSRID(ST_MakePoint($${pIdx}, $${pIdx + 1}), 4326)`);
+        values.push(lng, lat);
+        pIdx += 2;
+      }
+    }
+
+    if (setParts.length === 0) {
+      return this.findById(id);
+    }
+
     const query = `
-      UPDATE restaurants 
-      SET ${setClause}, updated_at = CURRENT_TIMESTAMP
+      UPDATE restaurants
+      SET ${setParts.join(', ')}, updated_at = CURRENT_TIMESTAMP
       WHERE id = $1
-      RETURNING *
+      RETURNING *, ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng
     `;
-    
-    const result = await db.query(query, [id, ...values]);
-    return result.rows[0];
+
+    const result = await db.query(query, values);
+    return result.rows[0] ? applyAvailabilityToRestaurant(result.rows[0]) : null;
   }
 
   // Get restaurant statistics

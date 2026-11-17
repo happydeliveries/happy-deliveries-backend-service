@@ -51,6 +51,9 @@ exports.updateRestaurant = async (req, res) => {
 
     // Verify ownership (platform admins can manage any restaurant; partners only their own)
     const managerProfile = await RestaurantManager.findByUserId(req.user.id);
+    if (!managerProfile) {
+      return res.status(403).json({ success: false, error: 'Manager profile not found' });
+    }
     const restaurants = await Restaurant.findAccessibleByManager(managerProfile, { includePending: true });
     const isOwner = restaurants.some(r => r.id === id);
 
