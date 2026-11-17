@@ -25,6 +25,7 @@ const userRoutes = require('./src/routes/userRoutes');
 const menuRoutes = require('./src/routes/menuRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
 const managerRoutes = require('./src/routes/managerRoutes');
+const routingRoutes = require('./src/routes/routingRoutes');
 
 // Import middleware
 const { errorHandler } = require('./src/middleware/errorHandler');
@@ -56,6 +57,8 @@ const limiter = rateLimit({
   skip: (req) =>
     req.path.includes('/drivers/location') ||
     req.path.includes('/tracking') ||
+    req.path.includes('/route') ||
+    req.path.includes('/routing/') ||
     req.path.includes('/payments/webhook'),
   message: {
     success: false,
@@ -126,6 +129,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/manager', managerRoutes);
+app.use('/api/routing', routingRoutes);
 
 const managerWebRoutes = require('./routes/managerWeb');
 app.use('/manager', managerWebRoutes);

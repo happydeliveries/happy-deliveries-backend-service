@@ -1628,8 +1628,41 @@ class Order {
     switch (userRole) {
       case 'customer':
         baseQuery = `
-          SELECT o.*, r.logo_url as restaurant_logo, r.name as restaurant_name, r.phone_number as restaurant_phone,
-                 du.first_name as driver_first_name, du.last_name as driver_last_name, du.phone_number as driver_phone
+          SELECT o.*,
+                 r.logo_url as restaurant_logo,
+                 r.cover_image_url as restaurant_cover,
+                 r.name as restaurant_name,
+                 r.address as restaurant_address,
+                 r.phone_number as restaurant_phone,
+                 du.first_name as driver_first_name,
+                 du.last_name as driver_last_name,
+                 du.phone_number as driver_phone,
+                 COALESCE(
+                   (SELECT SUM(oi.quantity)::int FROM order_items oi WHERE oi.order_id = o.id),
+                   0
+                 ) as items_count,
+                 COALESCE(
+                   (
+                     SELECT STRING_AGG(
+                       CASE WHEN oi.quantity > 1 THEN oi.quantity || 'x ' || mi.name ELSE mi.name END,
+                       ', ' ORDER BY oi.created_at
+                     )
+                     FROM order_items oi
+                     JOIN menu_items mi ON oi.menu_item_id = mi.id
+                     WHERE oi.order_id = o.id
+                   ),
+                   ''
+                 ) as items_summary,
+                 (
+                   SELECT mi.image_url
+                   FROM order_items oi
+                   JOIN menu_items mi ON oi.menu_item_id = mi.id
+                   WHERE oi.order_id = o.id
+                     AND mi.image_url IS NOT NULL
+                     AND mi.image_url <> ''
+                   ORDER BY oi.created_at
+                   LIMIT 1
+                 ) as first_item_image
           FROM orders o
           JOIN restaurants r ON o.restaurant_id = r.id
           LEFT JOIN drivers drv ON o.driver_id = drv.id

@@ -1,12 +1,59 @@
 const db = require('../config/database');
 const jwt = require('jsonwebtoken');
+const {
+  peekOrderCachedRoute,
+  getOrderCachedRoute,
+  resolveOrderRouteEndpoints,
+  clearOrderRouteCache,
+} = require('../utils/routing');
 
 let ioInstance;
 const LOCATION_PERSIST_INTERVAL_MS = 12000;
 const ACTIVE_ORDERS_CACHE_MS = 10000;
+const ORDER_ENDPOINT_CACHE_MS = 20000;
 const lastDriverDbPersist = new Map();
 const driverActiveOrdersCache = new Map();
 const orderCustomerUserCache = new Map();
+const orderEndpointsCache = new Map();
+const socketRouteRefreshInFlight = new Set();
+
+async function getCachedOrderEndpoints(orderId) {
+  const key = String(orderId);
+  const existing = orderEndpointsCache.get(key);
+  if (existing && Date.now() - existing.cachedAt < ORDER_ENDPOINT_CACHE_MS) {
+    return existing.endpoints;
+  }
+
+  const res = await db.query(
+    `SELECT o.id, o.status, o.delivery_address, r.address AS restaurant_address,
+            ST_X(r.location::geometry) AS r_lng, ST_Y(r.location::geometry) AS r_lat
+     FROM orders o
+     JOIN restaurants r ON o.restaurant_id = r.id
+     WHERE o.id = $1
+     LIMIT 1`,
+    [orderId]
+  );
+  const row = res.rows[0];
+  if (!row) return null;
+
+  const orderObj = {
+    id: row.id,
+    status: row.status,
+    delivery_address: row.delivery_address,
+    restaurant_address: row.restaurant_address,
+    restaurant_location:
+      row.r_lat != null && row.r_lng != null
+        ? { latitude: Number(row.r_lat), longitude: Number(row.r_lng) }
+        : null,
+  };
+  const endpoints = await resolveOrderRouteEndpoints(orderObj);
+  if (orderEndpointsCache.size > 1000) {
+    const oldestKey = orderEndpointsCache.keys().next().value;
+    if (oldestKey) orderEndpointsCache.delete(oldestKey);
+  }
+  orderEndpointsCache.set(key, { endpoints, cachedAt: Date.now() });
+  return endpoints;
+}
 
 function extractLngLat(data = {}) {
   const loc = data.location;
@@ -180,14 +227,16 @@ module.exports = (io) => {
 
       const { lng, lat } = coords;
       const effectiveDriverRef = socket.user?.id || driverId;
+      const parsedHeading = Number(data.heading);
+      const parsedSpeed = Number(data.speed);
       const payload = {
         driverId: effectiveDriverRef,
         orderId,
         location: [lng, lat],
         latitude: lat,
         longitude: lng,
-        heading: data.heading ?? null,
-        speed: data.speed ?? null,
+        heading: Number.isFinite(parsedHeading) ? parsedHeading : null,
+        speed: Number.isFinite(parsedSpeed) ? parsedSpeed : null,
         timestamp: new Date().toISOString()
       };
 
@@ -216,11 +265,46 @@ module.exports = (io) => {
         }
       }
 
+      const driverPos = { latitude: lat, longitude: lng };
       targetOrderIds.forEach((targetId) => {
+        const { route: cachedRoute, needsRefresh } = peekOrderCachedRoute(targetId, driverPos);
         io.to(`order_${targetId}`).emit('driver_location', {
           ...payload,
           orderId: targetId,
+          route: cachedRoute || null,
         });
+
+        if (needsRefresh) {
+          const lockKey = String(targetId);
+          if (!socketRouteRefreshInFlight.has(lockKey)) {
+            socketRouteRefreshInFlight.add(lockKey);
+            (async () => {
+              try {
+                const endpoints = await getCachedOrderEndpoints(targetId);
+                if (!endpoints || !endpoints.destination) return;
+                const refreshed = await getOrderCachedRoute({
+                  orderId: targetId,
+                  legKey: endpoints.legKey,
+                  origin: driverPos,
+                  destination: endpoints.destination,
+                  currentPosition: driverPos,
+                });
+                if (refreshed) {
+                  io.to(`order_${targetId}`).emit('driver_location', {
+                    ...payload,
+                    orderId: targetId,
+                    route: refreshed,
+                    routeRecalculated: true,
+                  });
+                }
+              } catch {
+                // ignore transient routing/DB failure on async route refresh
+              } finally {
+                socketRouteRefreshInFlight.delete(lockKey);
+              }
+            })();
+          }
+        }
       });
 
       // 2. Persist driver location checkpoint to Neon at most every 12s per driver
@@ -295,6 +379,11 @@ function emitOrderUpdate(orderId, data) {
     orderId,
     status
   };
+
+  if (status) {
+    orderEndpointsCache.delete(String(orderId));
+    clearOrderRouteCache(orderId);
+  }
 
   if (safeData.order?.driver_id) {
     driverActiveOrdersCache.delete(String(safeData.order.driver_id));

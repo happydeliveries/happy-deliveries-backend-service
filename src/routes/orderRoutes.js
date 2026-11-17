@@ -12,6 +12,7 @@ const {
   verifyDeliveryCode,
   reportCustomerUnreachable,
   getOrderTracking,
+  getOrderRoute,
   cancelOrder,
   rateOrder
 } = require('../controllers/orderController');
@@ -40,8 +41,9 @@ router.patch('/:id/status', auth, authorize('driver', 'restaurant_manager'), upd
 // Delivery code verification - drivers only
 router.post('/:id/verify-code', auth, authorize('driver'), verifyDeliveryCode);
 
-// Live tracking route
+// Live tracking & OSRM route endpoints
 router.get('/:id/tracking', auth, getOrderTracking);
+router.get('/:id/route', auth, getOrderRoute);
 
 // Parameterized routes last
 router.get('/:id', auth, getOrder);

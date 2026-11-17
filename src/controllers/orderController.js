@@ -6,6 +6,13 @@ const { sanitizeOrderForDriver, sanitizeOrderItemsForDriver } = require('../util
 const { emitManagerEvent, emitUserEvent } = require('../socket');
 const { evaluateRestaurantAvailability } = require('../utils/restaurantHours');
 const { resolveAddressCoordinates, evaluateDeliveryForOrder } = require('../utils/deliveryPricing');
+const {
+  normalizeLatLng,
+  getOrderCachedRoute,
+  getDirectionsBetweenCoords,
+  resolveOrderRouteEndpoints,
+  clearOrderRouteCache,
+} = require('../utils/routing');
 
 // Quote delivery fee, radial distance, radius eligibility, and restaurant open/closed status
 exports.getDeliveryQuote = async (req, res) => {
@@ -392,6 +399,7 @@ exports.updateOrderStatus = async (req, res) => {
       driver ? driver.id : null,
       locationCoords
     );
+    clearOrderRouteCache(orderId);
     
     res.json({
       success: true,
@@ -541,6 +549,97 @@ exports.reportCustomerUnreachable = async (req, res) => {
   } catch (error) {
     console.error('Report customer unreachable error:', error);
     res.status(error.statusCode || 400).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Get road-following OSRM driving route for an active order (+ optional Restaurant -> Customer preview leg)
+exports.getOrderRoute = async (req, res) => {
+  try {
+    const order = await Order.findById(
+      req.params.id,
+      req.user.id,
+      req.user.role
+    );
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found'
+      });
+    }
+
+    const qLat = req.query.lat ?? req.query.latitude;
+    const qLng = req.query.lng ?? req.query.longitude;
+    const driverOverrideCoords =
+      qLat !== undefined && qLng !== undefined
+        ? normalizeLatLng({ latitude: qLat, longitude: qLng })
+        : null;
+
+    const endpoints = await resolveOrderRouteEndpoints(order, driverOverrideCoords);
+    if (!endpoints || !endpoints.origin || !endpoints.destination) {
+      return res.status(404).json({
+        success: false,
+        error: 'Route coordinates are not available for this order yet'
+      });
+    }
+
+    const forceRefresh = req.query.force === '1' || req.query.refresh === '1';
+    const activeRoute = await getOrderCachedRoute({
+      orderId: order.id,
+      legKey: endpoints.legKey,
+      origin: endpoints.origin,
+      destination: endpoints.destination,
+      currentPosition: endpoints.driverCoords || endpoints.origin,
+      forceRefresh,
+    });
+
+    let previewRoute = null;
+    if (endpoints.hasSeparatePreviewLeg) {
+      const preview = await getDirectionsBetweenCoords(
+        endpoints.restaurantCoords,
+        endpoints.customerCoords
+      );
+      if (preview) {
+        previewRoute = {
+          leg: 'restaurant_to_customer',
+          reactNativeCoords: preview.reactNativeCoords,
+          leafletCoords: preview.leafletCoords,
+          distanceKm: preview.distanceKm,
+          durationMinutes: preview.durationMinutes,
+          source: preview.source,
+          fallback: preview.fallback,
+        };
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        orderId: order.id,
+        status: order.status,
+        leg: endpoints.legKey,
+        origin: endpoints.origin,
+        destination: endpoints.destination,
+        driverCoords: endpoints.driverCoords,
+        restaurantCoords: endpoints.restaurantCoords,
+        customerCoords: endpoints.customerCoords,
+        reactNativeCoords: activeRoute?.reactNativeCoords || [],
+        leafletCoords: activeRoute?.leafletCoords || [],
+        distanceKm: activeRoute?.distanceKm ?? null,
+        durationMinutes: activeRoute?.durationMinutes ?? null,
+        steps: activeRoute?.steps || [],
+        source: activeRoute?.source || 'unavailable',
+        fallback: Boolean(activeRoute?.fallback),
+        fetchedAt: activeRoute?.fetchedAt || Date.now(),
+        previewRoute,
+      }
+    });
+  } catch (error) {
+    console.error('Get order route error:', error);
+    res.status(500).json({
       success: false,
       error: error.message
     });

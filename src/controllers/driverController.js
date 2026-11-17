@@ -1,13 +1,14 @@
 const Driver = require('../models/Driver');
 const Order = require('../models/Order');
 const db = require('../config/database'); // Required for the raw delivery_tracking SQL queries
+const { peekOrderCachedRoute } = require('../utils/routing');
 
 // Update driver location
 exports.updateLocation = async (req, res) => {
   try {
     const lat = Number(req.body.lat ?? req.body.latitude);
     const lng = Number(req.body.lng ?? req.body.longitude);
-    const { accuracy, speed, orderId } = req.body;
+    const { accuracy, speed, heading, orderId } = req.body;
     
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
       return res.status(400).json({
@@ -48,14 +49,17 @@ exports.updateLocation = async (req, res) => {
       if (orderId) targetOrderIds.add(orderId);
 
       targetOrderIds.forEach(targetId => {
+        const { route: cachedRoute } = peekOrderCachedRoute(targetId, { latitude: lat, longitude: lng });
         io.to(`order_${targetId}`).emit('driver_location', {
           driverId: driver.id,
           orderId: targetId,
           location: [lng, lat],
           latitude: lat,
           longitude: lng,
+          heading: Number.isFinite(Number(heading)) ? Number(heading) : null,
           accuracy: accuracy ?? null,
           speed: speed ?? null,
+          route: cachedRoute || null,
           timestamp: new Date().toISOString()
         });
       });
