@@ -170,6 +170,7 @@ async function fetchPaginatedOrders(restaurantIds, { status, date, page = 1, lim
       u.phone_number AS customer_phone,
       NULLIF(TRIM(COALESCE(du.first_name, '') || ' ' || COALESCE(du.last_name, '')), '') AS driver_name,
       du.phone_number AS driver_phone,
+      du.profile_image_url AS driver_image,
       d.vehicle_type AS driver_vehicle_type,
       d.vehicle_model AS driver_vehicle_model,
       d.vehicle_color AS driver_vehicle_color,

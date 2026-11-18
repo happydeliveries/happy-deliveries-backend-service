@@ -246,7 +246,15 @@
       <p class="sub">Manage your restaurant info, menus, dishes, and live customer orders.</p>
 
       <% if (locals.error) { %>
-      <div class="alert alert-error"><%= locals.error %></div>
+      <div class="alert alert-error">
+        <%= locals.error %>
+        <% if (locals.unverifiedEmail) { %>
+          <div style="margin-top:8px;">
+            <button type="button" onclick="resendPartnerVerification('<%= locals.unverifiedEmail %>', this)" style="background:#991b1b;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;">Resend Verification Email</button>
+            <span id="resendVerifyMsg" style="margin-left:8px;font-size:0.78rem;"></span>
+          </div>
+        <% } %>
+      </div>
       <% } %>
       <% if (locals.success) { %>
       <div class="alert alert-success"><%= locals.success %></div>
@@ -289,6 +297,25 @@
       </div>
     </div>
   </div>
+  <script>
+    async function resendPartnerVerification(email, btn) {
+      if (btn) btn.disabled = true;
+      const msg = document.getElementById('resendVerifyMsg');
+      try {
+        const res = await fetch('/api/auth/resend-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+        if (msg) msg.textContent = data.message || 'Verification email sent!';
+      } catch (_) {
+        if (msg) msg.textContent = 'Could not send email right now.';
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+  </script>
 </body>
 
 </html>

@@ -187,6 +187,20 @@ router.post('/api/applications', async (req, res) => {
     });
 
     try {
+      const { code, token } = await User.issueEmailVerification(created.user.id);
+      const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
+      const host = req.get('x-forwarded-host') || req.get('host');
+      const verifyUrl = `${proto}://${host}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+      await EmailService.sendEmailVerificationEmail(created.user, {
+        code,
+        verifyUrl,
+        portalLabel: 'Happy Deliveries Restaurant Partner Portal',
+      });
+    } catch (emailErr) {
+      console.warn('[POST /restaurant/api/applications verification email]', emailErr.message);
+    }
+
+    try {
       await EmailService.sendRestaurantApplicationReceivedEmail(created.user, created.restaurant);
     } catch (emailErr) {
       console.warn('[POST /restaurant/api/applications email]', emailErr.message);
@@ -206,7 +220,8 @@ router.post('/api/applications', async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Your restaurant application has been submitted! Happy Deliveries management will review it and email you once approved.',
+      requires_email_verification: true,
+      message: 'Application submitted! Please verify your email using the link sent to your inbox while Happy Deliveries management reviews your restaurant.',
       restaurant: created.restaurant,
     });
   } catch (err) {
@@ -285,6 +300,15 @@ router.post('/login', async (req, res) => {
         title: 'Restaurant Partner Login · Happy Deliveries',
         error: 'Invalid email or password.',
         success: null,
+      });
+    }
+
+    if (!user.email_verified) {
+      return res.render('restaurant/login', {
+        title: 'Restaurant Partner Login · Happy Deliveries',
+        error: 'Please verify your email address before signing in. Check your inbox for the verification link or code.',
+        success: null,
+        unverifiedEmail: user.email,
       });
     }
 

@@ -332,6 +332,7 @@ class Restaurant {
               u.first_name AS owner_first_name,
               u.last_name AS owner_last_name,
               u.phone_number AS owner_phone,
+              u.email_verified AS owner_email_verified,
               u.is_active AS owner_is_active
        FROM restaurants r
        JOIN restaurant_managers rm ON r.manager_id = rm.id
@@ -358,6 +359,7 @@ class Restaurant {
               u.first_name AS owner_first_name,
               u.last_name AS owner_last_name,
               u.phone_number AS owner_phone,
+              u.email_verified AS owner_email_verified,
               u.is_active AS owner_is_active,
               (SELECT COUNT(*)::int FROM menus m WHERE m.restaurant_id = r.id) AS menu_count,
               (SELECT COUNT(*)::int FROM menu_items mi WHERE mi.restaurant_id = r.id) AS item_count,
@@ -487,6 +489,7 @@ class Restaurant {
               u.first_name AS owner_first_name,
               u.last_name AS owner_last_name,
               u.phone_number AS owner_phone,
+              u.email_verified AS owner_email_verified,
               u.is_active AS owner_is_active,
               (SELECT COUNT(*)::int FROM menus m WHERE m.restaurant_id = r.id) AS menu_count,
               (SELECT COUNT(*)::int FROM menu_items mi WHERE mi.restaurant_id = r.id) AS item_count,
@@ -565,11 +568,12 @@ class Restaurant {
       reviewed_by: reviewerUserId,
     };
 
+    const canActivate = Boolean(existing.owner_email_verified);
     const ownerUserId = existing.owner_user_id || existing.owner_resolved_user_id;
     if (ownerUserId) {
       await db.query(
-        `UPDATE users SET is_active = true, email_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-        [ownerUserId]
+        `UPDATE users SET is_active = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        [ownerUserId, canActivate]
       );
     }
 
@@ -584,12 +588,12 @@ class Restaurant {
            rejection_reason = NULL,
            reviewed_at = CURRENT_TIMESTAMP,
            reviewed_by = $2,
-           is_active = true,
-           is_accepting_orders = true,
+           is_active = $4,
+           is_accepting_orders = $4,
            application_data = $3::jsonb,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1`,
-      [restaurantId, reviewerUserId, JSON.stringify(updatedMeta)]
+      [restaurantId, reviewerUserId, JSON.stringify(updatedMeta), canActivate]
     );
 
     return this.findByIdWithOwner(restaurantId);

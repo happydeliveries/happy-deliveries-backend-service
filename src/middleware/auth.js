@@ -41,6 +41,14 @@ const auth = async (req, res, next) => {
       });
     }
 
+    if (!user.email_verified) {
+      return res.status(403).json({
+        success: false,
+        code: 'EMAIL_NOT_VERIFIED',
+        error: 'Please verify your email address before using your account.'
+      });
+    }
+
     if (user.is_active === false) {
       return res.status(403).json({
         success: false,

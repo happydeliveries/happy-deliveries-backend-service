@@ -1637,6 +1637,8 @@ class Order {
                  du.first_name as driver_first_name,
                  du.last_name as driver_last_name,
                  du.phone_number as driver_phone,
+                 du.profile_image_url as driver_image,
+                 drv.vehicle_type as driver_vehicle_type,
                  COALESCE(
                    (SELECT SUM(oi.quantity)::int FROM order_items oi WHERE oi.order_id = o.id),
                    0

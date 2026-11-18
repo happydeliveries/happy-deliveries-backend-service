@@ -215,7 +215,7 @@ class Driver {
   static async findByUserId(userId) {
     await this.ensureApplicationColumns();
     const query = `
-      SELECT d.*, u.email, u.phone_number, u.first_name, u.last_name, u.is_active AS user_is_active, u.created_at AS user_created_at
+      SELECT d.*, u.email, u.phone_number, u.first_name, u.last_name, u.profile_image_url, u.email_verified, u.is_active AS user_is_active, u.created_at AS user_created_at
       FROM drivers d
       JOIN users u ON d.user_id = u.id
       WHERE d.user_id = $1
@@ -229,7 +229,7 @@ class Driver {
   static async findByIdWithUser(driverId) {
     await this.ensureApplicationColumns();
     const query = `
-      SELECT d.*, u.email, u.phone_number, u.first_name, u.last_name, u.is_active AS user_is_active, u.created_at AS user_created_at
+      SELECT d.*, u.email, u.phone_number, u.first_name, u.last_name, u.profile_image_url, u.email_verified, u.is_active AS user_is_active, u.created_at AS user_created_at
       FROM drivers d
       JOIN users u ON d.user_id = u.id
       WHERE d.id = $1
@@ -242,7 +242,7 @@ class Driver {
   static async findByEmailWithUser(email) {
     await this.ensureApplicationColumns();
     const query = `
-      SELECT d.*, u.email, u.phone_number, u.first_name, u.last_name, u.is_active AS user_is_active, u.created_at AS user_created_at
+      SELECT d.*, u.email, u.phone_number, u.first_name, u.last_name, u.profile_image_url, u.email_verified, u.is_active AS user_is_active, u.created_at AS user_created_at
       FROM drivers d
       JOIN users u ON d.user_id = u.id
       WHERE LOWER(u.email) = LOWER($1)
@@ -255,7 +255,7 @@ class Driver {
   static async getAllForManager(filters = {}) {
     await this.ensureApplicationColumns();
     const query = `
-      SELECT d.*, u.email, u.phone_number, u.first_name, u.last_name, u.is_active AS user_is_active, u.created_at AS user_created_at
+      SELECT d.*, u.email, u.phone_number, u.first_name, u.last_name, u.profile_image_url, u.email_verified, u.is_active AS user_is_active, u.created_at AS user_created_at
       FROM drivers d
       JOIN users u ON d.user_id = u.id
       ORDER BY d.created_at DESC
@@ -324,10 +324,11 @@ class Driver {
       reviewed_by: reviewerUserId,
     };
 
-    // Activate user login
+    // Activate user login ONLY if driver has verified their email address
+    const canActivate = Boolean(existing.email_verified);
     await db.query(
-      `UPDATE users SET is_active = true, email_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-      [existing.user_id]
+      `UPDATE users SET is_active = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      [existing.user_id, canActivate]
     );
 
     try {
@@ -453,12 +454,14 @@ class Driver {
     const vehModel = (updateData.vehicle_model || existing.vehicle_model).trim();
     const radius = parseInt(updateData.service_radius_km, 10) || existing.service_radius_km || 10;
 
-    if (updateData.first_name || updateData.last_name || updateData.phone_number) {
+    const newPhotoUrl = updateData.profile_image_url ? String(updateData.profile_image_url).trim() : null;
+    if (updateData.first_name || updateData.last_name || updateData.phone_number || newPhotoUrl) {
       await db.query(
         `UPDATE users
          SET first_name = COALESCE($2, first_name),
              last_name = COALESCE($3, last_name),
              phone_number = COALESCE($4, phone_number),
+             profile_image_url = COALESCE($5, profile_image_url),
              is_active = false,
              updated_at = CURRENT_TIMESTAMP
          WHERE id = $1`,
@@ -467,6 +470,7 @@ class Driver {
           updateData.first_name || null,
           updateData.last_name || null,
           updateData.phone_number || null,
+          newPhotoUrl,
         ]
       );
     }

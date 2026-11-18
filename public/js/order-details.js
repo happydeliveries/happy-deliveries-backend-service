@@ -351,11 +351,27 @@
            </div>
          </div>`;
     } else if (order.driver_name) {
+      const safeDriverImg = order.driver_image ? esc(order.driver_image) : '';
+      const driverInitials = esc(
+        order.driver_name
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((p) => p.charAt(0).toUpperCase())
+          .join('') || 'DR'
+      );
       driverHtml = `<div class="od-driver-card">
-           <div>
-             <div style="font-size:0.7rem;color:#1e3a8a;font-weight:800;">ASSIGNED DRIVER ${order.reassigned_at ? '· REASSIGNED' : ''}</div>
-             <div style="font-weight:800;font-size:0.94rem;">${esc(order.driver_name)}</div>
-             ${order.accepted_at ? `<div style="font-size:0.72rem;color:#3b82f6;">Accepted ${esc(relativeTime(order.accepted_at))}</div>` : ''}
+           <div style="display:flex;align-items:center;gap:12px;">
+             ${safeDriverImg
+               ? `<a href="${safeDriverImg}" target="_blank" rel="noopener noreferrer" title="View full driver photo" style="flex-shrink:0;">
+                    <img src="${safeDriverImg}" alt="${esc(order.driver_name)}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid #bfdbfe;background:#fff;">
+                  </a>`
+               : `<div style="width:52px;height:52px;border-radius:50%;background:#dbeafe;color:#1e3a8a;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.95rem;flex-shrink:0;">${driverInitials}</div>`}
+             <div>
+               <div style="font-size:0.7rem;color:#1e3a8a;font-weight:800;">ASSIGNED DRIVER ${order.reassigned_at ? '· REASSIGNED' : ''}</div>
+               <div style="font-weight:800;font-size:0.94rem;">${esc(order.driver_name)}</div>
+               ${order.accepted_at ? `<div style="font-size:0.72rem;color:#3b82f6;">Accepted ${esc(relativeTime(order.accepted_at))}</div>` : ''}
+             </div>
            </div>
            <div>
              <div style="font-size:0.7rem;color:#1e3a8a;font-weight:800;">PHONE</div>

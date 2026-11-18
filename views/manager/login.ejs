@@ -546,13 +546,21 @@
         <p class="login-subtitle">to access Restaurant Manager</p>
 
         <% if (locals.error) { %>
-        <div class="alert alert-danger">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" x2="12" y1="8" y2="12" />
-            <line x1="12" x2="12.01" y1="16" y2="16" />
-          </svg>
-          <%= locals.error %>
+        <div class="alert alert-danger" style="flex-direction:column;align-items:flex-start;">
+          <div style="display:flex;align-items:center;gap:0.625rem;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" x2="12" y1="8" y2="12" />
+              <line x1="12" x2="12.01" y1="16" y2="16" />
+            </svg>
+            <span><%= locals.error %></span>
+          </div>
+          <% if (locals.unverifiedEmail) { %>
+            <div style="margin-top:6px;">
+              <button type="button" onclick="resendManagerVerification('<%= locals.unverifiedEmail %>', this)" style="background:#991b1b;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;">Resend Verification Email</button>
+              <span id="resendMgrMsg" style="margin-left:8px;font-size:0.78rem;"></span>
+            </div>
+          <% } %>
         </div>
         <% } %>
 
@@ -737,6 +745,24 @@
       btnIcon.innerHTML = '<circle class="spinner" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="60" stroke-dashoffset="10"/>';
       submitBtn.disabled = true;
     });
+
+    async function resendManagerVerification(email, btn) {
+      if (btn) btn.disabled = true;
+      const msg = document.getElementById('resendMgrMsg');
+      try {
+        const res = await fetch('/api/auth/resend-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+        if (msg) msg.textContent = data.message || 'Verification email sent!';
+      } catch (_) {
+        if (msg) msg.textContent = 'Could not send email right now.';
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
   </script>
 </body>
 

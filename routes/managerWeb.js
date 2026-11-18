@@ -80,7 +80,7 @@ const {
     parseBool,
 } = require('../src/utils/restaurantAccess');
 const { attachManageRestaurantRoutes } = require('./manageRestaurantsWeb');
-const { handleSingleImageUpload } = require('../src/utils/imageUpload');
+const { handleSingleImageUpload, handleAvatarUpload } = require('../src/utils/imageUpload');
 
 // ─── Models (lazy-loaded to survive missing optional deps) ──
 const getModel = {
@@ -332,6 +332,23 @@ router.post('/login', async (req, res) => {
             return res.render('manager/login', {
                 title: 'Manager Login',
                 error: 'Invalid email or password',
+                success: null,
+            });
+        }
+
+        if (!user.email_verified) {
+            return res.render('manager/login', {
+                title: 'Manager Login',
+                error: 'Please verify your email address before signing in. Check your inbox for your verification code or link.',
+                success: null,
+                unverifiedEmail: user.email,
+            });
+        }
+
+        if (user.is_active === false) {
+            return res.render('manager/login', {
+                title: 'Manager Login',
+                error: 'Your manager account is currently inactive. Please contact an administrator.',
                 success: null,
             });
         }
@@ -2056,6 +2073,12 @@ router.put('/api/settings/password', isLoggedInApi, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
+ * POST /manager/api/driver-applications/upload-photo
+ * Public Cloudinary face photo upload used during driver onboarding.
+ */
+router.post('/api/driver-applications/upload-photo', handleAvatarUpload);
+
+/**
  * POST /manager/api/driver-applications
  * Public endpoint for prospective drivers to submit (or resubmit) their application.
  */
@@ -2067,6 +2090,7 @@ router.post('/api/driver-applications', async (req, res) => {
         const first_name = (b.first_name || '').trim();
         const last_name = (b.last_name || '').trim();
         const phone_number = (b.phone_number || '').trim();
+        const profile_image_url = (b.profile_image_url || '').trim();
         const driver_license_number = (b.driver_license_number || '').trim();
         const license_expiry_date = b.license_expiry_date || '';
         const vehicle_type = (b.vehicle_type || '').trim();
@@ -2117,8 +2141,18 @@ router.post('/api/driver-applications', async (req, res) => {
                 });
             }
 
+            if (!profile_image_url && !existingUser.profile_image_url) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Please upload a clear face photo before submitting your driver application.',
+                });
+            }
+
             const existingDriver = await Driver.findByUserId(existingUser.id);
             if (!existingDriver) {
+                if (profile_image_url) {
+                    await User.update(existingUser.id, { profile_image_url });
+                }
                 const createdProfile = await Driver.create(existingUser.id, {
                     ...b,
                     vehicle_Registration,
@@ -2145,8 +2179,24 @@ router.post('/api/driver-applications', async (req, res) => {
                 first_name,
                 last_name,
                 phone_number,
+                profile_image_url: profile_image_url || existingUser.profile_image_url || null,
                 vehicle_Registration,
             });
+
+            if (!existingUser.email_verified) {
+                try {
+                    const { code, token } = await User.issueEmailVerification(existingUser.id);
+                    const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
+                    const host = req.get('x-forwarded-host') || req.get('host');
+                    const verifyUrl = `${proto}://${host}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+                    await EmailService.sendEmailVerificationEmail(
+                        { ...existingUser, first_name, last_name, email },
+                        { code, verifyUrl, portalLabel: 'Happy Deliveries Driver Portal' }
+                    );
+                } catch (emailErr) {
+                    console.warn('[POST /api/driver-applications resubmit verify email]', emailErr.message);
+                }
+            }
 
             try {
                 await EmailService.sendDriverApplicationReceivedEmail(
@@ -2168,12 +2218,22 @@ router.post('/api/driver-applications', async (req, res) => {
             return res.json({
                 success: true,
                 resubmitted: true,
-                message: 'Your updated driver application has been resubmitted for review! You will receive an email once management reviews your updated details.',
+                requires_email_verification: !existingUser.email_verified,
+                message: !existingUser.email_verified
+                    ? 'Your updated application was submitted! Please also verify your email using the link sent to your inbox.'
+                    : 'Your updated driver application has been resubmitted for review! You will receive an email once management reviews your updated details.',
                 driver: updatedDriver,
             });
         }
 
-        // Create new driver user (inactive until manager approves)
+        if (!profile_image_url) {
+            return res.status(400).json({
+                success: false,
+                error: 'Please upload a clear face profile photo before submitting your driver application.',
+            });
+        }
+
+        // Create new driver user (unverified & inactive until email verified + manager approves)
         const newUser = await User.create({
             email,
             password,
@@ -2181,6 +2241,8 @@ router.post('/api/driver-applications', async (req, res) => {
             first_name,
             last_name,
             phone_number,
+            profile_image_url,
+            email_verified: false,
             is_active: false,
         });
 
@@ -2205,6 +2267,20 @@ router.post('/api/driver-applications', async (req, res) => {
         const fullDriver = await Driver.findByIdWithUser(createdDriver.id);
 
         try {
+            const { code, token } = await User.issueEmailVerification(newUser.id);
+            const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
+            const host = req.get('x-forwarded-host') || req.get('host');
+            const verifyUrl = `${proto}://${host}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+            await EmailService.sendEmailVerificationEmail(newUser, {
+                code,
+                verifyUrl,
+                portalLabel: 'Happy Deliveries Driver Portal',
+            });
+        } catch (emailErr) {
+            console.warn('[POST /api/driver-applications verification email]', emailErr.message);
+        }
+
+        try {
             await EmailService.sendDriverApplicationReceivedEmail(newUser, fullDriver);
         } catch (emailErr) {
             console.warn('[POST /api/driver-applications email]', emailErr.message);
@@ -2220,7 +2296,8 @@ router.post('/api/driver-applications', async (req, res) => {
 
         return res.status(201).json({
             success: true,
-            message: 'Your driver application has been submitted! Management will review your registration and email you once your account is approved.',
+            requires_email_verification: true,
+            message: 'Your driver application has been submitted! Please click the verification link sent to your email while management reviews your application.',
             driver: fullDriver,
         });
     } catch (err) {
@@ -2386,9 +2463,13 @@ router.post('/api/drivers/:id/approve', isLoggedInApi, async (req, res) => {
             });
         }
 
+        const pendingEmailVerify = !approvedDriver.email_verified;
         res.json({
             success: true,
-            message: `Driver account for ${approvedDriver.first_name} ${approvedDriver.last_name} has been approved and an email notification was sent to ${approvedDriver.email}.`,
+            pending_email_verification: pendingEmailVerify,
+            message: pendingEmailVerify
+                ? `Driver application for ${approvedDriver.first_name} ${approvedDriver.last_name} was approved, but the driver must still verify their email address (${approvedDriver.email}) before their account activates.`
+                : `Driver account for ${approvedDriver.first_name} ${approvedDriver.last_name} has been approved and an email notification was sent to ${approvedDriver.email}.`,
             driver: approvedDriver,
             emailResult,
         });

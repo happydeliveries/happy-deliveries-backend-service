@@ -199,6 +199,37 @@
     .settings-tab-btn.active { background: hsl(var(--primary)); color: #fff; border-color: hsl(var(--primary)); }
     .settings-pane { display: none; }
     .settings-pane.active { display: block; }
+
+    /* Ringing Incoming Order Banner & Topbar Sound Toggle */
+    .ring-toggle-btn {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.4rem 0.85rem; border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+      border: 1px solid #cbd5e1; background: #fff; color: #334155; cursor: pointer;
+    }
+    .ring-toggle-btn.enabled { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; }
+    .ring-toggle-btn.muted { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+
+    .incoming-ring-banner {
+      display: none; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+      background: linear-gradient(90deg, #b91c1c, #dc2626);
+      color: #fff; padding: 0.95rem 1.25rem; border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(185, 28, 28, 0.28);
+      animation: ringPulse 1.1s ease-in-out infinite alternate;
+    }
+    .incoming-ring-banner.active { display: flex; }
+    @keyframes ringPulse {
+      from { transform: scale(1); box-shadow: 0 8px 20px rgba(185, 28, 28, 0.28); }
+      to   { transform: scale(1.006); box-shadow: 0 12px 30px rgba(220, 38, 38, 0.45); }
+    }
+    .driver-mini-avatar {
+      width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
+      border: 2px solid #bfdbfe; background: #fff; flex-shrink: 0;
+    }
+    .driver-mini-initials {
+      width: 34px; height: 34px; border-radius: 50%; background: #dbeafe; color: #1e3a8a;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 0.75rem; flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -300,6 +331,9 @@
           <span class="dot-green"></span>
           <span id="socketStateText">Live Updates Active</span>
         </span>
+        <button type="button" class="ring-toggle-btn" id="ringAlertToggleBtn" onclick="toggleRingAlerts()" title="Tap to enable continuous phone ring alert for incoming orders & keep screen awake">
+          🔔 Enable Ring Sound
+        </button>
         <% if (supportContact && supportContact.support_phone) { %>
           <a href="tel:<%= supportContact.support_phone %>" class="btn btn-outline btn-sm" style="background:#fffbeb;border-color:#fcd34d;color:#92400e;font-weight:700;" title="Call Happy Dispatch Support if driver is delayed">
             🛡️ Happy Dispatch: <%= supportContact.support_phone %>
@@ -312,6 +346,19 @@
     </header>
 
     <div class="page-container">
+      <div class="incoming-ring-banner" id="incomingOrderRingBanner">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <span style="font-size:1.45rem;">📞</span>
+          <div>
+            <div style="font-weight:800;font-size:1rem;" id="incomingRingTitle">NEW ORDER WAITING FOR APPROVAL!</div>
+            <div style="font-size:0.82rem;opacity:0.92;" id="incomingRingSub">Accept or reject the incoming order to stop the kitchen ringtone.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+          <button type="button" class="btn btn-sm" style="background:#fff;color:#991b1b;font-weight:800;" onclick="switchSection('kitchen', '/restaurant/kitchen'); silenceOrderRinging();">View & Accept Order</button>
+          <button type="button" class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);" onclick="silenceOrderRinging()">Silence Ring</button>
+        </div>
+      </div>
       <!-- ════════════ SECTION 1: OVERVIEW ════════════ -->
       <section class="section-panel <%= activeSection === 'overview' ? 'active' : '' %>" id="sec-overview">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
@@ -694,23 +741,147 @@
     return labels[st] || st;
   }
 
-  function playAlertTone() {
+  let sharedAudioCtx = null;
+  let ringSoundEnabled = localStorage.getItem('happy_ring_sound') !== 'muted';
+  let ringLoopTimer = null;
+  let ringSilencedManually = false;
+  let currentPendingCount = 0;
+  let screenWakeLock = null;
+
+  function ensureAudioCtx() {
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtor) return null;
+    if (!sharedAudioCtx) sharedAudioCtx = new AudioCtor();
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume().catch(() => {});
+    }
+    return sharedAudioCtx;
+  }
+
+  async function acquireScreenWakeLock() {
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      [660, 880].forEach((freq, i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.12, ctx.currentTime + i * 0.14);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.14 + 0.25);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(ctx.currentTime + i * 0.14);
-        osc.stop(ctx.currentTime + i * 0.14 + 0.26);
-      });
+      if ('wakeLock' in navigator && !screenWakeLock) {
+        screenWakeLock = await navigator.wakeLock.request('screen');
+        screenWakeLock.addEventListener?.('release', () => { screenWakeLock = null; });
+      }
     } catch (_) {}
   }
+
+  function updateRingToggleButton() {
+    const btn = document.getElementById('ringAlertToggleBtn');
+    if (!btn) return;
+    if (!ringSoundEnabled) {
+      btn.className = 'ring-toggle-btn muted';
+      btn.textContent = '🔕 Ring Muted';
+      return;
+    }
+    const unlocked = sharedAudioCtx && sharedAudioCtx.state === 'running';
+    btn.className = unlocked ? 'ring-toggle-btn enabled' : 'ring-toggle-btn';
+    btn.textContent = unlocked ? '🔔 Ring Alert ON' : '🔔 Tap to Enable Ring';
+  }
+
+  function toggleRingAlerts() {
+    const ctx = ensureAudioCtx();
+    if (!ringSoundEnabled) {
+      ringSoundEnabled = true;
+      localStorage.setItem('happy_ring_sound', 'enabled');
+      ringSilencedManually = false;
+      acquireScreenWakeLock();
+      playAlertTone();
+      showToast('🔔 Order Ring Enabled', 'Incoming customer orders will ring aloud while this dashboard is open.');
+    } else if (!ctx || ctx.state !== 'running') {
+      acquireScreenWakeLock();
+      playAlertTone();
+      showToast('🔔 Ring Audio Unlocked', 'Kitchen ring alert & screen wake-lock are now active.');
+    } else {
+      ringSoundEnabled = false;
+      localStorage.setItem('happy_ring_sound', 'muted');
+      stopOrderRinging();
+      showToast('🔕 Order Ring Muted', 'Visual alerts remain active.');
+    }
+    updateRingToggleButton();
+  }
+
+  function playAlertTone() {
+    if (!ringSoundEnabled) return;
+    try {
+      navigator.vibrate?.([420, 140, 420]);
+    } catch (_) {}
+    try {
+      const ctx = ensureAudioCtx();
+      if (!ctx) return;
+      // Classic phone ring pattern: two brisk dual-tone warbles separated by a short pause
+      [0, 0.55].forEach((offset) => {
+        [784, 987.77].forEach((freq) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.001, ctx.currentTime + offset);
+          gain.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + offset + 0.03);
+          gain.gain.setValueAtTime(0.28, ctx.currentTime + offset + 0.34);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + offset + 0.42);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + offset);
+          osc.stop(ctx.currentTime + offset + 0.44);
+        });
+      });
+      updateRingToggleButton();
+    } catch (_) {}
+  }
+
+  function startOrderRinging(orderNumLabel) {
+    const banner = document.getElementById('incomingOrderRingBanner');
+    const titleEl = document.getElementById('incomingRingTitle');
+    if (banner) banner.classList.add('active');
+    if (titleEl && orderNumLabel) {
+      titleEl.textContent = `NEW ORDER #${orderNumLabel} WAITING FOR APPROVAL!`;
+    } else if (titleEl && currentPendingCount > 0) {
+      titleEl.textContent = `${currentPendingCount} PENDING ORDER${currentPendingCount === 1 ? '' : 'S'} WAITING FOR APPROVAL!`;
+    }
+    if (ringSilencedManually || !ringSoundEnabled) return;
+    playAlertTone();
+    if (!ringLoopTimer) {
+      ringLoopTimer = setInterval(() => {
+        if (currentPendingCount <= 0 || ringSilencedManually || !ringSoundEnabled) {
+          stopOrderRinging(false);
+          return;
+        }
+        playAlertTone();
+      }, 2600);
+    }
+  }
+
+  function stopOrderRinging(hideBanner = true) {
+    if (ringLoopTimer) {
+      clearInterval(ringLoopTimer);
+      ringLoopTimer = null;
+    }
+    if (hideBanner) {
+      document.getElementById('incomingOrderRingBanner')?.classList.remove('active');
+    }
+  }
+
+  function silenceOrderRinging() {
+    ringSilencedManually = true;
+    stopOrderRinging(true);
+  }
+
+  // Unlock Web Audio cleanly on the first tap/click anywhere on the dashboard
+  document.addEventListener('pointerdown', () => {
+    if (ringSoundEnabled) {
+      ensureAudioCtx();
+      acquireScreenWakeLock();
+      updateRingToggleButton();
+    }
+  }, { passive: true });
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && ringSoundEnabled) {
+      acquireScreenWakeLock();
+    }
+  });
 
   function showToast(title, subtitle) {
     const c = document.getElementById('toastContainer');
@@ -751,6 +922,22 @@
     if (section === 'settings') updateStoreMap();
   }
 
+  function renderDriverAvatarHtml(imageUrl, name) {
+    if (imageUrl) {
+      const safe = esc(imageUrl);
+      return `<a href="${safe}" target="_blank" rel="noopener noreferrer" title="View driver photo" style="flex-shrink:0;"><img src="${safe}" alt="${esc(name || 'Driver')}" class="driver-mini-avatar"></a>`;
+    }
+    const initials = esc(
+      String(name || 'DR')
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((p) => p.charAt(0).toUpperCase())
+        .join('') || 'DR'
+    );
+    return `<span class="driver-mini-initials">${initials}</span>`;
+  }
+
   function renderDriverSummaryCell(o) {
     const rescueInfo = typeof o.rescue_courier === 'string'
       ? (() => { try { return JSON.parse(o.rescue_courier); } catch { return null; } })()
@@ -767,11 +954,14 @@
     if (o.driver_name) {
       const veh = [o.driver_vehicle_color, o.driver_vehicle_model || o.driver_vehicle_type].filter(Boolean).join(' ');
       return `
-        <div>
-          <div style="font-weight:600;color:#1e40af;">🚗 ${esc(o.driver_name)}</div>
-          ${o.reassigned_at ? `<div style="font-size:0.7rem;color:#2563eb;font-weight:700;">REASSIGNED DRIVER</div>` : ''}
-          <div style="font-size:0.75rem;color:hsl(var(--muted-foreground));">${o.driver_phone ? `<a href="tel:${esc(o.driver_phone)}" style="color:#1d4ed8;">📞 ${esc(o.driver_phone)}</a>` : ''}</div>
-          ${veh || o.driver_vehicle_plate ? `<div style="font-size:0.74rem;color:#475569;">${esc(veh)} ${o.driver_vehicle_plate ? '· <strong>' + esc(o.driver_vehicle_plate) + '</strong>' : ''}</div>` : ''}
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${renderDriverAvatarHtml(o.driver_image, o.driver_name)}
+          <div>
+            <div style="font-weight:600;color:#1e40af;">${esc(o.driver_name)}</div>
+            ${o.reassigned_at ? `<div style="font-size:0.7rem;color:#2563eb;font-weight:700;">REASSIGNED DRIVER</div>` : ''}
+            <div style="font-size:0.75rem;color:hsl(var(--muted-foreground));">${o.driver_phone ? `<a href="tel:${esc(o.driver_phone)}" style="color:#1d4ed8;">📞 ${esc(o.driver_phone)}</a>` : ''}</div>
+            ${veh || o.driver_vehicle_plate ? `<div style="font-size:0.74rem;color:#475569;">${esc(veh)} ${o.driver_vehicle_plate ? '· <strong>' + esc(o.driver_vehicle_plate) + '</strong>' : ''}</div>` : ''}
+          </div>
         </div>
       `;
     }
@@ -919,10 +1109,13 @@
               }
               if (o.driver_name) {
                 return `
-                  <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:0.55rem 0.75rem;font-size:0.79rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:0.35rem;align-items:center;">
-                    <span>
-                      <strong>🚗 Driver:</strong> ${esc(o.driver_name)} ${o.driver_vehicle_plate ? `(${esc(o.driver_vehicle_plate)})` : ''}
-                      ${o.driver_phone ? ` · <a href="tel:${esc(o.driver_phone)}" style="color:#1d4ed8;font-weight:700;">📞 ${esc(o.driver_phone)}</a>` : ''}
+                  <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:0.55rem 0.75rem;font-size:0.79rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;align-items:center;">
+                    <span style="display:flex;align-items:center;gap:8px;">
+                      ${renderDriverAvatarHtml(o.driver_image, o.driver_name)}
+                      <span>
+                        <strong>Driver:</strong> ${esc(o.driver_name)} ${o.driver_vehicle_plate ? `(${esc(o.driver_vehicle_plate)})` : ''}
+                        ${o.driver_phone ? ` · <a href="tel:${esc(o.driver_phone)}" style="color:#1d4ed8;font-weight:700;">📞 ${esc(o.driver_phone)}</a>` : ''}
+                      </span>
                     </span>
                     ${SUPPORT_PHONE ? `<a href="tel:${esc(SUPPORT_PHONE)}" style="color:#92400e;font-weight:700;font-size:0.75rem;">🛡️ Call Happy</a>` : ''}
                   </div>`;
@@ -970,11 +1163,19 @@
       document.getElementById('ovMenusCount').textContent = s.menu_count || 0;
 
       const badge = document.getElementById('sidebarPendingBadge');
-      if (s.pending_orders > 0) {
+      const prevPending = currentPendingCount;
+      currentPendingCount = Number(s.pending_orders || 0);
+      if (currentPendingCount > 0) {
         badge.style.display = 'inline-flex';
-        badge.textContent = s.pending_orders;
+        badge.textContent = currentPendingCount;
+        if (currentPendingCount > prevPending) {
+          ringSilencedManually = false;
+        }
+        startOrderRinging();
       } else {
         badge.style.display = 'none';
+        ringSilencedManually = false;
+        stopOrderRinging(true);
       }
 
       const kitchenBadge = document.getElementById('sidebarKitchenBadge');
@@ -1261,11 +1462,17 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     if (window.innerWidth <= 820) document.getElementById('mobileMenuBtn').style.display = 'inline-flex';
+    updateRingToggleButton();
     refreshPortal();
     if ("<%= activeSection %>" === 'kitchen') loadKitchenOrders();
     if ("<%= activeSection %>" === 'orders') loadOrders(1);
     if ("<%= activeSection %>" === 'menus') loadMenus();
     if ("<%= activeSection %>" === 'settings') updateStoreMap();
+
+    // Safety fallback poll every 25s when visible so missed socket events still trigger kitchen ringtone
+    setInterval(() => {
+      if (!document.hidden) refreshPortal();
+    }, 25000);
 
     if (typeof io !== 'undefined') {
       const socket = io();
@@ -1274,7 +1481,9 @@
         document.getElementById('socketStateText').textContent = 'Live Connected';
       });
       socket.on('new_order', (payload) => {
-        playAlertTone();
+        ringSilencedManually = false;
+        currentPendingCount = Math.max(1, currentPendingCount + 1);
+        startOrderRinging(payload?.order_number || '');
         showToast('🔔 New Incoming Order!', `Order #${payload?.order_number || ''} requires your acceptance.`);
         refreshPortal();
         loadKitchenOrders();
